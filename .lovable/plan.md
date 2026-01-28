@@ -1,31 +1,34 @@
 
-# Additional Reporting Implementation Plan
+# Implementation Plan: Extended Reporting Suite for ICN Hub
 
 ## Overview
 
-Based on analysis of the existing ICN Hub codebase and inference from traditional infection control nursing tools, this plan adds **6 new operational reports** and **2 new executive reports** that align with common infection control workflows and regulatory requirements.
+This plan adds **6 new specialized reports** based on your infection control workflow requirements, plus wiring verification to ensure all buttons and functionality work correctly.
 
 ---
 
-## New Reports to Implement
+## Reports to Implement
 
-### Operational Reports (Day-to-Day Clinical Use)
+| # | Report Name | Purpose | Key Filters |
+|---|-------------|---------|-------------|
+| 1 | **Vaccination Snapshot Report** | Weekly snapshot of vaccinated residents (Pneumonia, Influenza, RSV, COVID) + smart logic for outdated flu vaccinations | Vaccine type, Date range |
+| 2 | **Standard of Care Weekly Report** | Date-range based report combining ABT started, IP started, and VAX declinations | Date range (weekly) |
+| 3 | **Follow-up/Overdue Notes Report** | Notes requiring follow-up with status and sign-off capability | Follow-up status filter |
+| 4 | **Monthly ABT Report** | All residents on antibiotics for a given month | Month selection |
+| 5 | **Medicare ABT Compliance Report** | ABT regimens with inappropriate/missing indications for bacterial infections | None (auto-flags issues) |
+| 6 | **IP Tracker Review Report** | IP cases due for review based on protocol cadence (EBP: 7 days, Isolation: 3 days) + review notes | Date range, Protocol |
 
-| Report | Purpose | Key Data |
-|--------|---------|----------|
-| **ABT Days of Therapy (DOT) Summary** | Antibiotic stewardship metric tracking | Medication, DOT by unit, trends |
-| **Overdue Review Worklist** | Consolidated view of all items needing attention | ABT, IP, and VAX overdue reviews |
-| **Unit Census & Precaution Summary** | Per-unit snapshot for charge nurses | Resident count, active precautions, pending vaccinations |
-| **Symptom Surveillance Log** | Track symptom patterns for early outbreak detection | Notes with symptoms, categorized by type |
-| **Contact Tracing Report** | Outbreak contact documentation | Exposure details, follow-up status |
-| **Line Listing Export** | Standard outbreak documentation format | CDC-style line listing for outbreak cases |
+---
 
-### Executive Reports (Management & Regulatory)
+## Data Flow for Each Report
 
-| Report | Purpose | Key Data |
-|--------|---------|----------|
-| **Antibiotic Utilization Report** | Stewardship program metrics for QAPI | Usage rates, indication distribution, DOT trends |
-| **Monthly Infection Summary** | High-level infection metrics | New cases, resolved, rates by category |
+```text
++---------------------+     +----------------------+     +------------------+
+|   Database Query    | --> | Report Generator     | --> | ReportPreview    |
+|   (filter by date,  |     | (format rows/headers)|     | (table display)  |
+|    status, type)    |     |                      |     | + PDF export     |
++---------------------+     +----------------------+     +------------------+
+```
 
 ---
 
@@ -35,147 +38,106 @@ Based on analysis of the existing ICN Hub codebase and inference from traditiona
 
 Add to `src/lib/reportGenerators.ts`:
 
+**Report 1: Vaccination Snapshot Report**
 ```text
-+-------------------------------+
-|  generateABTDOTSummary()      |  Aggregates days of therapy by medication, unit, and route
-+-------------------------------+
-|  generateOverdueReviewWorklist() |  Combines overdue ABT, IP, and VAX items
-+-------------------------------+
-|  generateUnitSummary()        |  Per-unit census with precaution counts
-+-------------------------------+
-|  generateSymptomSurveillance() |  Notes with symptoms filtered by date range
-+-------------------------------+
-|  generateContactTracingReport() |  Contact entries linked to line listings
-+-------------------------------+
-|  generateLineListingExport()  |  CDC-format outbreak documentation
-+-------------------------------+
-|  generateABTUtilization()     |  Monthly/quarterly ABT metrics with charts
-+-------------------------------+
-|  generateMonthlyInfectionSummary() |  Aggregated infection data with trends
-+-------------------------------+
+generateVaxSnapshotReport(db, fromDate, toDate, vaccineType)
+- Filters VAX records with dateGiven within date range
+- Groups by vaccine type (Pneumonia, Influenza, RSV, COVID)
+- Smart logic: flags influenza vaccinations older than current flu season (Oct-Mar cycle)
+- Headers: Resident | Unit/Room | Vaccine | Date Given | Status | Notes
+```
+
+**Report 2: Standard of Care Weekly Report**
+```text
+generateStandardOfCareReport(db, fromDate, toDate)
+- Section 1: ABT regimens with startDate in range
+- Section 2: IP cases with onsetDate in range
+- Section 3: VAX records with status='declined' in range
+- Headers vary by section; combined into one output
+```
+
+**Report 3: Follow-up/Overdue Notes Report**
+```text
+generateFollowUpNotesReport(db, statusFilter)
+- Filters notes where requiresFollowUp=true
+- Sorts by followUpDate (overdue first)
+- Includes sign-off status column
+- Headers: Date | Resident | Unit/Room | Note | Follow-up Date | Status | Completed By
+```
+
+**Report 4: Monthly ABT Report**
+```text
+generateMonthlyABTReport(db, month, year)
+- All ABT records active during the selected month
+- Includes records where startDate <= month end AND (endDate >= month start OR endDate is null)
+- Headers: Resident | Unit/Room | Medication | Dose | Route | Indication | Start | End | Days
+```
+
+**Report 5: Medicare ABT Compliance Report**
+```text
+generateMedicareABTComplianceReport(db)
+- Flags ABT records with:
+  - Missing indication
+  - Indication containing "prophylaxis" without documented bacterial source
+  - Duration > 14 days without documented reassessment
+- Headers: Resident | Medication | Indication | Start | Duration | Compliance Issue
+```
+
+**Report 6: IP Tracker Review Report**
+```text
+generateIPReviewReport(db, fromDate, toDate)
+- Calculates review due dates based on protocol:
+  - EBP: every 7 days from onset
+  - Isolation: every 3 days from onset
+- Shows cases with nextReviewDate within date range
+- Includes review notes column for input tracking
+- Headers: Resident | Unit/Room | Protocol | Infection | Onset | Last Review | Next Due | Review Notes
 ```
 
 ### 2. Update ReportsView Component
 
 Modifications to `src/components/views/ReportsView.tsx`:
 
-- Add new reports to `operationalReports` array
-- Add new reports to `executiveReports` array
-- Add handler cases in `handleGenerateReport()` switch statement
-- Create chart data structures for utilization reports (similar to existing `InfectionTrendReport`)
+**Add to `operationalReports` array:**
+```typescript
+{ id: 'vax_snapshot', name: 'Vaccination Snapshot', description: 'Weekly vaccination status with flu season logic' },
+{ id: 'standard_of_care', name: 'Standard of Care Report', description: 'Weekly ABT, IP, VAX declinations by date range' },
+{ id: 'followup_notes', name: 'Follow-up Notes Report', description: 'Overdue and pending follow-up items' },
+{ id: 'monthly_abt', name: 'Monthly ABT Report', description: 'Residents on antibiotics for selected month' },
+{ id: 'medicare_compliance', name: 'Medicare ABT Compliance', description: 'Flag inappropriate antibiotic indications' },
+{ id: 'ip_review', name: 'IP Review Worklist', description: 'Cases due for review by protocol cadence' },
+```
 
-### 3. New PDF Templates (Optional Enhancement)
+**Update `handleGenerateReport()` switch statement:**
+- Add cases for each new report ID
+- Wire to corresponding generator functions
 
-Create specialized PDF builders for high-priority operational reports:
-- `src/lib/pdf/lineListingPdf.ts` - CDC-style line listing format
-- `src/lib/pdf/overdueWorklistPdf.ts` - Action-oriented overdue items list
+**Add new filter controls:**
+- Month/Year selector for Monthly ABT Report
+- Follow-up status dropdown for Notes Report
+- Vaccine type selector for Vaccination Snapshot
 
----
+### 3. Flu Season Smart Logic
 
-## Report Specifications
+Add helper function for outdated influenza detection:
+```typescript
+const isInfluenzaOutdated = (dateGiven: string): boolean => {
+  // Flu season: October 1 - March 31
+  const given = new Date(dateGiven);
+  const now = new Date();
+  const currentSeasonStart = now.getMonth() >= 9 
+    ? new Date(now.getFullYear(), 9, 1)  // Oct of current year
+    : new Date(now.getFullYear() - 1, 9, 1); // Oct of previous year
+  
+  return given < currentSeasonStart;
+};
+```
 
-### ABT Days of Therapy Summary
+### 4. IP Review Notes Integration
 
-**Purpose**: Track antibiotic stewardship metrics
-
-**Headers**: Medication | Route | Active Courses | Total DOT | Avg DOT | Most Common Indication
-
-**Data Source**: `db.records.abx` aggregated by medication
-
-**Filters**: Date range, Unit
-
----
-
-### Overdue Review Worklist
-
-**Purpose**: Single consolidated view of all items requiring immediate attention
-
-**Headers**: Type | Resident | Unit/Room | Item | Due Date | Days Overdue | Priority
-
-**Data Sources**:
-- ABT records with `nextReviewDate` < today
-- IP cases with `nextReviewDate` < today  
-- VAX records with status 'overdue'
-
-**Sorting**: Priority (most overdue first)
-
----
-
-### Unit Census & Precaution Summary
-
-**Purpose**: Quick reference for charge nurses on unit status
-
-**Headers**: Unit | Active Residents | On Precautions | On ABT | VAX Due | Notes (24h)
-
-**Data Source**: Aggregated from census, IP cases, ABT, VAX, and notes
-
-**Output**: One row per unit with counts
-
----
-
-### Symptom Surveillance Log
-
-**Purpose**: Early outbreak detection through symptom pattern tracking
-
-**Headers**: Date | Resident | Unit/Room | Category | Symptoms | Notes | Follow-up Status
-
-**Data Source**: `db.records.notes` with `symptoms` array
-
-**Filters**: Date range, Symptom category (respiratory, GI, skin, UTI)
-
----
-
-### Contact Tracing Report
-
-**Purpose**: Document exposure tracking for outbreak investigation
-
-**Headers**: Case Resident | Outbreak | Contact Name | Type | Exposure Date | Exposure Type | Follow-up Status
-
-**Data Source**: `db.records.contacts` joined with `db.records.line_listings`
-
-**Filters**: Outbreak selection, Date range
-
----
-
-### Line Listing Export
-
-**Purpose**: CDC-standard outbreak documentation
-
-**Headers**: Case # | Room | Name | Unit | Onset Date | Symptoms | Lab Results | Outcome | Resolution Date
-
-**Data Source**: `db.records.line_listings` filtered by outbreak
-
-**Format**: Follows CDC line listing template structure
-
----
-
-### Antibiotic Utilization Report
-
-**Purpose**: QAPI/stewardship program metrics
-
-**Sections**:
-1. Summary metrics (total courses, DOT, rate per 100 residents)
-2. Top 5 medications by usage
-3. Indication distribution (pie chart data)
-4. Route breakdown (IV vs PO)
-5. Monthly trend data (line chart)
-
-**Chart Data**: Similar to existing `TrendDataPoint` structure
-
----
-
-### Monthly Infection Summary
-
-**Purpose**: Executive overview of infection control program
-
-**Sections**:
-1. New infections this month vs previous
-2. Infection rate per 100 residents
-3. Breakdown by infection type
-4. Resolution rate
-5. Average days on precautions
-
-**Chart Data**: Month-over-month comparison data
+Extend IPCase type to support review tracking:
+- Add `lastReviewDate` and `reviewNotes` fields
+- Update IP Review Report to display/edit review notes inline
 
 ---
 
@@ -183,25 +145,47 @@ Create specialized PDF builders for high-priority operational reports:
 
 | File | Changes |
 |------|---------|
-| `src/lib/reportGenerators.ts` | Add 8 new generator functions (~400 lines) |
-| `src/components/views/ReportsView.tsx` | Add new reports to arrays, update switch statement (~80 lines) |
-| `src/lib/pdf/lineListingPdf.ts` | New file - CDC line listing PDF template (~150 lines) |
+| `src/lib/reportGenerators.ts` | Add 6 new generator functions (~350 lines) |
+| `src/components/views/ReportsView.tsx` | Add new reports to arrays, update switch, add filter UI (~120 lines) |
+| `src/lib/types.ts` | Add optional `lastReviewDate`, `reviewNotes` to IPCase (4 lines) |
+
+---
+
+## Wiring Verification Checklist
+
+After implementation, the following will be tested:
+
+1. **Report Generation Buttons** - Each "Generate" button produces correct output
+2. **Export Buttons** - PDF, CSV, JSON, HTML exports work for all reports
+3. **Print Button** - Opens print dialog with correct formatting
+4. **Filter Controls** - Unit, Date range, Vaccine type filters work correctly
+5. **Quick Stats** - Clicking dashboard stats generates corresponding report
+6. **Report Preview** - Table renders correctly with proper headers and data
 
 ---
 
 ## Implementation Order
 
-1. **Core report generators** - Add all 8 new functions to `reportGenerators.ts`
-2. **ReportsView integration** - Wire up new reports in the UI
-3. **Testing** - Verify each report generates correctly with sample data
-4. **PDF templates** - Add specialized PDF builders for line listing
+1. **Add report generators** to `reportGenerators.ts`
+2. **Update ReportsView** with new reports and handlers
+3. **Add filter UI components** (month selector, vaccine type, follow-up status)
+4. **Test each report** with sample data
+5. **Verify all button wiring** and export functionality
 
 ---
 
-## Technical Notes
+## Example: Monthly ABT Report Output
 
-- All new reports follow the existing `ReportData` interface structure
-- Chart-based reports extend `InfectionTrendReport` pattern with `chartData` array
-- Date filtering uses existing `date-fns` utilities already imported
-- Unit filtering reuses existing pattern from `generateDailyPrecautionList`
-- PDF generation uses existing jspdf/autotable infrastructure
+| Resident | Unit/Room | Medication | Dose | Route | Indication | Start | End | Days |
+|----------|-----------|------------|------|-------|------------|-------|-----|------|
+| SMITH, JOHN | Unit 2 / 201 | Amoxicillin | 500mg | PO | UTI | 01/15/26 | 01/22/26 | 7 |
+| DOE, JANE | Unit 3 / 305 | Levofloxacin | 750mg | IV | Pneumonia | 01/20/26 | Ongoing | 8 |
+
+---
+
+## Example: IP Review Worklist Output
+
+| Resident | Unit/Room | Protocol | Infection | Onset | Last Review | Next Due | Review Notes |
+|----------|-----------|----------|-----------|-------|-------------|----------|--------------|
+| JONES, MARY | Unit 2 / 210 | Isolation | COVID | 01/25/26 | 01/25/26 | 01/28/26 | Initial precautions in place |
+| BROWN, BOB | Unit 4 / 401 | EBP | Flu A | 01/21/26 | 01/21/26 | 01/28/26 | Continue monitoring |
