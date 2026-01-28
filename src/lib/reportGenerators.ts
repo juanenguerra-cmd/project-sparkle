@@ -1,7 +1,7 @@
 // Report Generation Functions for ICN Hub
-import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue } from './database';
-import { IPCase, ABTRecord, VaxRecord, Resident } from './types';
-import { differenceInDays, format } from 'date-fns';
+import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents } from './database';
+import { IPCase, ABTRecord, VaxRecord, Resident, Note } from './types';
+import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays } from 'date-fns';
 
 export interface ReportData {
   title: string;
@@ -683,6 +683,600 @@ export const generateComplianceCrosswalk = (db: ICNDatabase): ReportData => {
     rows,
     footer: {
       disclaimer: 'Compliance status is based on current data in the system. Manual verification of documentation is recommended before survey.'
+    }
+  };
+};
+
+// ============ NEW REPORTS ============
+
+// Helper: Check if influenza vaccination is outdated (not in current flu season)
+const isInfluenzaOutdated = (dateGiven: string): boolean => {
+  if (!dateGiven) return true;
+  const given = new Date(dateGiven);
+  const now = new Date();
+  // Flu season: October 1 - March 31
+  // If we're in Oct-Dec, current season started this Oct
+  // If we're in Jan-Sep, current season started last Oct
+  const currentSeasonStart = now.getMonth() >= 9 
+    ? new Date(now.getFullYear(), 9, 1)  // Oct 1 of current year
+    : new Date(now.getFullYear() - 1, 9, 1); // Oct 1 of previous year
+  
+  return given < currentSeasonStart;
+};
+
+// Helper: Get flu season display string
+const getFluSeasonDisplay = (dateGiven: string): string => {
+  if (!dateGiven) return 'Not vaccinated';
+  const given = new Date(dateGiven);
+  // Determine which season the vaccination belongs to
+  const year = given.getMonth() >= 9 ? given.getFullYear() : given.getFullYear() - 1;
+  return `${year}-${year + 1} Season`;
+};
+
+// Report 1: Vaccination Snapshot Report
+export const generateVaxSnapshotReport = (
+  db: ICNDatabase,
+  fromDate?: string,
+  toDate?: string,
+  vaccineType: string = 'all'
+): ReportData => {
+  const allVax = db.records.vax;
+  const activeResidents = Object.values(db.census.residentsByMrn).filter(r => r.active_on_census);
+  
+  // Filter by date range if provided
+  let filtered = allVax.filter(v => {
+    const dateGiven = v.dateGiven || v.date_given;
+    if (!dateGiven) return false;
+    
+    // Only include given vaccinations
+    if (v.status !== 'given') return false;
+    
+    // Check resident is still active
+    if (!db.census.residentsByMrn[v.mrn]?.active_on_census) return false;
+    
+    if (fromDate && dateGiven < fromDate) return false;
+    if (toDate && dateGiven > toDate) return false;
+    
+    return true;
+  });
+  
+  // Filter by vaccine type
+  if (vaccineType !== 'all') {
+    filtered = filtered.filter(v => {
+      const vaccine = (v.vaccine || v.vaccine_type || '').toLowerCase();
+      return vaccine.includes(vaccineType.toLowerCase());
+    });
+  }
+  
+  // Sort by date given (most recent first)
+  const sorted = [...filtered].sort((a, b) => {
+    const dateA = a.dateGiven || a.date_given || '';
+    const dateB = b.dateGiven || b.date_given || '';
+    return dateB.localeCompare(dateA);
+  });
+  
+  const rows = sorted.map(record => {
+    const resident = db.census.residentsByMrn[record.mrn];
+    const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+    const vaccine = record.vaccine || record.vaccine_type || '';
+    const dateGiven = record.dateGiven || record.date_given || '';
+    const isOutdated = vaccine.toLowerCase().includes('flu') && isInfluenzaOutdated(dateGiven);
+    const seasonInfo = vaccine.toLowerCase().includes('flu') ? getFluSeasonDisplay(dateGiven) : '';
+    
+    return [
+      residentName,
+      `${record.unit} / ${record.room}`,
+      vaccine,
+      dateGiven ? format(new Date(dateGiven), 'MM/dd/yyyy') : 'N/A',
+      isOutdated ? 'OUTDATED' : record.status.toUpperCase(),
+      seasonInfo || record.notes || ''
+    ];
+  });
+  
+  // Add summary section for outdated flu vaccinations
+  const fluVax = allVax.filter(v => 
+    (v.vaccine || v.vaccine_type || '').toLowerCase().includes('flu') && 
+    v.status === 'given' &&
+    db.census.residentsByMrn[v.mrn]?.active_on_census
+  );
+  const outdatedFlu = fluVax.filter(v => isInfluenzaOutdated(v.dateGiven || v.date_given || ''));
+  
+  return {
+    title: 'VACCINATION SNAPSHOT REPORT',
+    subtitle: `Weekly Vaccination Status with Flu Season Logic`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      fromDate: fromDate || 'All time',
+      toDate: toDate || 'Present',
+      vaccineType: vaccineType === 'all' ? 'All Types' : vaccineType,
+      date: format(new Date(), 'MM/dd/yyyy'),
+      note: outdatedFlu.length > 0 ? `⚠️ ${outdatedFlu.length} residents need flu vaccination offer for current season` : ''
+    },
+    headers: ['Resident', 'Unit/Room', 'Vaccine', 'Date Given', 'Status', 'Notes'],
+    rows,
+    footer: {
+      disclaimer: 'Influenza vaccinations are flagged as OUTDATED if given before the current flu season (Oct-Mar cycle). These residents should be offered vaccination for the current/upcoming season.'
+    }
+  };
+};
+
+// Report 2: Standard of Care Weekly Report
+export const generateStandardOfCareReport = (
+  db: ICNDatabase,
+  fromDate: string,
+  toDate: string
+): ReportData => {
+  const rows: string[][] = [];
+  
+  // Section 1: ABT regimens started within date range
+  const abtStarted = db.records.abx.filter(r => {
+    const start = r.startDate || r.start_date || '';
+    if (!start) return false;
+    return start >= fromDate && start <= toDate;
+  });
+  
+  rows.push(['=== ANTIBIOTIC REGIMENS STARTED ===', '', '', '', '', '']);
+  if (abtStarted.length === 0) {
+    rows.push(['No new antibiotic regimens in this period', '', '', '', '', '']);
+  } else {
+    abtStarted.forEach(record => {
+      const resident = db.census.residentsByMrn[record.mrn];
+      const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+      const medication = record.medication || record.med_name || '';
+      const startDate = record.startDate || record.start_date || '';
+      
+      rows.push([
+        'ABT',
+        residentName,
+        `${record.unit} / ${record.room}`,
+        medication,
+        startDate ? format(new Date(startDate), 'MM/dd/yyyy') : '',
+        record.indication || ''
+      ]);
+    });
+  }
+  
+  rows.push(['', '', '', '', '', '']);
+  
+  // Section 2: IP cases started within date range
+  const ipStarted = db.records.ip_cases.filter(c => {
+    const onset = c.onsetDate || c.onset_date || '';
+    if (!onset) return false;
+    return onset >= fromDate && onset <= toDate;
+  });
+  
+  rows.push(['=== ISOLATION/PRECAUTION CASES STARTED ===', '', '', '', '', '']);
+  if (ipStarted.length === 0) {
+    rows.push(['No new IP cases in this period', '', '', '', '', '']);
+  } else {
+    ipStarted.forEach(ipCase => {
+      const resident = db.census.residentsByMrn[ipCase.mrn];
+      const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
+      const onsetDate = ipCase.onsetDate || ipCase.onset_date || '';
+      
+      rows.push([
+        'IP',
+        residentName,
+        `${ipCase.unit} / ${ipCase.room}`,
+        ipCase.protocol,
+        onsetDate ? format(new Date(onsetDate), 'MM/dd/yyyy') : '',
+        ipCase.infectionType || ipCase.infection_type || ''
+      ]);
+    });
+  }
+  
+  rows.push(['', '', '', '', '', '']);
+  
+  // Section 3: VAX declinations within date range
+  const vaxDeclined = db.records.vax.filter(v => {
+    if (v.status !== 'declined') return false;
+    const date = v.dateGiven || v.date_given || v.dueDate || v.due_date || '';
+    if (!date) return false;
+    return date >= fromDate && date <= toDate;
+  });
+  
+  rows.push(['=== VACCINATION DECLINATIONS ===', '', '', '', '', '']);
+  if (vaxDeclined.length === 0) {
+    rows.push(['No vaccination declinations in this period', '', '', '', '', '']);
+  } else {
+    vaxDeclined.forEach(record => {
+      const resident = db.census.residentsByMrn[record.mrn];
+      const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+      const vaccine = record.vaccine || record.vaccine_type || '';
+      const date = record.dueDate || record.due_date || record.dateGiven || record.date_given || '';
+      
+      rows.push([
+        'VAX',
+        residentName,
+        `${record.unit} / ${record.room}`,
+        vaccine,
+        date ? format(new Date(date), 'MM/dd/yyyy') : '',
+        'DECLINED'
+      ]);
+    });
+  }
+  
+  return {
+    title: 'STANDARD OF CARE WEEKLY REPORT',
+    subtitle: 'ABT Started, IP Cases, and VAX Declinations',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      fromDate: format(new Date(fromDate), 'MM/dd/yyyy'),
+      toDate: format(new Date(toDate), 'MM/dd/yyyy'),
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Type', 'Resident', 'Unit/Room', 'Item', 'Date', 'Details'],
+    rows,
+    footer: {
+      disclaimer: 'Weekly standard of care documentation for quality assurance and regulatory compliance.'
+    }
+  };
+};
+
+// Report 3: Follow-up/Overdue Notes Report
+export const generateFollowUpNotesReport = (
+  db: ICNDatabase,
+  statusFilter: string = 'all'
+): ReportData => {
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  
+  // Filter notes that require follow-up
+  let followUpNotes = db.records.notes.filter(n => n.requiresFollowUp === true);
+  
+  // Apply status filter
+  if (statusFilter !== 'all') {
+    followUpNotes = followUpNotes.filter(n => n.followUpStatus === statusFilter);
+  }
+  
+  // Sort by follow-up date (overdue first, then by date)
+  const sorted = [...followUpNotes].sort((a, b) => {
+    const dateA = a.followUpDate || '';
+    const dateB = b.followUpDate || '';
+    
+    // Overdue items first
+    const aOverdue = dateA && dateA < todayStr;
+    const bOverdue = dateB && dateB < todayStr;
+    
+    if (aOverdue && !bOverdue) return -1;
+    if (!aOverdue && bOverdue) return 1;
+    
+    return dateA.localeCompare(dateB);
+  });
+  
+  const rows = sorted.map(note => {
+    const resident = db.census.residentsByMrn[note.mrn];
+    const residentName = note.residentName || note.name || resident?.name || 'Unknown';
+    const noteDate = note.createdAt || note.created_at || '';
+    const followUpDate = note.followUpDate || '';
+    const isOverdue = followUpDate && followUpDate < todayStr && note.followUpStatus !== 'completed';
+    const daysOverdue = followUpDate && isOverdue 
+      ? differenceInDays(today, new Date(followUpDate))
+      : 0;
+    
+    const statusDisplay = note.followUpStatus === 'completed' 
+      ? '✓ COMPLETED' 
+      : note.followUpStatus === 'escalated'
+        ? '⚠️ ESCALATED'
+        : isOverdue 
+          ? `🔴 OVERDUE (${daysOverdue}d)`
+          : '⏳ PENDING';
+    
+    return [
+      noteDate ? format(new Date(noteDate), 'MM/dd/yyyy') : '',
+      residentName,
+      `${note.unit} / ${note.room}`,
+      note.text.length > 50 ? note.text.substring(0, 50) + '...' : note.text,
+      followUpDate ? format(new Date(followUpDate), 'MM/dd/yyyy') : 'No date set',
+      statusDisplay,
+      note.followUpNotes || ''
+    ];
+  });
+  
+  // Count summaries
+  const overdue = sorted.filter(n => n.followUpDate && n.followUpDate < todayStr && n.followUpStatus !== 'completed').length;
+  const pending = sorted.filter(n => n.followUpStatus === 'pending' || !n.followUpStatus).length;
+  const completed = sorted.filter(n => n.followUpStatus === 'completed').length;
+  
+  return {
+    title: 'FOLLOW-UP NOTES REPORT',
+    subtitle: `Overdue: ${overdue} | Pending: ${pending} | Completed: ${completed}`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      status: statusFilter === 'all' ? 'All Statuses' : statusFilter.toUpperCase(),
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Note Date', 'Resident', 'Unit/Room', 'Note Summary', 'Follow-up Date', 'Status', 'Sign-off Notes'],
+    rows,
+    footer: {
+      disclaimer: 'Items marked as OVERDUE require immediate attention. Sign-off notes should document completion of follow-up actions.'
+    }
+  };
+};
+
+// Report 4: Monthly ABT Report
+export const generateMonthlyABTReport = (
+  db: ICNDatabase,
+  month: number,
+  year: number
+): ReportData => {
+  const monthStart = startOfMonth(new Date(year, month));
+  const monthEnd = endOfMonth(new Date(year, month));
+  const monthStartStr = format(monthStart, 'yyyy-MM-dd');
+  const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
+  
+  // Find all ABT records active during the selected month
+  // Active means: startDate <= month end AND (endDate >= month start OR endDate is null/ongoing)
+  const activeInMonth = db.records.abx.filter(r => {
+    const startDate = r.startDate || r.start_date || '';
+    const endDate = r.endDate || r.end_date || '';
+    
+    if (!startDate) return false;
+    
+    // Started before or during the month
+    if (startDate > monthEndStr) return false;
+    
+    // Still active during the month (no end date or end date >= month start)
+    if (endDate && endDate < monthStartStr) return false;
+    
+    return true;
+  });
+  
+  // Sort by start date
+  const sorted = [...activeInMonth].sort((a, b) => {
+    const dateA = a.startDate || a.start_date || '';
+    const dateB = b.startDate || b.start_date || '';
+    return dateA.localeCompare(dateB);
+  });
+  
+  const rows = sorted.map(record => {
+    const resident = db.census.residentsByMrn[record.mrn];
+    const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+    const medication = record.medication || record.med_name || '';
+    const startDate = record.startDate || record.start_date || '';
+    const endDate = record.endDate || record.end_date || '';
+    const days = record.daysOfTherapy || record.tx_days || 
+      (startDate ? differenceInDays(endDate ? new Date(endDate) : new Date(), new Date(startDate)) + 1 : 'N/A');
+    
+    return [
+      residentName,
+      `${record.unit} / ${record.room}`,
+      medication,
+      record.dose,
+      record.route,
+      record.indication || '',
+      startDate ? format(new Date(startDate), 'MM/dd/yyyy') : '',
+      endDate ? format(new Date(endDate), 'MM/dd/yyyy') : 'Ongoing',
+      days.toString()
+    ];
+  });
+  
+  return {
+    title: 'MONTHLY ANTIBIOTIC REPORT',
+    subtitle: `Residents on Antibiotics - ${format(monthStart, 'MMMM yyyy')}`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      month: format(monthStart, 'MMMM yyyy'),
+      totalCourses: sorted.length.toString(),
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Resident', 'Unit/Room', 'Medication', 'Dose', 'Route', 'Indication', 'Start', 'End', 'Days'],
+    rows,
+    footer: {
+      disclaimer: 'Report includes all antibiotic courses that were active at any point during the selected month.'
+    }
+  };
+};
+
+// Report 5: Medicare ABT Compliance Report
+export const generateMedicareABTComplianceReport = (db: ICNDatabase): ReportData => {
+  const allABT = db.records.abx;
+  const today = new Date();
+  
+  // Flag records with compliance issues
+  const flaggedRecords: Array<{ record: ABTRecord; issues: string[] }> = [];
+  
+  allABT.forEach(record => {
+    const issues: string[] = [];
+    const indication = (record.indication || '').toLowerCase();
+    const startDate = record.startDate || record.start_date || '';
+    const endDate = record.endDate || record.end_date || '';
+    
+    // Issue 1: Missing indication
+    if (!indication || indication.trim() === '') {
+      issues.push('Missing indication');
+    }
+    
+    // Issue 2: Prophylaxis without documented bacterial source
+    if (indication.includes('prophylaxis') && !indication.includes('surg') && !indication.includes('peri')) {
+      const hasSource = indication.includes('uti') || indication.includes('wound') || 
+                       indication.includes('pneumonia') || indication.includes('cellulitis') ||
+                       indication.includes('sepsis');
+      if (!hasSource) {
+        issues.push('Prophylaxis without documented bacterial source');
+      }
+    }
+    
+    // Issue 3: Duration > 14 days without reassessment
+    if (startDate) {
+      const durationDays = endDate 
+        ? differenceInDays(new Date(endDate), new Date(startDate))
+        : differenceInDays(today, new Date(startDate));
+      
+      if (durationDays > 14) {
+        // Check if there are review notes indicating reassessment
+        const hasReassessment = record.notes && (
+          record.notes.toLowerCase().includes('reassess') ||
+          record.notes.toLowerCase().includes('reviewed') ||
+          record.notes.toLowerCase().includes('continue per') ||
+          record.notes.toLowerCase().includes('extended')
+        );
+        
+        if (!hasReassessment) {
+          issues.push(`Duration ${durationDays} days - needs documented reassessment`);
+        }
+      }
+    }
+    
+    // Issue 4: Vague or inappropriate indications
+    const vagueTerms = ['infection', 'prophylaxis', 'prevention', 'other'];
+    if (vagueTerms.some(term => indication === term)) {
+      issues.push('Vague indication - needs specific diagnosis');
+    }
+    
+    if (issues.length > 0) {
+      flaggedRecords.push({ record, issues });
+    }
+  });
+  
+  const rows = flaggedRecords.map(({ record, issues }) => {
+    const resident = db.census.residentsByMrn[record.mrn];
+    const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+    const medication = record.medication || record.med_name || '';
+    const startDate = record.startDate || record.start_date || '';
+    const endDate = record.endDate || record.end_date || '';
+    const durationDays = startDate 
+      ? (endDate 
+          ? differenceInDays(new Date(endDate), new Date(startDate))
+          : differenceInDays(today, new Date(startDate)))
+      : 'N/A';
+    
+    return [
+      residentName,
+      medication,
+      record.indication || 'MISSING',
+      startDate ? format(new Date(startDate), 'MM/dd/yyyy') : '',
+      durationDays.toString(),
+      issues.join('; ')
+    ];
+  });
+  
+  return {
+    title: 'MEDICARE ABT COMPLIANCE REPORT',
+    subtitle: `Antibiotic Regimens with Compliance Issues - ${flaggedRecords.length} flagged`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      totalCourses: allABT.length.toString(),
+      flaggedCourses: flaggedRecords.length.toString(),
+      complianceRate: allABT.length > 0 
+        ? `${(((allABT.length - flaggedRecords.length) / allABT.length) * 100).toFixed(1)}%`
+        : '100%',
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Resident', 'Medication', 'Indication', 'Start Date', 'Duration (Days)', 'Compliance Issues'],
+    rows,
+    footer: {
+      disclaimer: 'This report identifies antibiotic regimens that may not meet Medicare documentation requirements. Issues include missing indications, prophylaxis without bacterial source documentation, and prolonged therapy without documented reassessment.'
+    }
+  };
+};
+
+// Report 6: IP Tracker Review Report
+export const generateIPReviewReport = (
+  db: ICNDatabase,
+  fromDate?: string,
+  toDate?: string,
+  protocolFilter: string = 'all'
+): ReportData => {
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  
+  // Get active IP cases
+  let activeCases = getActiveIPCases(db);
+  
+  // Filter by protocol if specified
+  if (protocolFilter !== 'all') {
+    activeCases = activeCases.filter(c => c.protocol === protocolFilter);
+  }
+  
+  // Calculate review due dates based on protocol cadence
+  const casesWithReview = activeCases.map(ipCase => {
+    const onsetDate = ipCase.onsetDate || ipCase.onset_date || '';
+    const lastReview = ipCase.lastReviewDate || onsetDate;
+    const protocol = ipCase.protocol;
+    
+    // Review cadence: EBP = 7 days, Isolation = 3 days
+    const reviewDays = protocol === 'EBP' ? 7 : protocol === 'Isolation' ? 3 : 7;
+    
+    let nextReviewDue = '';
+    if (lastReview) {
+      const lastReviewDate = new Date(lastReview);
+      const nextReview = addDays(lastReviewDate, reviewDays);
+      nextReviewDue = format(nextReview, 'yyyy-MM-dd');
+    }
+    
+    const isOverdue = nextReviewDue && nextReviewDue < todayStr;
+    const daysOverdue = isOverdue ? differenceInDays(today, new Date(nextReviewDue)) : 0;
+    
+    return {
+      ...ipCase,
+      lastReview,
+      nextReviewDue,
+      isOverdue,
+      daysOverdue,
+      reviewDays
+    };
+  });
+  
+  // Filter by date range if provided (based on next review date)
+  let filtered = casesWithReview;
+  if (fromDate) {
+    filtered = filtered.filter(c => c.nextReviewDue >= fromDate);
+  }
+  if (toDate) {
+    filtered = filtered.filter(c => c.nextReviewDue <= toDate);
+  }
+  
+  // Sort by review due date (overdue first, then by next due)
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.isOverdue && !b.isOverdue) return -1;
+    if (!a.isOverdue && b.isOverdue) return 1;
+    return a.nextReviewDue.localeCompare(b.nextReviewDue);
+  });
+  
+  const rows = sorted.map(ipCase => {
+    const resident = db.census.residentsByMrn[ipCase.mrn];
+    const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
+    const onsetDate = ipCase.onsetDate || ipCase.onset_date || '';
+    
+    const statusDisplay = ipCase.isOverdue 
+      ? `🔴 OVERDUE (${ipCase.daysOverdue}d)`
+      : ipCase.nextReviewDue === todayStr 
+        ? '⚠️ DUE TODAY'
+        : '⏳ SCHEDULED';
+    
+    return [
+      residentName,
+      `${ipCase.unit} / ${ipCase.room}`,
+      `${ipCase.protocol} (${ipCase.reviewDays}d cycle)`,
+      ipCase.infectionType || ipCase.infection_type || '',
+      onsetDate ? format(new Date(onsetDate), 'MM/dd/yyyy') : '',
+      ipCase.lastReview ? format(new Date(ipCase.lastReview), 'MM/dd/yyyy') : 'Initial',
+      ipCase.nextReviewDue ? format(new Date(ipCase.nextReviewDue), 'MM/dd/yyyy') : '',
+      statusDisplay,
+      ipCase.reviewNotes || ''
+    ];
+  });
+  
+  // Summary counts
+  const overdue = sorted.filter(c => c.isOverdue).length;
+  const dueToday = sorted.filter(c => c.nextReviewDue === todayStr).length;
+  const upcoming = sorted.length - overdue - dueToday;
+  
+  return {
+    title: 'IP TRACKER REVIEW REPORT',
+    subtitle: `Review Worklist - Overdue: ${overdue} | Due Today: ${dueToday} | Upcoming: ${upcoming}`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      protocol: protocolFilter === 'all' ? 'All Protocols' : protocolFilter,
+      fromDate: fromDate || 'All time',
+      toDate: toDate || 'Present',
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Resident', 'Unit/Room', 'Protocol', 'Infection', 'Onset', 'Last Review', 'Next Due', 'Status', 'Review Notes'],
+    rows,
+    footer: {
+      disclaimer: 'Review cadence: EBP = every 7 days, Isolation = every 3 days. Overdue items require immediate attention. Document review notes when completing assessments.'
     }
   };
 };

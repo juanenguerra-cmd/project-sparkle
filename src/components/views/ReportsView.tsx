@@ -1,11 +1,11 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SectionCard from '@/components/dashboard/SectionCard';
 import DataFlowVisual from '@/components/dashboard/DataFlowVisual';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getVaxDue } from '@/lib/database';
 import { 
   ReportData,
@@ -19,6 +19,12 @@ import {
   generateSurveyReadinessPacket,
   generateInfectionTrends,
   generateComplianceCrosswalk,
+  generateVaxSnapshotReport,
+  generateStandardOfCareReport,
+  generateFollowUpNotesReport,
+  generateMonthlyABTReport,
+  generateMedicareABTComplianceReport,
+  generateIPReviewReport,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
 import ReportPreview from '@/components/reports/ReportPreview';
@@ -28,6 +34,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildDailyPrecautionListPdf, isDailyPrecautionListReport } from '@/lib/pdf/dailyPrecautionListPdf';
+import { format, subDays } from 'date-fns';
 
 const ReportsView = () => {
   const [executiveOpen, setExecutiveOpen] = useState(true);
@@ -40,6 +47,13 @@ const ReportsView = () => {
   const [trendReport, setTrendReport] = useState<InfectionTrendReport | null>(null);
   const [exportFormat, setExportFormat] = useState('PDF');
   const reportRef = useRef<HTMLDivElement>(null);
+  
+  // New filter states for extended reports
+  const [selectedVaccineType, setSelectedVaccineType] = useState('all');
+  const [selectedFollowUpStatus, setSelectedFollowUpStatus] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedProtocol, setSelectedProtocol] = useState('all');
 
   const db = loadDB();
   const activeResidents = getActiveResidents(db).length;
@@ -53,12 +67,34 @@ const ReportsView = () => {
       .filter(r => r.active_on_census && r.unit)
       .map(r => r.unit)
   )].sort();
+  
+  // Generate month options for the last 12 months
+  const monthOptions = useMemo(() => {
+    const options = [];
+    for (let i = 0; i < 12; i++) {
+      options.push({
+        value: i.toString(),
+        label: format(new Date(2024, i, 1), 'MMMM')
+      });
+    }
+    return options;
+  }, []);
+  
+  // Generate year options
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return [currentYear - 1, currentYear, currentYear + 1].map(y => ({
+      value: y.toString(),
+      label: y.toString()
+    }));
+  }, []);
 
   const executiveReports = [
     { id: 'survey_readiness', name: 'Survey Readiness Packet', description: 'Comprehensive compliance documentation for CMS surveys' },
     { id: 'qapi', name: 'QAPI Report', description: 'Quality metrics and performance indicators' },
     { id: 'infection_trends', name: 'Infection Rate Trends', description: 'Monthly/quarterly infection rate analysis' },
     { id: 'compliance', name: 'Compliance Crosswalk', description: 'Regulatory compliance status overview' },
+    { id: 'medicare_compliance', name: 'Medicare ABT Compliance', description: 'Flag inappropriate antibiotic indications' },
   ];
 
   const operationalReports = [
@@ -67,6 +103,11 @@ const ReportsView = () => {
     { id: 'vax_due', name: 'Vaccination Due List', description: 'Residents with upcoming or overdue vaccinations' },
     { id: 'precautions_list', name: 'Active Precautions List', description: 'Current isolation precautions by unit' },
     { id: 'exposure_log', name: 'Exposure Tracking Log', description: 'Potential exposure events and follow-ups' },
+    { id: 'vax_snapshot', name: 'Vaccination Snapshot', description: 'Weekly vaccination status with flu season logic' },
+    { id: 'standard_of_care', name: 'Standard of Care Report', description: 'Weekly ABT, IP, VAX declinations by date range' },
+    { id: 'followup_notes', name: 'Follow-up Notes Report', description: 'Overdue and pending follow-up items' },
+    { id: 'monthly_abt', name: 'Monthly ABT Report', description: 'Residents on antibiotics for selected month' },
+    { id: 'ip_review', name: 'IP Review Worklist', description: 'Cases due for review by protocol cadence' },
   ];
 
   const handleGenerateReport = (reportId: string) => {
@@ -106,6 +147,32 @@ const ReportsView = () => {
         return;
       case 'compliance':
         report = generateComplianceCrosswalk(db);
+        break;
+      // New reports
+      case 'vax_snapshot':
+        report = generateVaxSnapshotReport(db, fromDate || undefined, toDate || undefined, selectedVaccineType);
+        break;
+      case 'standard_of_care':
+        if (!fromDate || !toDate) {
+          // Default to last 7 days if not specified
+          const defaultTo = format(new Date(), 'yyyy-MM-dd');
+          const defaultFrom = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+          report = generateStandardOfCareReport(db, fromDate || defaultFrom, toDate || defaultTo);
+        } else {
+          report = generateStandardOfCareReport(db, fromDate, toDate);
+        }
+        break;
+      case 'followup_notes':
+        report = generateFollowUpNotesReport(db, selectedFollowUpStatus);
+        break;
+      case 'monthly_abt':
+        report = generateMonthlyABTReport(db, parseInt(selectedMonth), parseInt(selectedYear));
+        break;
+      case 'medicare_compliance':
+        report = generateMedicareABTComplianceReport(db);
+        break;
+      case 'ip_review':
+        report = generateIPReviewReport(db, fromDate || undefined, toDate || undefined, selectedProtocol);
         break;
       default:
         toast.error('Unknown report type');
@@ -517,8 +584,8 @@ const ReportsView = () => {
       {/* Report Output */}
       <SectionCard title="Report Output">
         <div className="filter-panel mb-6">
-          {/* All controls in one row */}
-          <div className="flex flex-wrap items-end gap-4">
+          {/* Row 1: Common filters */}
+          <div className="flex flex-wrap items-end gap-4 mb-4">
             {/* Export Format - Toggle Group Style */}
             <div className="flex-shrink-0">
               <label className="text-sm font-medium mb-2 block">Export Format</label>
@@ -580,6 +647,88 @@ const ReportsView = () => {
             <div className="min-w-[140px]">
               <label className="text-sm font-medium mb-2 block">To / As of</label>
               <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+            </div>
+          </div>
+          
+          {/* Row 2: Extended report filters */}
+          <div className="flex flex-wrap items-end gap-4 pt-3 border-t border-border">
+            {/* Vaccine Type */}
+            <div className="min-w-[140px]">
+              <label className="text-sm font-medium mb-2 block">Vaccine Type</label>
+              <Select value={selectedVaccineType} onValueChange={setSelectedVaccineType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="flu">Influenza</SelectItem>
+                  <SelectItem value="pneumo">Pneumonia</SelectItem>
+                  <SelectItem value="covid">COVID-19</SelectItem>
+                  <SelectItem value="rsv">RSV</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Follow-up Status */}
+            <div className="min-w-[140px]">
+              <label className="text-sm font-medium mb-2 block">Follow-up Status</label>
+              <Select value={selectedFollowUpStatus} onValueChange={setSelectedFollowUpStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="escalated">Escalated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Month Selector */}
+            <div className="min-w-[140px]">
+              <label className="text-sm font-medium mb-2 block">Month</label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Year Selector */}
+            <div className="min-w-[100px]">
+              <label className="text-sm font-medium mb-2 block">Year</label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Protocol Filter */}
+            <div className="min-w-[140px]">
+              <label className="text-sm font-medium mb-2 block">Protocol</label>
+              <Select value={selectedProtocol} onValueChange={setSelectedProtocol}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Protocols" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Protocols</SelectItem>
+                  <SelectItem value="EBP">EBP (7-day review)</SelectItem>
+                  <SelectItem value="Isolation">Isolation (3-day review)</SelectItem>
+                  <SelectItem value="Standard Precautions">Standard Precautions</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
