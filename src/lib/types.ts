@@ -75,6 +75,9 @@ export interface IPCase {
   createdAt?: string;
   _autoClosed?: boolean;
   _autoClosedReason?: string;
+  // Review tracking fields
+  lastReviewDate?: string;
+  reviewNotes?: string;
 }
 
 export interface VaxRecord {
