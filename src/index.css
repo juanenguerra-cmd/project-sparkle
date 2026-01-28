@@ -1,0 +1,403 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ICN Hub Design System - Clean Healthcare Theme */
+
+@layer base {
+  :root {
+    /* Core Backgrounds */
+    --background: 210 25% 97%;
+    --foreground: 215 25% 15%;
+
+    /* Cards & Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Primary - Healthcare Blue */
+    --primary: 207 90% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Slate Gray */
+    --secondary: 210 14% 93%;
+    --secondary-foreground: 215 25% 25%;
+
+    /* Muted */
+    --muted: 210 14% 95%;
+    --muted-foreground: 215 15% 50%;
+
+    /* Accent - Teal */
+    --accent: 168 76% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive - Red */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Status Colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    /* Borders & Inputs */
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 207 90% 42%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 25% 25%;
+    --sidebar-primary: 207 90% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 14% 96%;
+    --sidebar-accent-foreground: 215 25% 15%;
+    --sidebar-border: 214 20% 90%;
+    --sidebar-ring: 207 90% 42%;
+
+    /* Healthcare-specific Status Badges */
+    --status-active: 142 76% 36%;
+    --status-pending: 38 92% 50%;
+    --status-critical: 0 72% 51%;
+    --status-isolation: 271 81% 56%;
+    --status-ebp: 199 89% 48%;
+
+    /* Tracker Colors */
+    --tracker-abt: 0 72% 51%;
+    --tracker-ip: 38 92% 50%;
+    --tracker-vax: 142 76% 36%;
+    --tracker-census: 207 90% 42%;
+
+    /* Gradients */
+    --gradient-header: linear-gradient(135deg, hsl(215, 25%, 20%) 0%, hsl(207, 90%, 42%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(207, 90%, 42%) 0%, hsl(199, 89%, 48%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(168, 76%, 36%) 100%);
+    --gradient-danger: linear-gradient(135deg, hsl(0, 72%, 51%) 0%, hsl(38, 92%, 50%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
+    --shadow: 0 2px 8px -1px hsl(215 25% 15% / 0.08);
+    --shadow-md: 0 4px 16px -2px hsl(215 25% 15% / 0.1);
+    --shadow-lg: 0 8px 24px -4px hsl(215 25% 15% / 0.12);
+
+    /* Chart Colors */
+    --chart-1: 207 90% 42%;
+    --chart-2: 142 76% 36%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 271 81% 56%;
+  }
+
+  .dark {
+    --background: 215 25% 10%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 25% 13%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 25% 13%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 207 90% 54%;
+    --primary-foreground: 215 25% 10%;
+
+    --secondary: 215 20% 20%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 215 20% 18%;
+    --muted-foreground: 215 15% 60%;
+
+    --accent: 168 76% 42%;
+    --accent-foreground: 215 25% 10%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 22%;
+    --input: 215 20% 22%;
+    --ring: 207 90% 54%;
+
+    --sidebar-background: 215 25% 12%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 207 90% 54%;
+    --sidebar-primary-foreground: 215 25% 10%;
+    --sidebar-accent: 215 20% 18%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 215 20% 20%;
+    --sidebar-ring: 207 90% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+@layer components {
+  /* Stat Card Styles */
+  .stat-card {
+    @apply bg-card rounded-xl p-5 border border-border transition-all duration-200;
+    box-shadow: var(--shadow);
+  }
+
+  .stat-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .stat-icon {
+    @apply w-10 h-10 rounded-lg flex items-center justify-center text-lg;
+  }
+
+  .stat-icon-blue {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .stat-icon-red {
+    @apply bg-destructive/10 text-destructive;
+  }
+
+  .stat-icon-amber {
+    background-color: hsl(var(--warning) / 0.1);
+    color: hsl(var(--warning));
+  }
+
+  .stat-icon-green {
+    background-color: hsl(var(--success) / 0.1);
+    color: hsl(var(--success));
+  }
+
+  .stat-icon-purple {
+    background-color: hsl(var(--status-isolation) / 0.1);
+    color: hsl(var(--status-isolation));
+  }
+
+  /* Badge Variants */
+  .badge-status {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .badge-ok {
+    background-color: hsl(var(--success) / 0.15);
+    color: hsl(142 76% 28%);
+  }
+
+  .badge-warn {
+    background-color: hsl(var(--warning) / 0.15);
+    color: hsl(38 92% 35%);
+  }
+
+  .badge-bad {
+    background-color: hsl(var(--destructive) / 0.15);
+    color: hsl(0 72% 40%);
+  }
+
+  .badge-info {
+    background-color: hsl(var(--info) / 0.15);
+    color: hsl(199 89% 35%);
+  }
+
+  .badge-muted {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  /* Tracker Badges */
+  .badge-abt {
+    background-color: hsl(var(--tracker-abt) / 0.1);
+    color: hsl(var(--tracker-abt));
+    border: 1px solid hsl(var(--tracker-abt) / 0.3);
+  }
+
+  .badge-ip {
+    background-color: hsl(var(--tracker-ip) / 0.1);
+    color: hsl(var(--tracker-ip));
+    border: 1px solid hsl(var(--tracker-ip) / 0.3);
+  }
+
+  .badge-vax {
+    background-color: hsl(var(--tracker-vax) / 0.1);
+    color: hsl(var(--tracker-vax));
+    border: 1px solid hsl(var(--tracker-vax) / 0.3);
+  }
+
+  /* Navigation Styles */
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-150;
+    color: hsl(var(--sidebar-foreground));
+  }
+
+  .nav-item:hover {
+    @apply bg-sidebar-accent;
+  }
+
+  .nav-item.active {
+    @apply bg-primary/10 text-primary font-semibold;
+    border-left: 3px solid hsl(var(--primary));
+    margin-left: -3px;
+  }
+
+  /* Flow Step Styles */
+  .flow-step {
+    @apply text-center px-3 py-2 min-w-28;
+  }
+
+  .flow-step-icon {
+    @apply w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center mx-auto mb-2 text-lg;
+  }
+
+  /* Quick Stat Cards */
+  .quick-stat {
+    @apply text-center p-4 bg-muted rounded-lg border border-border cursor-pointer transition-all duration-200;
+  }
+
+  .quick-stat:hover {
+    @apply bg-primary/5 border-primary/30;
+  }
+
+  /* Worklist Items */
+  .worklist-item {
+    @apply flex items-center gap-3 p-4 bg-card border border-border rounded-lg transition-all duration-200;
+  }
+
+  .worklist-item:hover {
+    @apply border-primary/50;
+    box-shadow: 0 2px 8px hsl(var(--primary) / 0.08);
+  }
+
+  /* Action Buttons Row */
+  .row-action-btn {
+    @apply w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-primary transition-colors;
+  }
+
+  /* Header Gradient */
+  .app-header {
+    background: var(--gradient-header);
+    @apply text-white shadow-lg;
+  }
+
+  /* Card Sections */
+  .section-card {
+    @apply bg-card rounded-xl border border-border overflow-hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .section-card-header {
+    @apply flex items-center justify-between px-5 py-4 border-b border-border;
+  }
+
+  .section-card-title {
+    @apply text-lg font-semibold text-foreground;
+  }
+
+  .section-card-body {
+    @apply p-5;
+  }
+
+  /* Table Styles */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply bg-muted/50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b-2 border-border;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b border-border;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-muted/30;
+  }
+
+  /* Toast Animations */
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-fade-up {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  /* Filter Panel */
+  .filter-panel {
+    @apply bg-muted/50 border border-border rounded-lg p-4 mb-5;
+  }
+
+  /* Report Preview */
+  .report-preview {
+    @apply bg-white border border-border rounded-lg p-5 max-h-96 overflow-y-auto font-mono text-sm;
+  }
+
+  /* Mini Indicators */
+  .mini-indicator {
+    @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .mini-indicator.active {
+    background-color: hsl(var(--success) / 0.15);
+    border: 1px solid hsl(var(--success));
+    color: hsl(142 76% 28%);
+  }
+
+  .mini-indicator.overdue {
+    background-color: hsl(var(--destructive) / 0.15);
+    border: 1px solid hsl(var(--destructive));
+    color: hsl(0 72% 40%);
+  }
+
+  .mini-indicator.warning {
+    background-color: hsl(var(--warning) / 0.15);
+    border: 1px solid hsl(var(--warning));
+    color: hsl(38 92% 35%);
+  }
+
+  /* Surveyor Banner */
+  .surveyor-banner {
+    @apply bg-primary text-primary-foreground px-4 py-2.5 rounded-xl flex items-center gap-3 font-semibold;
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow);
+  }
+
+  .shadow-card-hover {
+    box-shadow: var(--shadow-md);
+  }
+}
