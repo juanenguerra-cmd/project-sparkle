@@ -1,0 +1,181 @@
+import { useState } from 'react';
+import { Save, TestTube } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import SectionCard from '@/components/dashboard/SectionCard';
+import { loadDB, saveDB, addAudit } from '@/lib/database';
+import { useToast } from '@/hooks/use-toast';
+
+const SettingsView = () => {
+  const { toast } = useToast();
+  const db = loadDB();
+  
+  const [facilityName, setFacilityName] = useState(db.settings.facilityName || '');
+  const [abtReviewCadence, setAbtReviewCadence] = useState(String(db.settings.abtReviewCadence));
+  const [autoCloseCensus, setAutoCloseCensus] = useState(db.settings.autoCloseCensus);
+  const [autoCloseGraceDays, setAutoCloseGraceDays] = useState(db.settings.autoCloseGraceDays);
+  const [ebpReviewDays, setEbpReviewDays] = useState(db.settings.ipRules.ebpReviewDays);
+  const [isolationReviewDays, setIsolationReviewDays] = useState(db.settings.ipRules.isolationReviewDays);
+
+  const handleSaveSettings = () => {
+    const db = loadDB();
+    db.settings = {
+      ...db.settings,
+      facilityName,
+      abtReviewCadence: parseInt(abtReviewCadence),
+      autoCloseCensus,
+      autoCloseGraceDays,
+      ipRules: {
+        ...db.settings.ipRules,
+        ebpReviewDays,
+        isolationReviewDays,
+      },
+    };
+    addAudit(db, 'settings_updated', `Facility: ${facilityName}`, 'settings');
+    saveDB(db);
+    toast({
+      title: 'Settings Saved',
+      description: 'Your settings have been updated successfully.',
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Settings</h2>
+          <p className="text-sm text-muted-foreground">Configure application preferences</p>
+        </div>
+        <Button size="sm" onClick={handleSaveSettings}>
+          <Save className="w-4 h-4 mr-2" />
+          Save Settings
+        </Button>
+      </div>
+
+      {/* System Checks */}
+      <SectionCard 
+        title="System Checks"
+        actions={
+          <Button variant="outline" size="sm">
+            <TestTube className="w-4 h-4 mr-2" />
+            Run Checks
+          </Button>
+        }
+      >
+        <div className="bg-muted/50 rounded-lg p-4 font-mono text-sm max-h-48 overflow-auto">
+          Click "Run Checks" to scan the database.
+        </div>
+      </SectionCard>
+
+      {/* Application Settings */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <SectionCard title="Workflow Settings">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>ABT Review Cadence</Label>
+              <Select value={abtReviewCadence} onValueChange={setAbtReviewCadence}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="72">72 hours</SelectItem>
+                  <SelectItem value="96">96 hours</SelectItem>
+                  <SelectItem value="120">120 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Auto-close on Census Drop</Label>
+                <Switch checked={autoCloseCensus} onCheckedChange={setAutoCloseCensus} />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Auto-resolve IP precautions and discontinue ABX when a resident is no longer active on census.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Grace Period (Days)</Label>
+              <Input 
+                type="number" 
+                value={autoCloseGraceDays} 
+                onChange={(e) => setAutoCloseGraceDays(parseInt(e.target.value) || 0)}
+                min={0} 
+                max={14}
+              />
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="IP Review Rules">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>EBP Review Interval (Days)</Label>
+              <Input 
+                type="number" 
+                value={ebpReviewDays} 
+                onChange={(e) => setEbpReviewDays(parseInt(e.target.value) || 7)}
+                min={1} 
+                max={30}
+              />
+              <p className="text-sm text-muted-foreground">
+                How often EBP cases should be reviewed
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Isolation Review Interval (Days)</Label>
+              <Input 
+                type="number" 
+                value={isolationReviewDays} 
+                onChange={(e) => setIsolationReviewDays(parseInt(e.target.value) || 3)}
+                min={1} 
+                max={14}
+              />
+              <p className="text-sm text-muted-foreground">
+                How often isolation cases should be reviewed
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Facility Information">
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label>Facility Name</Label>
+              <Input 
+                value={facilityName} 
+                onChange={(e) => setFacilityName(e.target.value)}
+                placeholder="Enter facility name"
+              />
+              <p className="text-sm text-muted-foreground">
+                This name appears on all generated reports
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Data Management">
+          <div className="space-y-4">
+            <Button variant="outline" className="w-full justify-start">
+              Export All Data
+            </Button>
+            <Button variant="outline" className="w-full justify-start">
+              Import Data Backup
+            </Button>
+            <Button variant="destructive" className="w-full justify-start">
+              Clear All Data
+            </Button>
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+};
+
+export default SettingsView;
