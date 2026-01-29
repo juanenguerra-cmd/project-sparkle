@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import SectionCard from '@/components/dashboard/SectionCard';
+import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import { loadDB, getActiveIPCases, saveDB, addAudit } from '@/lib/database';
 import { IPCase } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
@@ -205,6 +206,9 @@ const IPView = () => {
           </Button>
         </div>
       </div>
+
+      {/* Trend Summary */}
+      <TrackerSummary type="ip" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

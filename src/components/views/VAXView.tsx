@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import SectionCard from '@/components/dashboard/SectionCard';
+import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import { loadDB, getVaxDue, saveDB, addAudit } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
 import VAXImportModal from '@/components/modals/VAXImportModal';
@@ -188,6 +189,9 @@ const VAXView = () => {
           </Button>
         </div>
       </div>
+
+      {/* Trend Summary */}
+      <TrackerSummary type="vax" />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
