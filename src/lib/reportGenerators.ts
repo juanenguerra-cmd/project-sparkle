@@ -714,6 +714,7 @@ const getFluSeasonDisplay = (dateGiven: string): string => {
 };
 
 // Report 1: Vaccination Snapshot Report
+// Shows COUNT of vaccines given to ACTIVE residents only (excluding discharged)
 export const generateVaxSnapshotReport = (
   db: ICNDatabase,
   fromDate?: string,
@@ -722,8 +723,9 @@ export const generateVaxSnapshotReport = (
 ): ReportData => {
   const allVax = db.records.vax;
   const activeResidents = Object.values(db.census.residentsByMrn).filter(r => r.active_on_census);
+  const activeResidentMrns = new Set(activeResidents.map(r => r.mrn));
   
-  // Filter by date range if provided
+  // Filter vaccinations: only active residents, only given status
   let filtered = allVax.filter(v => {
     const dateGiven = v.dateGiven || v.date_given;
     if (!dateGiven) return false;
@@ -731,9 +733,10 @@ export const generateVaxSnapshotReport = (
     // Only include given vaccinations
     if (v.status !== 'given') return false;
     
-    // Check resident is still active
-    if (!db.census.residentsByMrn[v.mrn]?.active_on_census) return false;
+    // CRITICAL: Only include active residents (exclude discharged)
+    if (!activeResidentMrns.has(v.mrn)) return false;
     
+    // Filter by date range if provided
     if (fromDate && dateGiven < fromDate) return false;
     if (toDate && dateGiven > toDate) return false;
     
@@ -747,6 +750,18 @@ export const generateVaxSnapshotReport = (
       return vaccine.includes(vaccineType.toLowerCase());
     });
   }
+  
+  // Count by vaccine type for summary
+  const vaccineCounts: Record<string, number> = {};
+  filtered.forEach(v => {
+    const vaccine = (v.vaccine || v.vaccine_type || 'Unknown').toUpperCase();
+    const category = vaccine.includes('FLU') || vaccine.includes('INFLUENZA') ? 'Influenza'
+      : vaccine.includes('PNEUMO') ? 'Pneumonia'
+      : vaccine.includes('RSV') ? 'RSV'
+      : vaccine.includes('COVID') ? 'COVID-19'
+      : 'Other';
+    vaccineCounts[category] = (vaccineCounts[category] || 0) + 1;
+  });
   
   // Sort by date given (most recent first)
   const sorted = [...filtered].sort((a, b) => {
@@ -773,29 +788,250 @@ export const generateVaxSnapshotReport = (
     ];
   });
   
-  // Add summary section for outdated flu vaccinations
+  // Count outdated flu vaccinations for active residents
   const fluVax = allVax.filter(v => 
     (v.vaccine || v.vaccine_type || '').toLowerCase().includes('flu') && 
     v.status === 'given' &&
-    db.census.residentsByMrn[v.mrn]?.active_on_census
+    activeResidentMrns.has(v.mrn)
   );
   const outdatedFlu = fluVax.filter(v => isInfluenzaOutdated(v.dateGiven || v.date_given || ''));
   
+  // Build summary string
+  const summaryParts = Object.entries(vaccineCounts).map(([type, count]) => `${type}: ${count}`);
+  const summaryString = summaryParts.join(' | ');
+  
   return {
     title: 'VACCINATION SNAPSHOT REPORT',
-    subtitle: `Weekly Vaccination Status with Flu Season Logic`,
+    subtitle: `Active Residents Vaccination Count (Excludes Discharged)`,
     generatedAt: new Date().toISOString(),
     filters: {
       fromDate: fromDate || 'All time',
       toDate: toDate || 'Present',
       vaccineType: vaccineType === 'all' ? 'All Types' : vaccineType,
       date: format(new Date(), 'MM/dd/yyyy'),
-      note: outdatedFlu.length > 0 ? `⚠️ ${outdatedFlu.length} residents need flu vaccination offer for current season` : ''
+      summary: summaryString || 'No vaccinations',
+      note: outdatedFlu.length > 0 ? `⚠️ ${outdatedFlu.length} active residents need flu offer for current season` : ''
     },
     headers: ['Resident', 'Unit/Room', 'Vaccine', 'Date Given', 'Status', 'Notes'],
     rows,
     footer: {
-      disclaimer: 'Influenza vaccinations are flagged as OUTDATED if given before the current flu season (Oct-Mar cycle). These residents should be offered vaccination for the current/upcoming season.'
+      disclaimer: `Snapshot shows ${filtered.length} vaccinations for ${activeResidents.length} active residents. Influenza marked OUTDATED if before current flu season (Oct-Mar). Discharged residents excluded.`
+    }
+  };
+};
+
+// Report: Vaccine Re-offer List
+// Logic: Flu - re-offer if declined within 30 days AND within flu season; COVID - re-offer if declined within 180 days
+export const generateVaxReofferReport = (
+  db: ICNDatabase,
+  vaccineType: string = 'all'
+): ReportData => {
+  const allVax = db.records.vax;
+  const activeResidents = Object.values(db.census.residentsByMrn).filter(r => r.active_on_census);
+  const activeResidentMrns = new Set(activeResidents.map(r => r.mrn));
+  const now = new Date();
+  
+  // Check if we're in flu season (Oct 1 - Mar 31)
+  const isInFluSeason = now.getMonth() >= 9 || now.getMonth() <= 2; // Oct=9, Mar=2
+  
+  const reofferList: Array<{
+    mrn: string;
+    name: string;
+    unit: string;
+    room: string;
+    vaccine: string;
+    declinedDate: string;
+    daysSinceDecline: number;
+    reason: string;
+  }> = [];
+  
+  // Group declinations by resident and vaccine type
+  const declinedVax = allVax.filter(v => 
+    v.status === 'declined' && 
+    activeResidentMrns.has(v.mrn)
+  );
+  
+  declinedVax.forEach(v => {
+    const vaccine = (v.vaccine || v.vaccine_type || '').toLowerCase();
+    const declineDate = v.dateGiven || v.date_given || v.dueDate || v.due_date || '';
+    if (!declineDate) return;
+    
+    const declinedOn = new Date(declineDate);
+    const daysSince = differenceInDays(now, declinedOn);
+    const resident = db.census.residentsByMrn[v.mrn];
+    const residentName = v.residentName || v.name || resident?.name || 'Unknown';
+    
+    let shouldReoffer = false;
+    let reason = '';
+    
+    // Influenza: Re-offer if declined within 30 days AND we're in flu season
+    if (vaccine.includes('flu') || vaccine.includes('influenza')) {
+      if (isInFluSeason && daysSince >= 30) {
+        shouldReoffer = true;
+        reason = `Flu season active, ${daysSince} days since decline (re-offer after 30 days per CDC)`;
+      } else if (isInFluSeason && daysSince < 30) {
+        // Too soon to re-offer
+        shouldReoffer = false;
+      } else if (!isInFluSeason) {
+        // Not flu season, mark for upcoming season if declined recently
+        if (daysSince <= 365) {
+          shouldReoffer = true;
+          reason = `Offer when flu season begins (Oct 1)`;
+        }
+      }
+    }
+    
+    // COVID: Re-offer if declined within 180 days
+    if (vaccine.includes('covid')) {
+      if (daysSince >= 180) {
+        shouldReoffer = true;
+        reason = `${daysSince} days since decline (re-offer after 180 days per CDC guidelines)`;
+      }
+    }
+    
+    // RSV and Pneumonia - annual re-offer
+    if (vaccine.includes('rsv') || vaccine.includes('pneumo')) {
+      if (daysSince >= 365) {
+        shouldReoffer = true;
+        reason = `${daysSince} days since decline (annual re-offer)`;
+      }
+    }
+    
+    if (shouldReoffer) {
+      reofferList.push({
+        mrn: v.mrn,
+        name: residentName,
+        unit: v.unit,
+        room: v.room,
+        vaccine: v.vaccine || v.vaccine_type || '',
+        declinedDate: declineDate,
+        daysSinceDecline: daysSince,
+        reason
+      });
+    }
+  });
+  
+  // Filter by vaccine type if specified
+  let filtered = reofferList;
+  if (vaccineType !== 'all') {
+    filtered = reofferList.filter(r => 
+      r.vaccine.toLowerCase().includes(vaccineType.toLowerCase())
+    );
+  }
+  
+  // Sort alphabetically by name
+  const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+  
+  const rows = sorted.map(r => [
+    r.name,
+    `${r.unit} / ${r.room}`,
+    r.vaccine,
+    format(new Date(r.declinedDate), 'MM/dd/yyyy'),
+    r.daysSinceDecline.toString(),
+    r.reason
+  ]);
+  
+  return {
+    title: 'VACCINE RE-OFFER LIST',
+    subtitle: 'Residents Eligible for Vaccine Re-offer Based on CDC Guidelines',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      vaccineType: vaccineType === 'all' ? 'All Types' : vaccineType,
+      date: format(new Date(), 'MM/dd/yyyy'),
+      fluSeason: isInFluSeason ? 'Active (Oct-Mar)' : 'Off-season',
+      total: `${sorted.length} residents eligible for re-offer`
+    },
+    headers: ['Resident', 'Unit/Room', 'Vaccine', 'Declined Date', 'Days Since', 'Re-offer Reason'],
+    rows,
+    footer: {
+      disclaimer: 'Re-offer guidelines: Influenza - 30 days after decline during flu season (Oct-Mar). COVID-19 - 180 days after decline. RSV/Pneumonia - annually. Document re-offer attempts and resident response.'
+    }
+  };
+};
+
+// Report: Surveyor Packet - Active Residents with ABT/IP Status
+export const generateSurveyorPacket = (
+  db: ICNDatabase,
+  includeABT: boolean = true,
+  includeIP: boolean = true
+): ReportData => {
+  const activeResidents = Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .sort((a, b) => a.name.localeCompare(b.name)); // Alphabetical order
+  
+  const activeABT = db.records.abx.filter(r => r.status === 'active');
+  const activeIP = db.records.ip_cases.filter(c => c.status === 'Active');
+  
+  // Build lookup maps
+  const abtByMrn: Record<string, typeof activeABT> = {};
+  activeABT.forEach(r => {
+    if (!abtByMrn[r.mrn]) abtByMrn[r.mrn] = [];
+    abtByMrn[r.mrn].push(r);
+  });
+  
+  const ipByMrn: Record<string, typeof activeIP> = {};
+  activeIP.forEach(c => {
+    if (!ipByMrn[c.mrn]) ipByMrn[c.mrn] = [];
+    ipByMrn[c.mrn].push(c);
+  });
+  
+  const rows = activeResidents.map(resident => {
+    const residentABT = abtByMrn[resident.mrn] || [];
+    const residentIP = ipByMrn[resident.mrn] || [];
+    
+    let abtDetails = '—';
+    let ipDetails = '—';
+    
+    if (includeABT && residentABT.length > 0) {
+      abtDetails = residentABT.map(r => {
+        const med = r.medication || r.med_name || 'Unknown';
+        const indication = r.indication || 'No indication';
+        return `${med} (${indication})`;
+      }).join('; ');
+    } else if (residentABT.length > 0) {
+      abtDetails = '✓';
+    }
+    
+    if (includeIP && residentIP.length > 0) {
+      ipDetails = residentIP.map(c => {
+        const protocol = c.protocol;
+        const infection = c.infectionType || c.infection_type || '';
+        const source = c.sourceOfInfection || c.source_of_infection || '';
+        return `${protocol}${infection ? ` - ${infection}` : ''}${source ? ` (${source})` : ''}`;
+      }).join('; ');
+    } else if (residentIP.length > 0) {
+      ipDetails = '✓';
+    }
+    
+    return [
+      resident.name,
+      resident.room,
+      resident.unit,
+      residentABT.length > 0 ? (includeABT ? abtDetails : '✓') : '—',
+      residentIP.length > 0 ? (includeIP ? ipDetails : '✓') : '—'
+    ];
+  });
+  
+  // Summary counts
+  const residentsWithABT = activeResidents.filter(r => abtByMrn[r.mrn]?.length > 0).length;
+  const residentsWithIP = activeResidents.filter(r => ipByMrn[r.mrn]?.length > 0).length;
+  
+  return {
+    title: 'SURVEYOR PACKET - ACTIVE RESIDENT LIST',
+    subtitle: 'Current Census with Active ABT and IP Status',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      date: format(new Date(), 'MM/dd/yyyy'),
+      totalResidents: activeResidents.length.toString(),
+      residentsOnABT: residentsWithABT.toString(),
+      residentsOnIP: residentsWithIP.toString(),
+      showABTDetails: includeABT ? 'Yes' : 'Checkbox Only',
+      showIPDetails: includeIP ? 'Yes' : 'Checkbox Only'
+    },
+    headers: ['Resident Name', 'Room', 'Unit', 'Active ABT', 'Active IP/Precautions'],
+    rows,
+    footer: {
+      disclaimer: `Total Active Residents: ${activeResidents.length} | On Antibiotics: ${residentsWithABT} | On Precautions: ${residentsWithIP}. This packet is for surveyor reference. ✓ indicates active status; detailed information shown if selected.`
     }
   };
 };

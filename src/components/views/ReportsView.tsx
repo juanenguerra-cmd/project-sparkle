@@ -25,6 +25,8 @@ import {
   generateMonthlyABTReport,
   generateMedicareABTComplianceReport,
   generateIPReviewReport,
+  generateVaxReofferReport,
+  generateSurveyorPacket,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
 import ReportPreview from '@/components/reports/ReportPreview';
@@ -54,6 +56,10 @@ const ReportsView = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedProtocol, setSelectedProtocol] = useState('all');
+  
+  // Surveyor packet options
+  const [surveyorIncludeABT, setSurveyorIncludeABT] = useState(true);
+  const [surveyorIncludeIP, setSurveyorIncludeIP] = useState(true);
 
   const db = loadDB();
   const activeResidents = getActiveResidents(db).length;
@@ -91,6 +97,7 @@ const ReportsView = () => {
 
   const executiveReports = [
     { id: 'survey_readiness', name: 'Survey Readiness Packet', description: 'Comprehensive compliance documentation for CMS surveys' },
+    { id: 'surveyor_packet', name: 'Surveyor Census Packet', description: 'Active residents list with ABT/IP status for surveyor reference' },
     { id: 'qapi', name: 'QAPI Report', description: 'Quality metrics and performance indicators' },
     { id: 'infection_trends', name: 'Infection Rate Trends', description: 'Monthly/quarterly infection rate analysis' },
     { id: 'compliance', name: 'Compliance Crosswalk', description: 'Regulatory compliance status overview' },
@@ -101,9 +108,10 @@ const ReportsView = () => {
     { id: 'daily_ip', name: 'Daily IP Worklist', description: 'Active isolation precautions and EBP cases' },
     { id: 'abt_review', name: 'ABT Review Worklist', description: 'Antibiotic courses requiring review' },
     { id: 'vax_due', name: 'Vaccination Due List', description: 'Residents with upcoming or overdue vaccinations' },
+    { id: 'vax_reoffer', name: 'Vaccine Re-offer List', description: 'Residents due for vaccine re-offer (Flu: 30 days, COVID: 180 days)' },
     { id: 'precautions_list', name: 'Active Precautions List', description: 'Current isolation precautions by unit' },
     { id: 'exposure_log', name: 'Exposure Tracking Log', description: 'Potential exposure events and follow-ups' },
-    { id: 'vax_snapshot', name: 'Vaccination Snapshot', description: 'Weekly vaccination status with flu season logic' },
+    { id: 'vax_snapshot', name: 'Vaccination Snapshot', description: 'Active residents vaccination count (excludes discharged)' },
     { id: 'standard_of_care', name: 'Standard of Care Report', description: 'Weekly ABT, IP, VAX declinations by date range' },
     { id: 'followup_notes', name: 'Follow-up Notes Report', description: 'Overdue and pending follow-up items' },
     { id: 'monthly_abt', name: 'Monthly ABT Report', description: 'Residents on antibiotics for selected month' },
@@ -173,6 +181,12 @@ const ReportsView = () => {
         break;
       case 'ip_review':
         report = generateIPReviewReport(db, fromDate || undefined, toDate || undefined, selectedProtocol);
+        break;
+      case 'vax_reoffer':
+        report = generateVaxReofferReport(db, selectedVaccineType);
+        break;
+      case 'surveyor_packet':
+        report = generateSurveyorPacket(db, surveyorIncludeABT, surveyorIncludeIP);
         break;
       default:
         toast.error('Unknown report type');
@@ -729,6 +743,31 @@ const ReportsView = () => {
                   <SelectItem value="Standard Precautions">Standard Precautions</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            
+            {/* Surveyor Packet Options */}
+            <div className="min-w-[200px] border-l border-border pl-4">
+              <label className="text-sm font-medium mb-2 block">Surveyor Packet Options</label>
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={surveyorIncludeABT} 
+                    onChange={(e) => setSurveyorIncludeABT(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Include ABT Details
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={surveyorIncludeIP} 
+                    onChange={(e) => setSurveyorIncludeIP(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Include IP Details
+                </label>
+              </div>
             </div>
           </div>
         </div>
