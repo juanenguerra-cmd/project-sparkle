@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, TestTube } from 'lucide-react';
+import { Save, TestTube, FileText, BookOpen, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SectionCard from '@/components/dashboard/SectionCard';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { generateUserGuidePdf, generateTrackerCapabilitiesPdf } from '@/lib/pdf/userGuidePdf';
 
 const SettingsView = () => {
   const { toast } = useToast();
@@ -171,6 +172,44 @@ const SettingsView = () => {
             <Button variant="destructive" className="w-full justify-start">
               Clear All Data
             </Button>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Documentation">
+          <div className="space-y-4">
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
+                const doc = generateUserGuidePdf(facilityName || 'Healthcare Facility');
+                doc.save('ICN_Hub_User_Guide.pdf');
+                toast({
+                  title: 'User Guide Downloaded',
+                  description: 'The comprehensive user guide PDF has been saved'
+                });
+              }}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              Download User Guide (PDF)
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
+                const doc = generateTrackerCapabilitiesPdf(facilityName || 'Healthcare Facility');
+                doc.save('ICN_Hub_Tracker_Capabilities.pdf');
+                toast({
+                  title: 'Capabilities List Downloaded',
+                  description: 'The tracker capabilities summary PDF has been saved'
+                });
+              }}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Download Capabilities List (PDF)
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Download documentation for training and reference
+            </p>
           </div>
         </SectionCard>
       </div>

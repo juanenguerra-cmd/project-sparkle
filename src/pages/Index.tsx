@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ViewType } from '@/lib/types';
 import AppHeader from '@/components/layout/AppHeader';
 import Sidebar from '@/components/layout/Sidebar';
@@ -15,6 +15,7 @@ import ReportsView from '@/components/views/ReportsView';
 import AuditView from '@/components/views/AuditView';
 import SettingsView from '@/components/views/SettingsView';
 import DataManagementModal from '@/components/modals/DataManagementModal';
+import BackupReminderBanner from '@/components/BackupReminderBanner';
 import LockScreen from '@/components/LockScreen';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -22,10 +23,15 @@ const Index = () => {
   const [activeView, setActiveView] = useState<ViewType>('dashboard');
   const [surveyorMode, setSurveyorMode] = useState(false);
   const [showDataModal, setShowDataModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleAddResident = () => {
     setActiveView('census');
   };
+
+  const handleDataChange = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+  }, []);
 
   const renderView = () => {
     switch (activeView) {
@@ -59,6 +65,7 @@ const Index = () => {
   return (
     <LockScreen>
       <div className="min-h-screen bg-background">
+        <BackupReminderBanner onDataChange={handleDataChange} />
         <AppHeader 
           surveyorMode={surveyorMode}
           onToggleSurveyorMode={() => setSurveyorMode(!surveyorMode)}
@@ -87,7 +94,7 @@ const Index = () => {
         <DataManagementModal
           open={showDataModal}
           onClose={() => setShowDataModal(false)}
-          onDataChange={() => {}}
+          onDataChange={handleDataChange}
         />
         
         <Toaster />
