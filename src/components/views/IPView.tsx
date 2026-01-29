@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,9 @@ import { IPCase } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
 
-type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'resolved';
+type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
+type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol';
+type SortDir = 'asc' | 'desc';
 
 const IPView = () => {
   const { toast } = useToast();
@@ -19,6 +21,8 @@ const IPView = () => {
   const [activeFilter, setActiveFilter] = useState<IPFilter>('active');
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingCase, setEditingCase] = useState<IPCase | null>(null);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   
   const records = db.records.ip_cases;
 
@@ -29,36 +33,91 @@ const IPView = () => {
       .map(r => r.mrn)
   );
 
-  const filteredRecords = records.filter(r => {
-    const name = r.residentName || r.name || '';
-    const infectionType = r.infectionType || r.infection_type || '';
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      infectionType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.protocol.toLowerCase().includes(searchTerm.toLowerCase());
+  // Filter and sort records
+  const filteredRecords = useMemo(() => {
+    let filtered = records.filter(r => {
+      const name = r.residentName || r.name || '';
+      const infectionType = r.infectionType || r.infection_type || '';
+      const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        infectionType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.protocol.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+      
+      // For active views, exclude discharged residents from census
+      if (activeFilter === 'active' || activeFilter === 'ebp' || activeFilter === 'isolation' || activeFilter === 'standard') {
+        // Exclude Discharged/Resolved status
+        if (r.status === 'Discharged' || r.status === 'Resolved') return false;
+        // Exclude residents no longer on census
+        if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+      }
+      
+      switch (activeFilter) {
+        case 'active':
+          return r.status === 'Active';
+        case 'ebp':
+          return r.protocol === 'EBP' && r.status === 'Active';
+        case 'isolation':
+          return r.protocol === 'Isolation' && r.status === 'Active';
+        case 'standard':
+          return r.protocol === 'Standard Precautions' && r.status === 'Active';
+        case 'resolved':
+          return r.status === 'Resolved' || r.status === 'Discharged';
+        default:
+          return true;
+      }
+    });
     
-    if (!matchesSearch) return false;
+    // Sort records
+    filtered.sort((a, b) => {
+      let valA = '';
+      let valB = '';
+      
+      switch (sortField) {
+        case 'name':
+          valA = (a.residentName || a.name || '').toLowerCase();
+          valB = (b.residentName || b.name || '').toLowerCase();
+          break;
+        case 'room':
+          valA = a.room || '';
+          valB = b.room || '';
+          break;
+        case 'onset':
+          valA = a.onsetDate || a.onset_date || '';
+          valB = b.onsetDate || b.onset_date || '';
+          break;
+        case 'review':
+          valA = a.nextReviewDate || a.next_review_date || '';
+          valB = b.nextReviewDate || b.next_review_date || '';
+          break;
+        case 'protocol':
+          valA = a.protocol;
+          valB = b.protocol;
+          break;
+      }
+      
+      const cmp = valA.localeCompare(valB, undefined, { numeric: true });
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
     
-    // For active views, exclude discharged residents from census
-    if (activeFilter === 'active' || activeFilter === 'ebp' || activeFilter === 'isolation') {
-      // Exclude Discharged/Resolved status
-      if (r.status === 'Discharged' || r.status === 'Resolved') return false;
-      // Exclude residents no longer on census
-      if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    return filtered;
+  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
     }
-    
-    switch (activeFilter) {
-      case 'active':
-        return r.status === 'Active';
-      case 'ebp':
-        return r.protocol === 'EBP' && r.status === 'Active';
-      case 'isolation':
-        return r.protocol === 'Isolation' && r.status === 'Active';
-      case 'resolved':
-        return r.status === 'Resolved' || r.status === 'Discharged';
-      default:
-        return true;
-    }
-  });
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
+    return sortDir === 'asc' 
+      ? <ArrowUp className="w-3 h-3 ml-1" />
+      : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
 
   // Accurate active count - exclude discharged census residents
   const activeCount = records.filter(r => {
@@ -82,6 +141,12 @@ const IPView = () => {
   
   const isolationCount = records.filter(r => {
     if (r.protocol !== 'Isolation' || r.status !== 'Active') return false;
+    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    return true;
+  }).length;
+  
+  const standardCount = records.filter(r => {
+    if (r.protocol !== 'Standard Precautions' || r.status !== 'Active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
@@ -285,6 +350,13 @@ const IPView = () => {
               Isolation ({isolationCount})
             </Badge>
             <Badge 
+              variant={activeFilter === 'standard' ? 'default' : 'outline'} 
+              className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+              onClick={() => setActiveFilter('standard')}
+            >
+              Standard ({standardCount})
+            </Badge>
+            <Badge 
               variant={activeFilter === 'resolved' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
               onClick={() => setActiveFilter('resolved')}
@@ -307,13 +379,23 @@ const IPView = () => {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Resident</th>
-                  <th>Unit/Room</th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('name')}>
+                    <span className="flex items-center">Resident <SortIcon field="name" /></span>
+                  </th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('room')}>
+                    <span className="flex items-center">Unit/Room <SortIcon field="room" /></span>
+                  </th>
                   <th>Infection Type</th>
-                  <th>Protocol</th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('protocol')}>
+                    <span className="flex items-center">Protocol <SortIcon field="protocol" /></span>
+                  </th>
                   <th>Source</th>
-                  <th>Onset</th>
-                  <th>Next Review</th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('onset')}>
+                    <span className="flex items-center">Onset <SortIcon field="onset" /></span>
+                  </th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('review')}>
+                    <span className="flex items-center">Next Review <SortIcon field="review" /></span>
+                  </th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>

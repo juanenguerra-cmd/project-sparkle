@@ -38,6 +38,7 @@ export interface ABTRecord {
   start_date?: string;
   endDate?: string;
   end_date?: string;
+  plannedStopDate?: string;
   status: 'active' | 'completed' | 'discontinued';
   daysOfTherapy?: number;
   tx_days?: number | null;
@@ -46,6 +47,17 @@ export interface ABTRecord {
   createdAt?: string;
   updated_at?: string;
   source?: string;
+  // F881 Stewardship Fields
+  prescriber?: string;
+  symptomsChecklist?: string[];
+  cultureCollected?: boolean;
+  cultureResult?: string;
+  cultureReviewedDate?: string;
+  timeoutReviewDate?: string;
+  timeoutOutcome?: 'continue' | 'change' | 'stop' | null;
+  adverseEffects?: string;
+  cdiffRisk?: 'low' | 'medium' | 'high';
+  stewardshipNotes?: string;
 }
 
 export interface IPCase {
@@ -78,6 +90,15 @@ export interface IPCase {
   // Review tracking fields
   lastReviewDate?: string;
   reviewNotes?: string;
+  // F880 Enhanced Fields
+  triggerReason?: string;
+  highContactCare?: string[];
+  signagePosted?: boolean;
+  suppliesStocked?: boolean;
+  roomCheckDate?: string;
+  exposureLinked?: boolean;
+  outbreakId?: string;
+  requiredPPE?: string;
 }
 
 export interface VaxRecord {
@@ -98,6 +119,15 @@ export interface VaxRecord {
   due_date?: string;
   notes?: string;
   createdAt?: string;
+  // F883/F887 Enhanced Fields
+  offerDate?: string;
+  educationProvided?: boolean;
+  manufacturer?: string;
+  lotNumber?: string;
+  administrationSite?: string;
+  declineReason?: string;
+  consentFormAttached?: boolean;
+  nextDueDate?: string;
 }
 
 // Symptom types for auto-classification
