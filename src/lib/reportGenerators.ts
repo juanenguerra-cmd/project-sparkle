@@ -1,7 +1,7 @@
 // Report Generation Functions for ICN Hub
 import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents } from './database';
 import { IPCase, ABTRecord, VaxRecord, Resident, Note } from './types';
-import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays } from 'date-fns';
+import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays } from 'date-fns';
 
 export interface ReportData {
   title: string;
@@ -1513,6 +1513,246 @@ export const generateIPReviewReport = (
     rows,
     footer: {
       disclaimer: 'Review cadence: EBP = every 7 days, Isolation = every 3 days. Overdue items require immediate attention. Document review notes when completing assessments.'
+    }
+  };
+};
+
+// Hand Hygiene Compliance Report
+export const generateHandHygieneReport = (
+  db: ICNDatabase,
+  fromDate?: string,
+  toDate?: string
+): ReportData => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const defaultFrom = fromDate || format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const defaultTo = toDate || today;
+  
+  // Get active units for observation tracking
+  const units = [...new Set(
+    Object.values(db.census.residentsByMrn)
+      .filter(r => r.active_on_census && r.unit)
+      .map(r => r.unit)
+  )].sort();
+  
+  // Generate template rows for hand hygiene auditing
+  // In a real implementation, this would pull from an audits table
+  const rows = units.map(unit => {
+    const residentsInUnit = Object.values(db.census.residentsByMrn)
+      .filter(r => r.active_on_census && r.unit === unit).length;
+    
+    return [
+      unit,
+      residentsInUnit.toString(),
+      '', // Total Opportunities - to be filled
+      '', // Observed Compliance
+      '', // Compliance Rate %
+      '', // Before Patient Contact
+      '', // After Patient Contact
+      '', // After Body Fluid Exposure
+      '', // After Touching Surroundings
+      '', // Gel/Foam vs Soap %
+      '' // Notes
+    ];
+  });
+  
+  // Add summary row
+  const totalResidents = Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census).length;
+  
+  rows.push([
+    'FACILITY TOTAL',
+    totalResidents.toString(),
+    '', '', '', '', '', '', '', '', ''
+  ]);
+  
+  return {
+    title: 'HAND HYGIENE COMPLIANCE AUDIT REPORT',
+    subtitle: 'CDC 5 Moments of Hand Hygiene Monitoring',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      fromDate: defaultFrom,
+      toDate: defaultTo,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: [
+      'Unit',
+      'Census',
+      'Opportunities',
+      'Compliant',
+      'Rate %',
+      'Before Contact',
+      'After Contact',
+      'After Fluid',
+      'After Surround',
+      'Gel vs Soap',
+      'Notes'
+    ],
+    rows,
+    footer: {
+      disclaimer: 'Hand hygiene compliance based on WHO/CDC 5 Moments: (1) Before patient contact, (2) Before aseptic task, (3) After body fluid exposure, (4) After patient contact, (5) After touching patient surroundings. Target compliance: ≥85%. Record observations during routine care activities across all shifts.'
+    }
+  };
+};
+
+// PPE Usage Tracking Report
+export const generatePPEUsageReport = (
+  db: ICNDatabase,
+  fromDate?: string,
+  toDate?: string
+): ReportData => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const defaultFrom = fromDate || format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const defaultTo = toDate || today;
+  
+  // Get units with active precautions
+  const activeIPCases = getActiveIPCases(db);
+  const unitIPCounts = activeIPCases.reduce((acc, c) => {
+    const unit = c.unit || 'Unknown';
+    acc[unit] = (acc[unit] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const units = [...new Set(
+    Object.values(db.census.residentsByMrn)
+      .filter(r => r.active_on_census && r.unit)
+      .map(r => r.unit)
+  )].sort();
+  
+  // Generate template rows for PPE tracking
+  const rows = units.map(unit => {
+    const residentsInUnit = Object.values(db.census.residentsByMrn)
+      .filter(r => r.active_on_census && r.unit === unit).length;
+    const ipCasesInUnit = unitIPCounts[unit] || 0;
+    
+    return [
+      unit,
+      residentsInUnit.toString(),
+      ipCasesInUnit.toString(),
+      '', // Gloves Used
+      '', // Gowns Used
+      '', // Masks Used
+      '', // N95s Used
+      '', // Eye Protection
+      '', // Compliance Observations
+      '', // Compliance Rate
+      '' // Notes
+    ];
+  });
+  
+  // Summary row
+  const totalResidents = Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census).length;
+  const totalIPCases = activeIPCases.length;
+  
+  rows.push([
+    'FACILITY TOTAL',
+    totalResidents.toString(),
+    totalIPCases.toString(),
+    '', '', '', '', '', '', '', ''
+  ]);
+  
+  // Add PPE by precaution type summary
+  const ebpCases = activeIPCases.filter(c => c.protocol === 'EBP').length;
+  const isolationCases = activeIPCases.filter(c => c.protocol === 'Isolation').length;
+  const contactCases = activeIPCases.filter(c => c.isolationType === 'Contact' || c.isolation_type === 'Contact').length;
+  const dropletCases = activeIPCases.filter(c => c.isolationType === 'Droplet' || c.isolation_type === 'Droplet').length;
+  const airborneCases = activeIPCases.filter(c => c.isolationType === 'Airborne' || c.isolation_type === 'Airborne').length;
+  
+  rows.push(
+    ['', '', '', '', '', '', '', '', '', '', ''],
+    ['PRECAUTION SUMMARY', '', '', '', '', '', '', '', '', '', ''],
+    ['EBP Cases', ebpCases.toString(), 'Gloves + Gown for high-contact care', '', '', '', '', '', '', '', ''],
+    ['Contact Isolation', contactCases.toString(), 'Gloves + Gown required', '', '', '', '', '', '', '', ''],
+    ['Droplet Isolation', dropletCases.toString(), 'Surgical Mask + Gloves + Gown', '', '', '', '', '', '', '', ''],
+    ['Airborne Isolation', airborneCases.toString(), 'N95 + Gloves + Gown + Eye Protection', '', '', '', '', '', '', '', '']
+  );
+  
+  return {
+    title: 'PPE USAGE & COMPLIANCE TRACKING REPORT',
+    subtitle: 'Personal Protective Equipment Monitoring by Unit',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      fromDate: defaultFrom,
+      toDate: defaultTo,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: [
+      'Unit',
+      'Census',
+      'IP Cases',
+      'Gloves',
+      'Gowns',
+      'Masks',
+      'N95s',
+      'Eye Prot.',
+      'Observations',
+      'Compliance',
+      'Notes'
+    ],
+    rows,
+    footer: {
+      disclaimer: 'PPE requirements: EBP (gloves + gown for high-contact activities), Contact (gloves + gown), Droplet (surgical mask + gloves + gown), Airborne (N95 + eye protection + gloves + gown). Document donning/doffing observations and any breaks in technique. Target compliance: ≥95%.'
+    }
+  };
+};
+
+// Combined Hand Hygiene and PPE Audit Summary (for surveyors)
+export const generateHHPPEAuditSummary = (
+  db: ICNDatabase,
+  fromDate?: string,
+  toDate?: string
+): ReportData => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const defaultFrom = fromDate || format(subDays(new Date(), 30), 'yyyy-MM-dd');
+  const defaultTo = toDate || today;
+  
+  const totalResidents = Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census).length;
+  const activeIPCases = getActiveIPCases(db);
+  
+  const rows = [
+    ['HAND HYGIENE METRICS', '', '', ''],
+    ['Total Observation Opportunities', '', '', 'Fill in from audits'],
+    ['Compliant Observations', '', '', 'Fill in from audits'],
+    ['Overall Compliance Rate', '', '', 'Target: ≥85%'],
+    ['', '', '', ''],
+    ['BREAKDOWN BY 5 MOMENTS', '', '', ''],
+    ['1. Before Patient Contact', '', '', ''],
+    ['2. Before Aseptic Task', '', '', ''],
+    ['3. After Body Fluid Exposure Risk', '', '', ''],
+    ['4. After Patient Contact', '', '', ''],
+    ['5. After Touching Patient Surroundings', '', '', ''],
+    ['', '', '', ''],
+    ['PPE COMPLIANCE METRICS', '', '', ''],
+    ['Total Observations', '', '', 'Fill in from audits'],
+    ['Correct Donning Observed', '', '', ''],
+    ['Correct Doffing Observed', '', '', ''],
+    ['Overall PPE Compliance', '', '', 'Target: ≥95%'],
+    ['', '', '', ''],
+    ['CURRENT PRECAUTION STATUS', '', '', ''],
+    ['Active IP Cases', activeIPCases.length.toString(), `${((activeIPCases.length / totalResidents) * 100).toFixed(1)}%`, 'of census'],
+    ['EBP Cases', activeIPCases.filter(c => c.protocol === 'EBP').length.toString(), '', ''],
+    ['Isolation Cases', activeIPCases.filter(c => c.protocol === 'Isolation').length.toString(), '', ''],
+    ['', '', '', ''],
+    ['TRAINING & COMPETENCY', '', '', ''],
+    ['Staff Trained This Period', '', '', 'Fill in from records'],
+    ['Competency Validations', '', '', 'Fill in from records'],
+    ['Remediation Required', '', '', 'Fill in from records'],
+  ];
+  
+  return {
+    title: 'HAND HYGIENE & PPE AUDIT SUMMARY',
+    subtitle: 'Compliance Documentation for Surveyor Review',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      fromDate: defaultFrom,
+      toDate: defaultTo,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Metric', 'Count', 'Rate', 'Notes'],
+    rows,
+    footer: {
+      disclaimer: 'This report provides a template for documenting hand hygiene and PPE compliance as required by CMS F-Tag 880 (Infection Prevention and Control). Complete audit data should be entered from direct observation records. National benchmark for hand hygiene: 85%+; PPE compliance: 95%+.'
     }
   };
 };
