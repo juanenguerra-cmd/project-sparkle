@@ -44,25 +44,28 @@ const IPView = () => {
       
       if (!matchesSearch) return false;
       
+      // Normalize status for case-insensitive comparison
+      const status = (r.status || '').toLowerCase();
+      
       // For active views, exclude discharged residents from census
       if (activeFilter === 'active' || activeFilter === 'ebp' || activeFilter === 'isolation' || activeFilter === 'standard') {
-        // Exclude Discharged/Resolved status
-        if (r.status === 'Discharged' || r.status === 'Resolved') return false;
+        // Exclude Discharged/Resolved status (case-insensitive)
+        if (status === 'discharged' || status === 'resolved') return false;
         // Exclude residents no longer on census
         if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
       }
       
       switch (activeFilter) {
         case 'active':
-          return r.status === 'Active';
+          return status === 'active';
         case 'ebp':
-          return r.protocol === 'EBP' && r.status === 'Active';
+          return r.protocol === 'EBP' && status === 'active';
         case 'isolation':
-          return r.protocol === 'Isolation' && r.status === 'Active';
+          return r.protocol === 'Isolation' && status === 'active';
         case 'standard':
-          return r.protocol === 'Standard Precautions' && r.status === 'Active';
+          return r.protocol === 'Standard Precautions' && status === 'active';
         case 'resolved':
-          return r.status === 'Resolved' || r.status === 'Discharged';
+          return status === 'resolved' || status === 'discharged';
         default:
           return true;
       }
@@ -119,39 +122,47 @@ const IPView = () => {
       : <ArrowDown className="w-3 h-3 ml-1" />;
   };
 
-  // Accurate active count - exclude discharged census residents
+  // Accurate active count - exclude discharged census residents (case-insensitive)
   const activeCount = records.filter(r => {
-    if (r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const overdueCount = records.filter(r => {
-    if (r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     const reviewDate = r.nextReviewDate || r.next_review_date;
     return reviewDate && new Date(reviewDate) < new Date();
   }).length;
   
   const ebpCount = records.filter(r => {
-    if (r.protocol !== 'EBP' || r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (r.protocol !== 'EBP' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const isolationCount = records.filter(r => {
-    if (r.protocol !== 'Isolation' || r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (r.protocol !== 'Isolation' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const standardCount = records.filter(r => {
-    if (r.protocol !== 'Standard Precautions' || r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (r.protocol !== 'Standard Precautions' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
-  const resolvedCount = records.filter(r => r.status === 'Resolved' || r.status === 'Discharged').length;
+  const resolvedCount = records.filter(r => {
+    const status = (r.status || '').toLowerCase();
+    return status === 'resolved' || status === 'discharged';
+  }).length;
 
   const handleRefresh = () => {
     setDb(loadDB());
@@ -222,12 +233,13 @@ const IPView = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Active':
+    const normalizedStatus = (status || '').toLowerCase();
+    switch (normalizedStatus) {
+      case 'active':
         return <span className="badge-status badge-warn">Active</span>;
-      case 'Resolved':
+      case 'resolved':
         return <span className="badge-status badge-ok">Resolved</span>;
-      case 'Discharged':
+      case 'discharged':
         return <span className="badge-status badge-muted">Discharged</span>;
       default:
         return <span className="badge-status badge-muted">{status}</span>;
@@ -447,7 +459,7 @@ const IPView = () => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                          {record.status === 'Active' && (
+                          {(record.status || '').toLowerCase() === 'active' && (
                             <button 
                               type="button"
                               className="row-action-btn text-warning hover:text-warning" 

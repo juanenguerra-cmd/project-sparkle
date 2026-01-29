@@ -326,10 +326,12 @@ const getActiveCensusMrns = (db: ICNDatabase): Set<string> => {
 };
 
 // ABT helpers - excludes discharged residents and discontinued treatments
+// Status check is case-insensitive
 export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
   const activeMrns = getActiveCensusMrns(db);
   return db.records.abx.filter(r => {
-    if (r.status === 'completed' || r.status === 'discontinued') return false;
+    const status = (r.status || '').toLowerCase();
+    if (status === 'completed' || status === 'discontinued') return false;
     // Hard exclude discharged residents regardless of date
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
     return true;
@@ -337,20 +339,24 @@ export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
 };
 
 // IP helpers - excludes discharged residents
+// Status check is case-insensitive to handle both 'Active' and 'ACTIVE'
 export const getActiveIPCases = (db: ICNDatabase): IPCase[] => {
   const activeMrns = getActiveCensusMrns(db);
   return db.records.ip_cases.filter(r => {
-    if (r.status !== 'Active') return false;
+    const status = (r.status || '').toLowerCase();
+    if (status !== 'active') return false;
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
     return true;
   });
 };
 
 // VAX helpers - excludes discharged residents
+// Status check is case-insensitive
 export const getVaxDue = (db: ICNDatabase): VaxRecord[] => {
   const activeMrns = getActiveCensusMrns(db);
   return db.records.vax.filter(r => {
-    if (r.status !== 'due' && r.status !== 'overdue') return false;
+    const status = (r.status || '').toLowerCase();
+    if (status !== 'due' && status !== 'overdue') return false;
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
     return true;
   });
