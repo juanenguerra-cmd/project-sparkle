@@ -35,6 +35,14 @@ export const defaultReportDescriptions: Record<string, string> = {
   ip_review: 'IP cases due for protocol-based review. Tracks review cadence compliance and identifies overdue assessments.',
   hand_hygiene: 'CDC 5 Moments of Hand Hygiene audit template with opportunity tracking and compliance rate calculation.',
   ppe_usage: 'Personal protective equipment monitoring by unit and precaution type (EBP, Contact, Droplet, Airborne).',
+  
+  // Surveillance Reports
+  surv_trend: 'Monthly infection counts by category (UTI, Respiratory, Skin/Wound, GI, MDRO, COVID, Flu) with trending analysis.',
+  surv_acquired: 'Facility-acquired infections with onset dates, classification, and outcome tracking for surveillance.',
+  surv_rate_census: 'Infection rates calculated as a percentage of average monthly census by infection category.',
+  surv_rate_1000: 'Infection rates per 1,000 resident days by category - standard NHSN surveillance metric.',
+  surv_abt_1000: 'Antibiotic prescription starts per 1,000 resident days - key antibiotic stewardship metric.',
+  surv_aur: 'Antibiotic Utilization Ratio: Days of therapy (DOT) per 1,000 resident days with national benchmark comparison.',
 };
 
 /**
