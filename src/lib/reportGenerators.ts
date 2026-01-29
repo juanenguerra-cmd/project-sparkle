@@ -960,6 +960,8 @@ export const generateSurveyorPacket = (
     .sort((a, b) => a.name.localeCompare(b.name)); // Alphabetical order
   
   const activeABT = db.records.abx.filter(r => r.status === 'active');
+  // FIX: Include BOTH EBP and Isolation cases - check status === 'Active' 
+  // (both protocols should have Active status when currently on precautions)
   const activeIP = db.records.ip_cases.filter(c => c.status === 'Active');
   
   // Build lookup maps
@@ -1016,12 +1018,18 @@ export const generateSurveyorPacket = (
   const residentsWithABT = activeResidents.filter(r => abtByMrn[r.mrn]?.length > 0).length;
   const residentsWithIP = activeResidents.filter(r => ipByMrn[r.mrn]?.length > 0).length;
   
+  // Count by protocol type for footer detail
+  const ebpCount = activeIP.filter(c => c.protocol === 'EBP').length;
+  const isolationCount = activeIP.filter(c => c.protocol === 'Isolation').length;
+  
   return {
     title: 'SURVEYOR PACKET - ACTIVE RESIDENT LIST',
     subtitle: 'Current Census with Active ABT and IP Status',
     generatedAt: new Date().toISOString(),
     filters: {
+      unit: '', // For PDF header compatibility
       date: format(new Date(), 'MM/dd/yyyy'),
+      shift: '—',
       totalResidents: activeResidents.length.toString(),
       residentsOnABT: residentsWithABT.toString(),
       residentsOnIP: residentsWithIP.toString(),
@@ -1029,10 +1037,8 @@ export const generateSurveyorPacket = (
       showIPDetails: includeIP ? 'Yes' : 'Checkbox Only'
     },
     headers: ['Resident Name', 'Room', 'Unit', 'Active ABT', 'Active IP/Precautions'],
-    rows,
-    footer: {
-      disclaimer: `Total Active Residents: ${activeResidents.length} | On Antibiotics: ${residentsWithABT} | On Precautions: ${residentsWithIP}. This packet is for surveyor reference. ✓ indicates active status; detailed information shown if selected.`
-    }
+    rows
+    // NO footer for surveyor packet per user request
   };
 };
 
