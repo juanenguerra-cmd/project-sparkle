@@ -40,6 +40,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildDailyPrecautionListPdf, isDailyPrecautionListReport } from '@/lib/pdf/dailyPrecautionListPdf';
+import { buildSurveyorPacketPdf, isSurveyorPacketReport } from '@/lib/pdf/surveyorPacketPdf';
 import { generateBinderCoverPdf, generateBinderDividersPdf } from '@/lib/pdf/binderPdf';
 import { format, subDays } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -358,6 +359,15 @@ const ReportsView = () => {
       // Daily Precaution List: strict template PDF (matches on-screen preview)
       if (isDailyPrecautionListReport(currentReport)) {
         const doc = buildDailyPrecautionListPdf({ report: currentReport, facility });
+        const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+        doc.save(filename);
+        toast.success(`Exported as ${filename}`);
+        return;
+      }
+
+      // Surveyor Packet: no footer, repeating headers
+      if (isSurveyorPacketReport(currentReport)) {
+        const doc = buildSurveyorPacketPdf({ report: currentReport, facility });
         const filename = `${sanitizedTitle}_${dateStr}.pdf`;
         doc.save(filename);
         toast.success(`Exported as ${filename}`);
