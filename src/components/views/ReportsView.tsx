@@ -46,6 +46,7 @@ import { getReportDescription, saveReportDescription, resetReportDescription } f
 import ReportPreview from '@/components/reports/ReportPreview';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
+import SurveyModePanel from '@/components/reports/SurveyModePanel';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -57,7 +58,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-const ReportsView = () => {
+interface ReportsViewProps {
+  surveyorMode?: boolean;
+}
+
+const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   const [executiveOpen, setExecutiveOpen] = useState(true);
   const [operationalOpen, setOperationalOpen] = useState(true);
   const [surveillanceOpen, setSurveillanceOpen] = useState(true);
@@ -619,6 +624,9 @@ const ReportsView = () => {
           </Button>
         </div>
       </div>
+
+      {/* Survey Mode Quick Packs - Shown when surveyor mode is active */}
+      <SurveyModePanel surveyorMode={surveyorMode} />
 
       {/* Data Flow */}
       <SectionCard title="Integrated Data Flow">

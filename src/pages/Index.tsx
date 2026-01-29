@@ -52,7 +52,7 @@ const Index = () => {
       case 'outbreak':
         return <OutbreakView />;
       case 'reports':
-        return <ReportsView />;
+        return <ReportsView surveyorMode={surveyorMode} />;
       case 'audit':
         return <AuditView />;
       case 'settings':
