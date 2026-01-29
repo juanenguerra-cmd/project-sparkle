@@ -240,6 +240,8 @@ export interface AppSettings {
     windowStartMmdd?: string;
     windowEndMmdd?: string;
   }>;
+  // Custom report descriptions
+  customReportDescriptions?: Record<string, string>;
 }
 
 export interface AppDatabase {
