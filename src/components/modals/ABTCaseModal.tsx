@@ -20,6 +20,13 @@ interface ABTCaseModalProps {
 
 const INFECTION_SOURCES = ['Urinary', 'Respiratory', 'GI', 'Skin/Soft Tissue', 'Bloodstream', 'Other'];
 const ROUTES = ['PO', 'IV', 'IM', 'TOP', 'INH', 'PR', 'SL', 'TD'];
+const FREQUENCIES = ['QD', 'BID', 'TID', 'QID', 'Q4H', 'Q6H', 'Q8H', 'Q12H', 'PRN', 'STAT', 'Other'];
+const TIMEOUT_OUTCOMES = [
+  { value: '', label: '— Select —' },
+  { value: 'continue', label: 'Continue' },
+  { value: 'change', label: 'Change' },
+  { value: 'stop', label: 'Stop' },
+];
 
 const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) => {
   const { toast } = useToast();
@@ -34,12 +41,23 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     medication: '',
     dose: '',
     route: 'PO',
+    frequency: '',
     indication: '',
     infectionSource: 'Other',
     startDate: '',
     endDate: '',
+    plannedStopDate: '',
     status: 'active' as 'active' | 'completed' | 'discontinued',
     notes: '',
+    // F881 Stewardship Fields
+    prescriber: '',
+    cultureCollected: false,
+    cultureResult: '',
+    cultureReviewedDate: '',
+    timeoutReviewDate: '',
+    timeoutOutcome: '' as '' | 'continue' | 'change' | 'stop',
+    adverseEffects: '',
+    stewardshipNotes: '',
   });
 
   const db = loadDB();
@@ -63,12 +81,22 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
         medication: editRecord.medication || editRecord.med_name || '',
         dose: editRecord.dose,
         route: editRecord.route || 'PO',
+        frequency: editRecord.frequency || '',
         indication: editRecord.indication,
         infectionSource: editRecord.infection_source || 'Other',
         startDate: editRecord.startDate || editRecord.start_date || '',
         endDate: editRecord.endDate || editRecord.end_date || '',
+        plannedStopDate: editRecord.plannedStopDate || '',
         status: editRecord.status,
         notes: editRecord.notes || '',
+        prescriber: editRecord.prescriber || '',
+        cultureCollected: editRecord.cultureCollected || false,
+        cultureResult: editRecord.cultureResult || '',
+        cultureReviewedDate: editRecord.cultureReviewedDate || '',
+        timeoutReviewDate: editRecord.timeoutReviewDate || '',
+        timeoutOutcome: editRecord.timeoutOutcome || '',
+        adverseEffects: editRecord.adverseEffects || '',
+        stewardshipNotes: editRecord.stewardshipNotes || '',
       });
       setSearchTerm(editRecord.residentName || editRecord.name || '');
     } else {
@@ -87,12 +115,22 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       medication: '',
       dose: '',
       route: 'PO',
+      frequency: '',
       indication: '',
       infectionSource: 'Other',
       startDate: new Date().toISOString().slice(0, 10),
       endDate: '',
+      plannedStopDate: '',
       status: 'active',
       notes: '',
+      prescriber: '',
+      cultureCollected: false,
+      cultureResult: '',
+      cultureReviewedDate: '',
+      timeoutReviewDate: '',
+      timeoutOutcome: '',
+      adverseEffects: '',
+      stewardshipNotes: '',
     });
   };
 
@@ -109,10 +147,38 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
   };
 
   const handleSubmit = () => {
+    // Hard-stop validation per F881 stewardship requirements
     if (!formData.mrn || !formData.medication) {
       toast({
         title: 'Missing required fields',
         description: 'Please select a resident and enter medication.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!formData.indication) {
+      toast({
+        title: 'Missing indication',
+        description: 'Per F881 requirements, indication is required for antibiotic stewardship.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!formData.startDate) {
+      toast({
+        title: 'Missing start date',
+        description: 'Start date is required.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!formData.plannedStopDate && !formData.timeoutReviewDate) {
+      toast({
+        title: 'Missing stop date or timeout review',
+        description: 'Per F881, either planned stop date OR timeout review date is required.',
         variant: 'destructive'
       });
       return;
@@ -133,16 +199,27 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       med_name: formData.medication,
       dose: formData.dose,
       route: formData.route,
+      frequency: formData.frequency,
       indication: formData.indication,
       infection_source: formData.infectionSource,
       startDate: formData.startDate,
       start_date: formData.startDate,
       endDate: formData.endDate,
       end_date: formData.endDate,
+      plannedStopDate: formData.plannedStopDate,
       status: formData.status,
       tx_days: txDays,
       daysOfTherapy: txDays,
       notes: formData.notes,
+      // F881 Stewardship fields
+      prescriber: formData.prescriber,
+      cultureCollected: formData.cultureCollected,
+      cultureResult: formData.cultureResult,
+      cultureReviewedDate: formData.cultureReviewedDate,
+      timeoutReviewDate: formData.timeoutReviewDate,
+      timeoutOutcome: formData.timeoutOutcome || null,
+      adverseEffects: formData.adverseEffects,
+      stewardshipNotes: formData.stewardshipNotes,
       createdAt: editRecord?.createdAt || now,
       updated_at: now,
     };
@@ -269,8 +346,8 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
               />
             </div>
 
-            {/* Dose and Route */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Dose, Route, Frequency */}
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Dose</Label>
                 <Input 
@@ -293,12 +370,36 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-primary">Frequency</Label>
+                <Select value={formData.frequency} onValueChange={(v) => setFormData(p => ({ ...p, frequency: v }))}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCIES.map(f => (
+                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Prescriber */}
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-primary">Prescriber</Label>
+              <Input 
+                placeholder="Ordering physician name"
+                value={formData.prescriber}
+                onChange={(e) => setFormData(p => ({ ...p, prescriber: e.target.value }))}
+                className="text-sm"
+              />
             </div>
 
             {/* Indication and Source */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">Indication</Label>
+                <Label className="text-xs font-semibold text-primary">Indication *</Label>
                 <Input 
                   placeholder="e.g., UTI, Pneumonia..."
                   value={formData.indication}
@@ -322,9 +423,9 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
             </div>
 
             {/* Dates */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">Start Date</Label>
+                <Label className="text-xs font-semibold text-primary">Start Date *</Label>
                 <Input 
                   type="date"
                   value={formData.startDate}
@@ -333,7 +434,17 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">End Date</Label>
+                <Label className="text-xs font-semibold text-primary">Planned Stop Date *</Label>
+                <Input 
+                  type="date"
+                  value={formData.plannedStopDate}
+                  onChange={(e) => setFormData(p => ({ ...p, plannedStopDate: e.target.value }))}
+                  className="text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">Or set Timeout Review</p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-primary">Actual End Date</Label>
                 <Input 
                   type="date"
                   value={formData.endDate}
@@ -356,15 +467,101 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
               </div>
             </div>
 
-            {/* Notes */}
+            {/* Time-out Review (F881) */}
+            <div className="p-3 border rounded-lg bg-muted/30">
+              <p className="text-xs font-semibold text-primary mb-2">48-72h Time-out Review (F881)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Timeout Review Date *</Label>
+                  <Input 
+                    type="date"
+                    value={formData.timeoutReviewDate}
+                    onChange={(e) => setFormData(p => ({ ...p, timeoutReviewDate: e.target.value }))}
+                    className="text-sm"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Required if no Planned Stop Date</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Timeout Outcome</Label>
+                  <Select value={formData.timeoutOutcome} onValueChange={(v: '' | 'continue' | 'change' | 'stop') => setFormData(p => ({ ...p, timeoutOutcome: v }))}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="— Select —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEOUT_OUTCOMES.map(o => (
+                        <SelectItem key={o.value || 'none'} value={o.value || 'none'}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Culture Tracking */}
+            <div className="p-3 border rounded-lg bg-muted/30">
+              <p className="text-xs font-semibold text-primary mb-2">Culture Tracking</p>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1 flex items-center gap-2 pt-5">
+                  <input 
+                    type="checkbox"
+                    checked={formData.cultureCollected}
+                    onChange={(e) => setFormData(p => ({ ...p, cultureCollected: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                  <Label className="text-xs">Culture Collected</Label>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Culture Result</Label>
+                  <Input 
+                    placeholder="e.g., E. coli"
+                    value={formData.cultureResult}
+                    onChange={(e) => setFormData(p => ({ ...p, cultureResult: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Date Reviewed</Label>
+                  <Input 
+                    type="date"
+                    value={formData.cultureReviewedDate}
+                    onChange={(e) => setFormData(p => ({ ...p, cultureReviewedDate: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Adverse Effects */}
             <div className="space-y-1">
-              <Label className="text-xs font-semibold text-primary">Notes</Label>
-              <Textarea 
-                placeholder="Additional notes..."
-                value={formData.notes}
-                onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
-                className="text-sm h-20"
+              <Label className="text-xs font-semibold text-primary">Adverse Effects / C. diff Risk</Label>
+              <Input 
+                placeholder="Document any adverse reactions..."
+                value={formData.adverseEffects}
+                onChange={(e) => setFormData(p => ({ ...p, adverseEffects: e.target.value }))}
+                className="text-sm"
               />
+            </div>
+
+            {/* Notes and Stewardship Communication */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-primary">Clinical Notes</Label>
+                <Textarea 
+                  placeholder="Additional notes..."
+                  value={formData.notes}
+                  onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
+                  className="text-sm h-20"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-primary">Stewardship Communication Log</Label>
+                <Textarea 
+                  placeholder="Provider/pharmacy communications..."
+                  value={formData.stewardshipNotes}
+                  onChange={(e) => setFormData(p => ({ ...p, stewardshipNotes: e.target.value }))}
+                  className="text-sm h-20"
+                />
+              </div>
             </div>
           </div>
         </ScrollArea>
