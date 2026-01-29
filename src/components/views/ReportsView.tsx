@@ -27,6 +27,9 @@ import {
   generateIPReviewReport,
   generateVaxReofferReport,
   generateSurveyorPacket,
+  generateHandHygieneReport,
+  generatePPEUsageReport,
+  generateHHPPEAuditSummary,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
 import ReportPreview from '@/components/reports/ReportPreview';
@@ -36,7 +39,9 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { buildDailyPrecautionListPdf, isDailyPrecautionListReport } from '@/lib/pdf/dailyPrecautionListPdf';
+import { generateBinderCoverPdf, generateBinderDividersPdf } from '@/lib/pdf/binderPdf';
 import { format, subDays } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ReportsView = () => {
   const [executiveOpen, setExecutiveOpen] = useState(true);
@@ -102,6 +107,7 @@ const ReportsView = () => {
     { id: 'infection_trends', name: 'Infection Rate Trends', description: 'Monthly/quarterly infection rate analysis' },
     { id: 'compliance', name: 'Compliance Crosswalk', description: 'Regulatory compliance status overview' },
     { id: 'medicare_compliance', name: 'Medicare ABT Compliance', description: 'Flag inappropriate antibiotic indications' },
+    { id: 'hh_ppe_summary', name: 'Hand Hygiene & PPE Audit Summary', description: 'Compliance documentation for surveyor review' },
   ];
 
   const operationalReports = [
@@ -116,6 +122,8 @@ const ReportsView = () => {
     { id: 'followup_notes', name: 'Follow-up Notes Report', description: 'Overdue and pending follow-up items' },
     { id: 'monthly_abt', name: 'Monthly ABT Report', description: 'Residents on antibiotics for selected month' },
     { id: 'ip_review', name: 'IP Review Worklist', description: 'Cases due for review by protocol cadence' },
+    { id: 'hand_hygiene', name: 'Hand Hygiene Compliance Report', description: 'CDC 5 Moments monitoring audit template' },
+    { id: 'ppe_usage', name: 'PPE Usage Tracking Report', description: 'Personal protective equipment monitoring by unit' },
   ];
 
   const handleGenerateReport = (reportId: string) => {
@@ -187,6 +195,15 @@ const ReportsView = () => {
         break;
       case 'surveyor_packet':
         report = generateSurveyorPacket(db, surveyorIncludeABT, surveyorIncludeIP);
+        break;
+      case 'hand_hygiene':
+        report = generateHandHygieneReport(db, fromDate || undefined, toDate || undefined);
+        break;
+      case 'ppe_usage':
+        report = generatePPEUsageReport(db, fromDate || undefined, toDate || undefined);
+        break;
+      case 'hh_ppe_summary':
+        report = generateHHPPEAuditSummary(db, fromDate || undefined, toDate || undefined);
         break;
       default:
         toast.error('Unknown report type');
@@ -589,6 +606,45 @@ const ReportsView = () => {
           </CollapsibleContent>
         </SectionCard>
       </Collapsible>
+
+      {/* Binder Organization Tools */}
+      <SectionCard title="Infection Control Binder Organization">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Generate printable cover pages and section dividers for organizing your physical Infection Control binder.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const facility = db.settings.facilityName || 'Healthcare Facility';
+                const doc = generateBinderCoverPdf(facility);
+                doc.save(`infection_control_binder_cover_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+                toast.success('Binder cover page downloaded');
+              }}
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              Download Cover Page
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const facility = db.settings.facilityName || 'Healthcare Facility';
+                const doc = generateBinderDividersPdf(facility);
+                doc.save(`infection_control_binder_dividers_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+                toast.success('Binder dividers downloaded (8 sections)');
+              }}
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              Download Section Dividers
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground mt-2">
+            <strong>Sections included:</strong> Infection Prevention • Antibiotic Stewardship • Immunization Tracking • 
+            Surveillance & Trending • Compliance & Survey • Hand Hygiene & PPE • Outbreak Management • Clinical Notes
+          </div>
+        </div>
+      </SectionCard>
 
       {/* Scheduled Reports */}
       <SectionCard title="Scheduled Reports">

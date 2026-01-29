@@ -1,6 +1,6 @@
 # ICN Hub - Implementation Status
 
-## ✅ COMPLETED: Extended Reporting Suite + Surveyor Reports + CMS/CDC Compliance
+## ✅ COMPLETED: Extended Reporting Suite + Surveyor Reports + CMS/CDC Compliance + HH/PPE + Binder
 
 ---
 
@@ -19,7 +19,32 @@
 | 7 | **Medicare ABT Compliance Report** | ✅ Done | Flags inappropriate/missing indications |
 | 8 | **IP Tracker Review Report** | ✅ Done | Cases due for review by protocol cadence |
 
-### 2. Vaccine Re-offer Logic (CDC Guidelines)
+### 2. Hand Hygiene & PPE Tracking (NEW)
+
+| Report | Purpose | Key Features |
+|--------|---------|--------------|
+| **Hand Hygiene Compliance Report** | CDC 5 Moments audit template | Unit-based tracking, compliance rate columns, observations |
+| **PPE Usage Tracking Report** | Personal protective equipment monitoring | PPE counts by type, precaution summary, compliance tracking |
+| **HH & PPE Audit Summary** | Surveyor documentation | Combined metrics, training/competency tracking |
+
+### 3. Infection Control Binder Organization (NEW)
+
+| Feature | Description |
+|---------|-------------|
+| **Binder Cover Page PDF** | Professional cover with facility branding, IC logo, section preview |
+| **Section Dividers PDF** | 8 color-coded dividers with document checklists and notes sections |
+
+**Sections included:**
+1. Infection Prevention (Red)
+2. Antibiotic Stewardship (Blue)
+3. Immunization Tracking (Green)
+4. Surveillance & Trending (Purple)
+5. Compliance & Survey (Orange)
+6. Hand Hygiene & PPE (Cyan)
+7. Outbreak Management (Pink)
+8. Clinical Notes (Gray)
+
+### 4. Vaccine Re-offer Logic (CDC Guidelines)
 
 | Vaccine | Re-offer Logic |
 |---------|----------------|
@@ -27,17 +52,7 @@
 | COVID-19 | Re-offer 180+ days after decline |
 | RSV/Pneumonia | Re-offer annually (365+ days) |
 
-### 3. Surveyor Packet Features
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Alphabetical resident list | ✅ Done | Sorted by name |
-| Room and Unit columns | ✅ Done | Standard layout |
-| Checkbox: Include ABT Details | ✅ Done | Shows medication + indication or ✓ |
-| Checkbox: Include IP Details | ✅ Done | Shows protocol + infection or ✓ |
-| Summary counts | ✅ Done | Total residents, on ABT, on precautions |
-
-### 4. CMS/NYSDOH/CDC Compliance Enhancements
+### 5. CMS/NYSDOH/CDC Compliance Enhancements
 
 | Feature | Compliance Area |
 |---------|-----------------|
@@ -46,6 +61,8 @@
 | Flu season vaccination tracking | CDC Immunization Guidelines |
 | COVID re-offer timing | CDC COVID-19 Guidelines |
 | Protocol-based review cadence | NYSDOH IP Standards |
+| Hand Hygiene 5 Moments | WHO/CDC Guidelines |
+| PPE Compliance Tracking | CMS F-Tag 880 |
 
 ---
 
@@ -53,26 +70,16 @@
 
 | File | Changes |
 |------|---------|
-| `src/lib/reportGenerators.ts` | Updated VaxSnapshot, added VaxReofferReport, added SurveyorPacket |
-| `src/components/views/ReportsView.tsx` | Added new reports, surveyor packet checkboxes |
-
----
-
-## Additional Reports Surveyors May Request
-
-These reports are now available:
-
-1. **Survey Readiness Packet** - Comprehensive compliance documentation
-2. **Compliance Crosswalk** - F-Tag 880-887 status overview
-3. **QAPI Summary** - Quality metrics and rates
-4. **Infection Rate Trends** - Monthly/quarterly analysis
-5. **Surveyor Census Packet** - Active resident list with ABT/IP status
-6. **Vaccination Snapshot** - Current immunization status
-7. **Medicare ABT Compliance** - Antibiotic stewardship documentation
-8. **IP Review Worklist** - Protocol compliance tracking
+| `src/lib/reportGenerators.ts` | Added VaxSnapshot, VaxReoffer, SurveyorPacket, HandHygiene, PPEUsage, HHPPEAuditSummary |
+| `src/components/views/ReportsView.tsx` | Added new reports, binder download buttons, surveyor packet checkboxes |
+| `src/lib/pdf/binderPdf.ts` | NEW - Binder cover and dividers PDF generation |
 
 ---
 
 ## Ready for Deployment
 
-The application is ready for deployment with enhanced surveyor-ready reporting.
+The application is ready for deployment with:
+- 20+ specialized reports
+- Surveyor-ready documentation
+- Hand Hygiene & PPE compliance tracking
+- Printable binder organization tools
