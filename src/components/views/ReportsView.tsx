@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, Edit2, RotateCcw } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, Edit2, RotateCcw, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +32,16 @@ import {
   generateHHPPEAuditSummary,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
+import {
+  generateInfectionSurveillanceTrend,
+  generateInfectionAcquired,
+  generateInfectionRateByCensus,
+  generateInfectionRatePer1000Days,
+  generateABTStartsPer1000Days,
+  generateAntibioticUtilizationRatio,
+  getQuarterDates,
+  SurveillanceReportData
+} from '@/lib/reports/surveillanceReports';
 import { getReportDescription, saveReportDescription, resetReportDescription } from '@/lib/reportDescriptions';
 import ReportPreview from '@/components/reports/ReportPreview';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
@@ -42,13 +52,15 @@ import autoTable from 'jspdf-autotable';
 import { buildDailyPrecautionListPdf, isDailyPrecautionListReport } from '@/lib/pdf/dailyPrecautionListPdf';
 import { buildSurveyorPacketPdf, isSurveyorPacketReport } from '@/lib/pdf/surveyorPacketPdf';
 import { generateBinderCoverPdf, generateBinderDividersPdf } from '@/lib/pdf/binderPdf';
-import { format, subDays } from 'date-fns';
+import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 const ReportsView = () => {
   const [executiveOpen, setExecutiveOpen] = useState(true);
   const [operationalOpen, setOperationalOpen] = useState(true);
+  const [surveillanceOpen, setSurveillanceOpen] = useState(true);
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [selectedShift, setSelectedShift] = useState('Day');
   const [fromDate, setFromDate] = useState('');
@@ -73,6 +85,20 @@ const ReportsView = () => {
   const [editingReportId, setEditingReportId] = useState<string | null>(null);
   const [editingDescription, setEditingDescription] = useState('');
   const [, setDescriptionRefresh] = useState(0); // Force re-render when descriptions change
+  
+  // Surveillance report filters
+  const [surveillancePeriodType, setSurveillancePeriodType] = useState<'range' | 'quarter'>('range');
+  const [surveillanceQuarter, setSurveillanceQuarter] = useState<'1' | '2' | '3' | '4'>(() => {
+    const currentQuarter = Math.floor(new Date().getMonth() / 3) + 1;
+    return currentQuarter.toString() as '1' | '2' | '3' | '4';
+  });
+  const [surveillanceYear, setSurveillanceYear] = useState(new Date().getFullYear().toString());
+  const [surveillanceFromDate, setSurveillanceFromDate] = useState(() => 
+    format(subMonths(new Date(), 5), 'yyyy-MM-dd')
+  );
+  const [surveillanceToDate, setSurveillanceToDate] = useState(() => 
+    format(new Date(), 'yyyy-MM-dd')
+  );
 
   const db = loadDB();
   const activeResidents = getActiveResidents(db).length;
@@ -107,6 +133,40 @@ const ReportsView = () => {
       label: y.toString()
     }));
   }, []);
+  
+  // Surveillance reports definition
+  const surveillanceReports = [
+    { 
+      id: 'surv_trend', 
+      name: 'Infection Surveillance Trend', 
+      description: 'Monthly infection counts by category with trending analysis' 
+    },
+    { 
+      id: 'surv_acquired', 
+      name: 'Infections Acquired', 
+      description: 'Facility-acquired infections with onset dates and classification' 
+    },
+    { 
+      id: 'surv_rate_census', 
+      name: 'Infection Rate by Census', 
+      description: 'Infection rates calculated against average monthly census' 
+    },
+    { 
+      id: 'surv_rate_1000', 
+      name: 'Infection Rate per 1000 Resident Days', 
+      description: 'Infection rates per 1,000 resident days by category' 
+    },
+    { 
+      id: 'surv_abt_1000', 
+      name: 'ABT Starts per 1000 Resident Days', 
+      description: 'Antibiotic prescription starts per 1,000 resident days' 
+    },
+    { 
+      id: 'surv_aur', 
+      name: 'Antibiotic Utilization Ratio (AUR)', 
+      description: 'Days of therapy (DOT) per 1,000 resident days with benchmark comparison' 
+    },
+  ];
 
   const executiveReports = [
     { id: 'survey_readiness', name: 'Survey Readiness Packet', description: 'Comprehensive compliance documentation for CMS surveys' },
@@ -213,6 +273,56 @@ const ReportsView = () => {
       case 'hh_ppe_summary':
         report = generateHHPPEAuditSummary(db, fromDate || undefined, toDate || undefined);
         break;
+      // Surveillance Reports
+      case 'surv_trend':
+      case 'surv_acquired':
+      case 'surv_rate_census':
+      case 'surv_rate_1000':
+      case 'surv_abt_1000':
+      case 'surv_aur': {
+        // Determine date range based on period type
+        let startDate: Date;
+        let endDate: Date;
+        
+        if (surveillancePeriodType === 'quarter') {
+          const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
+          const year = parseInt(surveillanceYear);
+          const dates = getQuarterDates(quarterNum, year);
+          startDate = dates.start;
+          endDate = dates.end;
+        } else {
+          startDate = surveillanceFromDate ? parseISO(surveillanceFromDate) : subMonths(new Date(), 5);
+          endDate = surveillanceToDate ? parseISO(surveillanceToDate) : new Date();
+        }
+        
+        let survReport: SurveillanceReportData;
+        switch (reportId) {
+          case 'surv_trend':
+            survReport = generateInfectionSurveillanceTrend(db, startDate, endDate);
+            break;
+          case 'surv_acquired':
+            survReport = generateInfectionAcquired(db, startDate, endDate);
+            break;
+          case 'surv_rate_census':
+            survReport = generateInfectionRateByCensus(db, startDate, endDate);
+            break;
+          case 'surv_rate_1000':
+            survReport = generateInfectionRatePer1000Days(db, startDate, endDate);
+            break;
+          case 'surv_abt_1000':
+            survReport = generateABTStartsPer1000Days(db, startDate, endDate);
+            break;
+          case 'surv_aur':
+          default:
+            survReport = generateAntibioticUtilizationRatio(db, startDate, endDate);
+            break;
+        }
+        
+        setCurrentReport(survReport);
+        setTrendReport(null);
+        toast.success(`Generated: ${survReport.title}`);
+        return;
+      }
       default:
         toast.error('Unknown report type');
         return;
@@ -756,6 +866,194 @@ const ReportsView = () => {
                           variant="outline"
                           onClick={() => handleGenerateReport(report.id)}
                         >
+                          Generate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CollapsibleContent>
+        </SectionCard>
+      </Collapsible>
+
+      {/* Antibiotic & Infection Surveillance Reports */}
+      <Collapsible open={surveillanceOpen} onOpenChange={setSurveillanceOpen}>
+        <SectionCard 
+          title="Antibiotic & Infection Surveillance"
+          actions={
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronDown className={`w-4 h-4 transition-transform ${surveillanceOpen ? '' : '-rotate-90'}`} />
+              </Button>
+            </CollapsibleTrigger>
+          }
+        >
+          <CollapsibleContent>
+            {/* Date Range / Quarter Selector */}
+            <div className="bg-muted/30 rounded-lg p-4 mb-4">
+              <div className="flex flex-wrap items-end gap-4">
+                {/* Period Type Toggle */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Period Type</label>
+                  <div className="inline-flex rounded-md border border-input overflow-hidden">
+                    <button
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        surveillancePeriodType === 'range'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                      onClick={() => setSurveillancePeriodType('range')}
+                    >
+                      Date Range
+                    </button>
+                    <button
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-l border-input ${
+                        surveillancePeriodType === 'quarter'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                      onClick={() => setSurveillancePeriodType('quarter')}
+                    >
+                      Quarter
+                    </button>
+                  </div>
+                </div>
+
+                {surveillancePeriodType === 'range' ? (
+                  <>
+                    <div className="min-w-[150px]">
+                      <label className="text-sm font-medium mb-2 block">From Date</label>
+                      <Input 
+                        type="date" 
+                        value={surveillanceFromDate} 
+                        onChange={e => setSurveillanceFromDate(e.target.value)} 
+                      />
+                    </div>
+                    <div className="min-w-[150px]">
+                      <label className="text-sm font-medium mb-2 block">To Date</label>
+                      <Input 
+                        type="date" 
+                        value={surveillanceToDate} 
+                        onChange={e => setSurveillanceToDate(e.target.value)} 
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-w-[120px]">
+                      <label className="text-sm font-medium mb-2 block">Quarter</label>
+                      <Select 
+                        value={surveillanceQuarter} 
+                        onValueChange={(v) => setSurveillanceQuarter(v as '1' | '2' | '3' | '4')}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Q1 (Jan-Mar)</SelectItem>
+                          <SelectItem value="2">Q2 (Apr-Jun)</SelectItem>
+                          <SelectItem value="3">Q3 (Jul-Sep)</SelectItem>
+                          <SelectItem value="4">Q4 (Oct-Dec)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="min-w-[100px]">
+                      <label className="text-sm font-medium mb-2 block">Year</label>
+                      <Select value={surveillanceYear} onValueChange={setSurveillanceYear}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map(y => (
+                            <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-3">
+                Reports will be generated with monthly breakdowns for the selected period. 
+                Rates are calculated per average census and resident days.
+              </p>
+            </div>
+
+            {/* Report Cards */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {surveillanceReports.map((report) => {
+                const description = getReportDescription(report.id) || report.description;
+                const isEditing = editingReportId === report.id;
+                
+                return (
+                  <div key={report.id} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
+                    <div className="flex items-start gap-3">
+                      <BarChart3 className="w-5 h-5 text-primary mt-0.5" />
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-semibold text-sm">{report.name}</h4>
+                          <div className="flex items-center gap-1">
+                            {isEditing ? (
+                              <>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => {
+                                    saveReportDescription(report.id, editingDescription);
+                                    setEditingReportId(null);
+                                    setDescriptionRefresh(n => n + 1);
+                                    toast.success('Description updated');
+                                  }}
+                                  title="Save"
+                                >
+                                  ✓
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => setEditingReportId(null)}
+                                  title="Cancel"
+                                >
+                                  ✕
+                                </Button>
+                              </>
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+                                onClick={() => {
+                                  setEditingReportId(report.id);
+                                  setEditingDescription(description);
+                                }}
+                                title="Edit description"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        {isEditing ? (
+                          <Textarea
+                            value={editingDescription}
+                            onChange={(e) => setEditingDescription(e.target.value)}
+                            className="text-xs mb-3 min-h-[50px]"
+                            placeholder="Enter report description..."
+                          />
+                        ) : (
+                          <p className="text-xs text-muted-foreground mb-3">{description}</p>
+                        )}
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleGenerateReport(report.id)}
+                        >
+                          <TrendingUp className="w-3 h-3 mr-1" />
                           Generate
                         </Button>
                       </div>
