@@ -359,25 +359,24 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center relative">
               <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
               <p className="text-sm text-muted-foreground mb-3">
                 Select a backup JSON file to restore your data
               </p>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportFile}
-                className="hidden"
-                id="import-file-input"
-              />
-              <Button 
-                variant="outline" 
-                onClick={() => document.getElementById('import-file-input')?.click()}
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Choose Backup File
-              </Button>
+              <div className="relative inline-block">
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={handleImportFile}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  style={{ display: 'block' }}
+                />
+                <Button variant="outline" className="pointer-events-none">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Choose Backup File
+                </Button>
+              </div>
             </div>
             
             <div className="text-center">
