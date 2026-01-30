@@ -317,20 +317,20 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
               <p className="text-sm text-muted-foreground mb-3">
                 Select a backup JSON file to restore your data
               </p>
-              <label>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportFile}
-                  className="hidden"
-                />
-                <Button variant="outline" className="cursor-pointer" asChild>
-                  <span>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose Backup File
-                  </span>
-                </Button>
-              </label>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImportFile}
+                className="hidden"
+                id="import-file-input"
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => document.getElementById('import-file-input')?.click()}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Choose Backup File
+              </Button>
             </div>
             
             <div className="text-center">
