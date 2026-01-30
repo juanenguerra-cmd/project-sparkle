@@ -1,24 +1,11 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
 import { exportDBToJSON, importDBFromJSON, clearDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { Download, Upload, Trash2 } from 'lucide-react';
 import { todayISO } from '@/lib/parsers';
-
-type ImportMode = 'merge' | 'replace';
+import ImportPreviewModal, { parseBackupPreview, BackupPreview, ImportMode } from './ImportPreviewModal';
 
 interface DataManagementModalProps {
   open: boolean;
@@ -28,9 +15,10 @@ interface DataManagementModalProps {
 
 const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModalProps) => {
   const [importing, setImporting] = useState(false);
-  const [importMode, setImportMode] = useState<ImportMode>('merge');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [preview, setPreview] = useState<BackupPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -56,12 +44,27 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     setPendingFile(file);
-    setShowConfirmDialog(true);
+    setPreviewLoading(true);
+    setShowPreview(true);
+    
+    try {
+      const backupPreview = await parseBackupPreview(file);
+      setPreview(backupPreview);
+    } catch (err) {
+      setPreview({
+        isValid: false,
+        errors: ['Failed to parse backup file'],
+        warnings: [],
+        counts: { residents: 0, abt: 0, ipCases: 0, vax: 0, notes: 0, outbreaks: 0, contacts: 0 }
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
     
     // Reset file input for re-selection
     if (fileInputRef.current) {
@@ -69,15 +72,15 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
     }
   };
 
-  const handleConfirmImport = async () => {
+  const handleConfirmImport = async (mode: ImportMode) => {
     if (!pendingFile) return;
     
-    setShowConfirmDialog(false);
+    setShowPreview(false);
     setImporting(true);
     
     try {
       // If replace mode, clear existing data first
-      if (importMode === 'replace') {
+      if (mode === 'replace') {
         clearDB();
       }
       
@@ -86,7 +89,7 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
       
       if (result.success) {
         toast({
-          title: importMode === 'replace' ? 'Data Replaced' : 'Import Successful',
+          title: mode === 'replace' ? 'Data Replaced' : 'Import Successful',
           description: result.message
         });
         onDataChange();
@@ -106,12 +109,14 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
     } finally {
       setImporting(false);
       setPendingFile(null);
+      setPreview(null);
     }
   };
 
-  const handleCancelImport = () => {
-    setShowConfirmDialog(false);
+  const handleCancelPreview = () => {
+    setShowPreview(false);
     setPendingFile(null);
+    setPreview(null);
   };
 
   const handleClearData = () => {
@@ -160,34 +165,6 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
               Export All Data (JSON)
             </Button>
             
-            {/* Import Mode Selection */}
-            <div className="space-y-3 p-3 border rounded-lg bg-muted/30">
-              <Label className="text-sm font-medium">Import Mode</Label>
-              <RadioGroup
-                value={importMode}
-                onValueChange={(v) => setImportMode(v as ImportMode)}
-                className="flex flex-col gap-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="merge" id="merge" />
-                  <Label htmlFor="merge" className="text-sm font-normal cursor-pointer">
-                    Merge with existing data
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="replace" id="replace" />
-                  <Label htmlFor="replace" className="text-sm font-normal cursor-pointer">
-                    Replace all existing data
-                  </Label>
-                </div>
-              </RadioGroup>
-              <p className="text-xs text-muted-foreground">
-                {importMode === 'merge' 
-                  ? 'New records will be added. Existing records with the same ID will be updated.'
-                  : 'All current data will be cleared before importing.'}
-              </p>
-            </div>
-            
             <Button 
               variant="outline" 
               className="w-full justify-start"
@@ -229,39 +206,14 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
         </DialogContent>
       </Dialog>
 
-      {/* Import Confirmation Dialog */}
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {importMode === 'replace' && <AlertTriangle className="w-5 h-5 text-destructive" />}
-              Confirm Import
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                <strong>File:</strong> {pendingFile?.name}
-              </p>
-              <p>
-                <strong>Mode:</strong> {importMode === 'merge' ? 'Merge with existing data' : 'Replace all existing data'}
-              </p>
-              {importMode === 'replace' && (
-                <p className="text-destructive font-medium">
-                  Warning: This will permanently delete all current data before importing!
-                </p>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleCancelImport}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmImport}
-              className={importMode === 'replace' ? 'bg-destructive hover:bg-destructive/90' : ''}
-            >
-              {importMode === 'replace' ? 'Replace & Import' : 'Merge & Import'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ImportPreviewModal
+        open={showPreview}
+        file={pendingFile}
+        onClose={handleCancelPreview}
+        onConfirm={handleConfirmImport}
+        preview={preview}
+        loading={previewLoading}
+      />
     </>
   );
 };
