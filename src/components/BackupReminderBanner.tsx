@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { exportDBToJSON, importDBFromJSON, loadDB, saveDB } from '@/lib/database';
+import { exportDBToJSON, importDBFromJSON, loadDB, clearDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { todayISO } from '@/lib/parsers';
 import { differenceInHours, differenceInDays, parseISO, format } from 'date-fns';
+import ImportPreviewModal, { parseBackupPreview, BackupPreview, ImportMode } from '@/components/modals/ImportPreviewModal';
 
 interface BackupSettings {
   reminderEnabled: boolean;
@@ -59,6 +60,13 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [isFirstVisit, setIsFirstVisit] = useState(false);
+  
+  // Preview modal state
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [preview, setPreview] = useState<BackupPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  
   const { toast } = useToast();
 
   // Check if backup reminder should show
@@ -187,16 +195,49 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    // Reset input immediately
+    e.target.value = '';
+    
+    // Show preview modal
+    setPendingFile(file);
+    setPreviewLoading(true);
+    setShowPreview(true);
+    setShowImportModal(false);
+    
     try {
-      const text = await file.text();
+      const backupPreview = await parseBackupPreview(file);
+      setPreview(backupPreview);
+    } catch (err) {
+      setPreview({
+        isValid: false,
+        errors: ['Failed to parse backup file'],
+        warnings: [],
+        counts: { residents: 0, abt: 0, ipCases: 0, vax: 0, notes: 0, outbreaks: 0, contacts: 0 }
+      });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleConfirmImport = async (mode: ImportMode) => {
+    if (!pendingFile) return;
+    
+    setShowPreview(false);
+    
+    try {
+      // If replace mode, clear existing data first
+      if (mode === 'replace') {
+        clearDB();
+      }
+      
+      const text = await pendingFile.text();
       const result = await importDBFromJSON(text);
       
       if (result.success) {
         toast({
-          title: 'Import Successful',
+          title: mode === 'replace' ? 'Data Replaced' : 'Import Successful',
           description: result.message,
         });
-        setShowImportModal(false);
         onDataChange?.();
       } else {
         toast({
@@ -211,10 +252,16 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
         description: 'Failed to read file',
         variant: 'destructive',
       });
+    } finally {
+      setPendingFile(null);
+      setPreview(null);
     }
-    
-    // Reset input
-    e.target.value = '';
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreview(false);
+    setPendingFile(null);
+    setPreview(null);
   };
 
   const getTimeSinceBackup = (): string => {
@@ -341,6 +388,15 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ImportPreviewModal
+        open={showPreview}
+        file={pendingFile}
+        onClose={handleCancelPreview}
+        onConfirm={handleConfirmImport}
+        preview={preview}
+        loading={previewLoading}
+      />
     </>
   );
 };
