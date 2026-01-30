@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ViewType } from '@/lib/types';
 import AppHeader from '@/components/layout/AppHeader';
 import Sidebar from '@/components/layout/Sidebar';
@@ -18,6 +18,7 @@ import DataManagementModal from '@/components/modals/DataManagementModal';
 import BackupReminderBanner from '@/components/BackupReminderBanner';
 import LockScreen from '@/components/LockScreen';
 import { Toaster } from '@/components/ui/toaster';
+import { useDataLoader } from '@/hooks/useDataLoader';
 
 const Index = () => {
   const [activeView, setActiveView] = useState<ViewType>('dashboard');
@@ -25,13 +26,16 @@ const Index = () => {
   const [showDataModal, setShowDataModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleAddResident = () => {
-    setActiveView('census');
-  };
-
   const handleDataChange = useCallback(() => {
     setRefreshKey(prev => prev + 1);
   }, []);
+
+  // Auto-load initial data if database is empty
+  const { loading: dataLoading } = useDataLoader(handleDataChange);
+
+  const handleAddResident = () => {
+    setActiveView('census');
+  };
 
   const renderView = () => {
     switch (activeView) {
@@ -61,6 +65,18 @@ const Index = () => {
         return <DashboardView onNavigate={setActiveView} />;
     }
   };
+
+  // Show loading indicator while initial data loads
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <LockScreen>
