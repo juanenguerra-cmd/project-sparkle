@@ -80,7 +80,7 @@ const Index = () => {
           />
           
           <main className="flex-1 p-4 md:p-6 pb-20 lg:pb-6 overflow-auto min-h-[calc(100vh-80px)]">
-            <div className="max-w-7xl mx-auto">
+            <div key={refreshKey} className="max-w-7xl mx-auto">
               {renderView()}
             </div>
           </main>
