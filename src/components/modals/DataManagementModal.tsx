@@ -46,7 +46,7 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
     setImporting(true);
     try {
       const text = await file.text();
-      const result = importDBFromJSON(text);
+      const result = await importDBFromJSON(text);
       
       if (result.success) {
         toast({

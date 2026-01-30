@@ -117,12 +117,20 @@ export const initDB = async (): Promise<ICNDatabase> => {
 /**
  * Save database (updates cache and persists)
  */
+export const saveDBAsync = async (
+  db: ICNDatabase,
+  opts: { optimistic?: boolean } = {}
+): Promise<void> => {
+  const optimistic = opts.optimistic ?? true;
+  if (optimistic) dbCache = db;
+  await storage.save(db);
+  if (!optimistic) dbCache = db;
+};
+
 export const saveDB = (db: ICNDatabase): void => {
-  dbCache = db;
-  
   // Async save - fire and forget for now
   // When migrating to D1, consider adding error handling UI
-  storage.save(db).catch(e => {
+  saveDBAsync(db, { optimistic: true }).catch(e => {
     console.error('Failed to save DB:', e);
   });
 };
@@ -163,7 +171,29 @@ export const exportDBToJSON = (): string => {
   return JSON.stringify(exportData, null, 2);
 };
 
-export const importDBFromJSON = (jsonStr: string): { success: boolean; message: string } => {
+const cloneDeep = <T,>(value: T): T => {
+  // structuredClone is available in modern browsers; fallback for older ones
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sc = (globalThis as any).structuredClone as undefined | ((v: T) => T);
+  if (typeof sc === 'function') return sc(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+};
+
+const formatImportError = (e: unknown): string => {
+  // QuotaExceededError is the most common “import looks successful but nothing saved” failure.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyErr = e as any;
+  const name = typeof anyErr?.name === 'string' ? anyErr.name : '';
+  const message = typeof anyErr?.message === 'string' ? anyErr.message : '';
+  if (name === 'QuotaExceededError') {
+    return 'Browser storage is full (QuotaExceededError).';
+  }
+  return message || String(e);
+};
+
+export const importDBFromJSON = async (
+  jsonStr: string
+): Promise<{ success: boolean; message: string }> => {
   try {
     const data = JSON.parse(jsonStr);
     
@@ -193,7 +223,20 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
       audit_log: data.audit_log
     };
     
-    const db = loadDB();
+    const baseDb = loadDB();
+    const before = {
+      census: Object.keys(baseDb.census.residentsByMrn).length,
+      abx: baseDb.records.abx.length,
+      ip: baseDb.records.ip_cases.length,
+      vax: baseDb.records.vax.length,
+      notes: baseDb.records.notes.length,
+      lineListings: baseDb.records.line_listings.length,
+      outbreaks: baseDb.records.outbreaks.length,
+      contacts: baseDb.records.contacts.length,
+    };
+
+    // Work on a clone so a failed persist doesn’t mutate the in-memory DB.
+    const db = cloneDeep(baseDb);
     const now = nowISO();
     
     // Merge census - handle UNIFIED_DB_V1 schema format
@@ -339,17 +382,55 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
       db.settings = { ...db.settings, ...normalizedData.settings };
     }
     
-    // Count what was imported
-    const censusCount = Object.keys(db.census.residentsByMrn).length;
-    const abxCount = db.records.abx.length;
-    const vaxCount = db.records.vax.length;
-    
-    addAudit(db, 'db_import', `Imported: ${censusCount} residents, ${abxCount} ABX, ${vaxCount} VAX`, 'import');
-    saveDB(db);
-    
-    return { success: true, message: `Imported ${censusCount} residents, ${abxCount} ABX records, ${vaxCount} VAX records` };
+    const after = {
+      census: Object.keys(db.census.residentsByMrn).length,
+      abx: db.records.abx.length,
+      ip: db.records.ip_cases.length,
+      vax: db.records.vax.length,
+      notes: db.records.notes.length,
+      lineListings: db.records.line_listings.length,
+      outbreaks: db.records.outbreaks.length,
+      contacts: db.records.contacts.length,
+    };
+
+    const delta = {
+      census: after.census - before.census,
+      abx: after.abx - before.abx,
+      ip: after.ip - before.ip,
+      vax: after.vax - before.vax,
+      notes: after.notes - before.notes,
+      lineListings: after.lineListings - before.lineListings,
+      outbreaks: after.outbreaks - before.outbreaks,
+      contacts: after.contacts - before.contacts,
+    };
+
+    addAudit(
+      db,
+      'db_import',
+      `Backup import: +${delta.census} residents, +${delta.abx} ABX, +${delta.ip} IP, +${delta.vax} VAX`,
+      'import'
+    );
+
+    try {
+      // Important: don't optimistically swap the in-memory DB until persistence succeeds.
+      await saveDBAsync(db, { optimistic: false });
+    } catch (e) {
+      const err = formatImportError(e);
+      return {
+        success: false,
+        message:
+          err.includes('QuotaExceededError')
+            ? `Import parsed, but could not be saved: ${err} Try “Clear All Data” then import, or reduce the backup size.`
+            : `Import parsed, but could not be saved: ${err}`,
+      };
+    }
+
+    return {
+      success: true,
+      message: `Imported +${delta.census} residents, +${delta.abx} ABX, +${delta.ip} IP, +${delta.vax} VAX (totals: ${after.census} residents, ${after.abx} ABX, ${after.ip} IP, ${after.vax} VAX).`,
+    };
   } catch (e) {
-    return { success: false, message: `Failed to parse JSON: ${e}` };
+    return { success: false, message: `Failed to import backup: ${formatImportError(e)}` };
   }
 };
 
