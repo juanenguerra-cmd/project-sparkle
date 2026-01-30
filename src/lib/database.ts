@@ -167,17 +167,38 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
   try {
     const data = JSON.parse(jsonStr);
     
-    // Basic validation - support both old and UNIFIED_DB_V1 schemas
-    if (!data.census && !data.records) {
-      return { success: false, message: 'Invalid backup file: missing census or records' };
+    // Basic validation - support multiple backup schemas
+    // Accept: census, records, residentsByMrn (direct), or any known record arrays
+    const hasCensus = data.census?.residentsByMrn || data.residentsByMrn;
+    const hasRecords = data.records || data.abx || data.ip_cases || data.vax || data.notes || 
+                       data.abt_worklist || data.vax_due;
+    
+    if (!hasCensus && !hasRecords) {
+      return { success: false, message: 'Invalid backup file: missing census or records data' };
     }
+    
+    // Normalize structure if data is in flat format
+    const normalizedData = {
+      census: data.census || (data.residentsByMrn ? { residentsByMrn: data.residentsByMrn, meta: data.meta } : undefined),
+      records: data.records || {
+        abx: data.abx || data.abt_worklist || [],
+        ip_cases: data.ip_cases || [],
+        vax: data.vax || data.vax_due || [],
+        notes: data.notes || [],
+        line_listings: data.line_listings || [],
+        outbreaks: data.outbreaks || [],
+        contacts: data.contacts || []
+      },
+      settings: data.settings,
+      audit_log: data.audit_log
+    };
     
     const db = loadDB();
     const now = nowISO();
     
     // Merge census - handle UNIFIED_DB_V1 schema format
-    if (data.census?.residentsByMrn) {
-      Object.entries(data.census.residentsByMrn).forEach(([mrn, resident]: [string, any]) => {
+    if (normalizedData.census?.residentsByMrn) {
+      Object.entries(normalizedData.census.residentsByMrn).forEach(([mrn, resident]: [string, any]) => {
         const canonical = canonicalMRN(mrn);
         db.census.residentsByMrn[canonical] = {
           id: resident.id || `res_${canonical}`,
@@ -193,16 +214,16 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
         };
       });
     }
-    if (data.census?.meta) {
+    if (normalizedData.census?.meta) {
       db.census.meta = {
-        imported_at: data.census.meta.updatedAt 
-          ? new Date(data.census.meta.updatedAt).toISOString() 
-          : data.census.meta.imported_at
+        imported_at: normalizedData.census.meta.updatedAt 
+          ? new Date(normalizedData.census.meta.updatedAt).toISOString() 
+          : normalizedData.census.meta.imported_at
       };
     }
     
-    // Merge ABX records - support UNIFIED_DB_V1 format (records.abt_worklist)
-    const abxSource = data.records?.abx || data.records?.abt_worklist || [];
+    // Merge ABX records
+    const abxSource = normalizedData.records?.abx || [];
     if (Array.isArray(abxSource)) {
       const existingIds = new Set(db.records.abx.map(r => r.record_id || r.id));
       abxSource.forEach((r: any) => {
@@ -236,7 +257,7 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
     }
     
     // Merge IP cases
-    const ipSource = data.records?.ip_cases || [];
+    const ipSource = normalizedData.records?.ip_cases || [];
     if (Array.isArray(ipSource)) {
       const existingIds = new Set(db.records.ip_cases.map(r => r.id));
       ipSource.forEach((r: any) => {
@@ -246,8 +267,8 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
       });
     }
     
-    // Merge VAX records - support UNIFIED_DB_V1 format (records.vax_due)
-    const vaxSource = data.records?.vax || data.records?.vax_due || [];
+    // Merge VAX records
+    const vaxSource = normalizedData.records?.vax || [];
     if (Array.isArray(vaxSource)) {
       const existingIds = new Set(db.records.vax.map(r => r.record_id || r.id));
       vaxSource.forEach((r: any) => {
@@ -274,18 +295,48 @@ export const importDBFromJSON = (jsonStr: string): { success: boolean; message: 
     }
     
     // Merge notes
-    if (Array.isArray(data.records?.notes)) {
+    if (Array.isArray(normalizedData.records?.notes)) {
       const existingIds = new Set(db.records.notes.map(r => r.id));
-      data.records.notes.forEach((r: Note) => {
+      normalizedData.records.notes.forEach((r: Note) => {
         if (!existingIds.has(r.id)) {
           db.records.notes.push(r);
         }
       });
     }
     
+    // Merge line listings
+    if (Array.isArray(normalizedData.records?.line_listings)) {
+      const existingIds = new Set(db.records.line_listings.map(r => r.id));
+      normalizedData.records.line_listings.forEach((r: any) => {
+        if (!existingIds.has(r.id)) {
+          db.records.line_listings.push(r);
+        }
+      });
+    }
+    
+    // Merge outbreaks
+    if (Array.isArray(normalizedData.records?.outbreaks)) {
+      const existingIds = new Set(db.records.outbreaks.map(r => r.id));
+      normalizedData.records.outbreaks.forEach((r: any) => {
+        if (!existingIds.has(r.id)) {
+          db.records.outbreaks.push(r);
+        }
+      });
+    }
+    
+    // Merge contacts
+    if (Array.isArray(normalizedData.records?.contacts)) {
+      const existingIds = new Set(db.records.contacts.map(r => r.id));
+      normalizedData.records.contacts.forEach((r: any) => {
+        if (!existingIds.has(r.id)) {
+          db.records.contacts.push(r);
+        }
+      });
+    }
+    
     // Merge settings
-    if (data.settings) {
-      db.settings = { ...db.settings, ...data.settings };
+    if (normalizedData.settings) {
+      db.settings = { ...db.settings, ...normalizedData.settings };
     }
     
     // Count what was imported
