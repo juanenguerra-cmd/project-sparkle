@@ -189,7 +189,7 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
     
     try {
       const text = await file.text();
-      const result = importDBFromJSON(text);
+      const result = await importDBFromJSON(text);
       
       if (result.success) {
         toast({
