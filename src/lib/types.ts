@@ -214,6 +214,8 @@ export interface LineListingEntry {
   updatedAt?: string;
   linkedNoteIds?: string[];
   contacts?: ContactEntry[];
+  // Extended template data - stores all dynamic field values
+  templateData?: Record<string, string | number | boolean | undefined>;
 }
 
 // Contact tracing
@@ -272,6 +274,20 @@ export interface AppSettings {
   }>;
   // Custom report descriptions
   customReportDescriptions?: Record<string, string>;
+  // Line listing form field configurations
+  lineListingConfigs?: Record<string, {
+    templateId: string;
+    enabledFields: string[];
+    customFields?: Array<{
+      id: string;
+      label: string;
+      shortLabel?: string;
+      type: 'text' | 'checkbox' | 'select' | 'date' | 'number';
+      options?: string[];
+      category?: string;
+      defaultEnabled: boolean;
+    }>;
+  }>;
 }
 
 export interface AppDatabase {

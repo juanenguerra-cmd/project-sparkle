@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -6,7 +6,7 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import DataFlowVisual from '@/components/dashboard/DataFlowVisual';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState, useRef, useMemo } from 'react';
-import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getVaxDue } from '@/lib/database';
+import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getVaxDue, getActiveOutbreaks, getLineListingsByOutbreak } from '@/lib/database';
 import { 
   ReportData,
   generateDailyPrecautionList,
@@ -46,6 +46,8 @@ import {
   SurveillanceReportData
 } from '@/lib/reports/surveillanceReports';
 import { getReportDescription } from '@/lib/reportDescriptions';
+import { generateLineListingPdf, generateBlankLineListingPdf } from '@/lib/pdf/lineListingPdf';
+import { ALL_TEMPLATES } from '@/lib/lineListingTemplates';
 import ReportPreview from '@/components/reports/ReportPreview';
 import ReportListItem from '@/components/reports/ReportListItem';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
@@ -63,6 +65,7 @@ import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Badge } from '@/components/ui/badge';
 
 interface ReportsViewProps {
   surveyorMode?: boolean;
@@ -74,6 +77,7 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   const [surveillanceOpen, setSurveillanceOpen] = useState(false);
   const [floorLayoutOpen, setFloorLayoutOpen] = useState(false);
   const [admissionScreeningOpen, setAdmissionScreeningOpen] = useState(false);
+  const [lineListingOpen, setLineListingOpen] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [selectedShift, setSelectedShift] = useState('Day');
   const [fromDate, setFromDate] = useState('');
@@ -116,6 +120,7 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   const activeABT = getActiveABT(db).length;
   const activeIP = getActiveIPCases(db).length;
   const vaxDue = getVaxDue(db).length;
+  const activeOutbreaks = getActiveOutbreaks(db);
 
   // Get unique units from census
   const units = [...new Set(
@@ -903,7 +908,108 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
         </SectionCard>
       </Collapsible>
 
-      {/* Binder Organization Tools */}
+      {/* Line Listing Reports */}
+      <Collapsible open={lineListingOpen} onOpenChange={setLineListingOpen}>
+        <SectionCard 
+          title="Line Listing Reports"
+          actions={
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronDown className={`w-4 h-4 transition-transform ${lineListingOpen ? '' : '-rotate-90'}`} />
+              </Button>
+            </CollapsibleTrigger>
+          }
+        >
+          <CollapsibleContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generate line listing reports matching CDC/CMS templates for outbreak documentation.
+              Customize form fields in Settings → Line Listing Form Configuration.
+            </p>
+            
+            {/* Active Outbreaks */}
+            {activeOutbreaks.length > 0 ? (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Active Outbreaks</h4>
+                {activeOutbreaks.map(outbreak => {
+                  const entries = getLineListingsByOutbreak(db, outbreak.id);
+                  return (
+                    <div 
+                      key={outbreak.id} 
+                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className={
+                          outbreak.type === 'respiratory' ? 'bg-blue-100 text-blue-800' :
+                          outbreak.type === 'gi' ? 'bg-amber-100 text-amber-800' :
+                          outbreak.type === 'skin' ? 'bg-pink-100 text-pink-800' :
+                          'bg-gray-100 text-gray-800'
+                        }>
+                          {outbreak.type.toUpperCase()}
+                        </Badge>
+                        <div>
+                          <p className="font-medium text-sm">{outbreak.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {entries.length} cases • Started {new Date(outbreak.startDate).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const facility = db.settings.facilityName || 'Healthcare Facility';
+                          const doc = generateLineListingPdf({
+                            outbreak,
+                            entries,
+                            facility
+                          });
+                          doc.save(`${outbreak.name.replace(/\s+/g, '_')}_Line_List.pdf`);
+                          toast.success('Line listing PDF generated');
+                        }}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Print
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No active outbreaks. Create an outbreak from the Outbreak & Line Listing view.</p>
+              </div>
+            )}
+
+            {/* Blank Templates */}
+            <div className="mt-6 pt-4 border-t">
+              <h4 className="text-sm font-medium mb-3">Print Blank Templates</h4>
+              <div className="flex flex-wrap gap-2">
+                {ALL_TEMPLATES.map(template => (
+                  <Button
+                    key={template.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const facility = db.settings.facilityName || 'Healthcare Facility';
+                      const doc = generateBlankLineListingPdf(template.id, template.name, facility);
+                      doc.save(`${template.name.replace(/\s+/g, '_')}_Blank_Template.pdf`);
+                      toast.success(`${template.name} blank template downloaded`);
+                    }}
+                  >
+                    <FileDown className="w-4 h-4 mr-1" />
+                    {template.name}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Download blank line listing forms for manual documentation during outbreaks.
+              </p>
+            </div>
+          </CollapsibleContent>
+        </SectionCard>
+      </Collapsible>
+
       <SectionCard title="Infection Control Binder Organization">
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, AlertTriangle, Users, FileText, ChevronDown, Check, Clock, X, UserPlus, UserRoundPlus, Edit, Trash2 } from 'lucide-react';
+import { Plus, AlertTriangle, Users, FileText, ChevronDown, Check, Clock, X, UserPlus, UserRoundPlus, Edit, Trash2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import SectionCard from '@/components/dashboard/SectionCard';
+import LineListingCaseModal from '@/components/modals/LineListingCaseModal';
 import { 
   loadDB, 
   saveDB, 
@@ -29,6 +30,7 @@ import {
   SYMPTOM_OPTIONS,
   Resident 
 } from '@/lib/types';
+import { generateLineListingPdf } from '@/lib/pdf/lineListingPdf';
 import { toast } from 'sonner';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
@@ -130,6 +132,101 @@ const OutbreakView = () => {
     setNewOutbreakNotes('');
     setOutbreakStartDate(new Date().toISOString().slice(0, 10));
     setRefreshKey(k => k + 1);
+  };
+
+  const handleAddCaseFromModal = (data: {
+    mrn: string;
+    residentName: string;
+    unit: string;
+    room: string;
+    isStaffOrVisitor: boolean;
+    onsetDate: string;
+    symptoms: string[];
+    labResults: string;
+    notes: string;
+    templateData: Record<string, string | number | boolean | undefined>;
+  }) => {
+    if (!selectedOutbreak) return;
+    
+    if (!data.isStaffOrVisitor && !data.mrn) {
+      toast.error('Please select a resident');
+      return;
+    }
+    if (data.isStaffOrVisitor && !data.residentName) {
+      toast.error('Please enter staff/visitor name');
+      return;
+    }
+
+    const db = loadDB();
+    addToLineListing(db, {
+      mrn: data.mrn,
+      residentName: data.residentName,
+      unit: data.unit,
+      room: data.room,
+      outbreakId: selectedOutbreak.id,
+      onsetDate: data.onsetDate,
+      symptoms: data.symptoms,
+      symptomCategory: selectedOutbreak.type,
+      labResults: data.labResults,
+      outcome: 'active',
+      notes: data.notes,
+      templateData: data.templateData
+    });
+    saveDB(db);
+
+    toast.success(`${data.residentName} added to line listing`);
+    setShowAddCaseModal(false);
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleUpdateCaseFromModal = (data: {
+    mrn: string;
+    residentName: string;
+    unit: string;
+    room: string;
+    isStaffOrVisitor: boolean;
+    onsetDate: string;
+    symptoms: string[];
+    labResults: string;
+    notes: string;
+    templateData: Record<string, string | number | boolean | undefined>;
+  }) => {
+    if (!editingLineListing) return;
+    
+    const db = loadDB();
+    const idx = db.records.line_listings.findIndex(l => l.id === editingLineListing.id);
+    if (idx >= 0) {
+      db.records.line_listings[idx] = {
+        ...db.records.line_listings[idx],
+        onsetDate: data.onsetDate,
+        symptoms: data.symptoms,
+        labResults: data.labResults,
+        notes: data.notes,
+        templateData: data.templateData,
+        updatedAt: new Date().toISOString()
+      };
+      addAudit(db, 'line_listing_updated', `Updated: ${editingLineListing.residentName}`, 'ip');
+      saveDB(db);
+      toast.success(`${editingLineListing.residentName} updated`);
+      setShowEditCaseModal(false);
+      setEditingLineListing(null);
+      setRefreshKey(k => k + 1);
+    }
+  };
+
+  const handlePrintLineListing = (outbreak: Outbreak) => {
+    const db = loadDB();
+    const entries = getLineListingsByOutbreak(db, outbreak.id);
+    const facility = db.settings.facilityName || 'Healthcare Facility';
+    
+    const doc = generateLineListingPdf({
+      outbreak,
+      entries,
+      facility
+    });
+    
+    doc.save(`${outbreak.name.replace(/\s+/g, '_')}_Line_List.pdf`);
+    toast.success('Line listing PDF generated');
   };
 
   const handleAddCase = () => {
@@ -567,6 +664,17 @@ const OutbreakView = () => {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
+                      handlePrintLineListing(outbreak);
+                    }}
+                    title="Print Line List"
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedOutbreak(outbreak);
                       setShowAddCaseModal(true);
                     }}
@@ -701,151 +809,29 @@ const OutbreakView = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Case Modal */}
-      <Dialog open={showAddCaseModal} onOpenChange={setShowAddCaseModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Case to Line Listing</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Staff/Visitor Toggle */}
-            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-              <Checkbox 
-                id="staffVisitor" 
-                checked={isStaffOrVisitor}
-                onCheckedChange={(checked) => {
-                  setIsStaffOrVisitor(checked === true);
-                  if (checked) setCaseMrn('');
-                }}
-              />
-              <Label htmlFor="staffVisitor" className="text-sm font-medium cursor-pointer">
-                Staff or Visitor (not a resident)
-              </Label>
-            </div>
+      {/* Add Case Modal - Using new template-based modal */}
+      <LineListingCaseModal
+        open={showAddCaseModal}
+        onOpenChange={setShowAddCaseModal}
+        outbreak={selectedOutbreak}
+        residents={residents}
+        onSubmit={handleAddCaseFromModal}
+        mode="add"
+      />
 
-            {isStaffOrVisitor ? (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Staff/Visitor Name</label>
-                <Input 
-                  value={staffVisitorName}
-                  onChange={(e) => setStaffVisitorName(e.target.value)}
-                  placeholder="Enter name..."
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Resident</label>
-                <Select value={caseMrn} onValueChange={setCaseMrn}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select resident..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {residents.map(r => (
-                      <SelectItem key={r.mrn} value={r.mrn}>
-                        {r.name} - {r.room} ({r.unit})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Onset Date</label>
-              <Input type="date" value={caseOnsetDate} onChange={(e) => setCaseOnsetDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Symptoms</label>
-              <div className="flex flex-wrap gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
-                {selectedOutbreak && getSymptomOptions(selectedOutbreak.type).map(symptom => (
-                  <Badge
-                    key={symptom.id}
-                    variant={caseSymptoms.includes(symptom.id) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setCaseSymptoms(prev => 
-                        prev.includes(symptom.id) 
-                          ? prev.filter(s => s !== symptom.id)
-                          : [...prev, symptom.id]
-                      );
-                    }}
-                  >
-                    {symptom.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lab Results</label>
-              <Input 
-                value={caseLabResults} 
-                onChange={(e) => setCaseLabResults(e.target.value)}
-                placeholder="e.g., COVID+ PCR, Flu A+"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes</label>
-              <Textarea value={caseNotes} onChange={(e) => setCaseNotes(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowAddCaseModal(false)}>Cancel</Button>
-            <Button onClick={handleAddCase}>Add to Line Listing</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Case Modal */}
-      <Dialog open={showEditCaseModal} onOpenChange={setShowEditCaseModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Case: {editingLineListing?.residentName}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Onset Date</label>
-              <Input type="date" value={caseOnsetDate} onChange={(e) => setCaseOnsetDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Symptoms</label>
-              <div className="flex flex-wrap gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
-                {SYMPTOM_OPTIONS.map(symptom => (
-                  <Badge
-                    key={symptom.id}
-                    variant={caseSymptoms.includes(symptom.id) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      setCaseSymptoms(prev => 
-                        prev.includes(symptom.id) 
-                          ? prev.filter(s => s !== symptom.id)
-                          : [...prev, symptom.id]
-                      );
-                    }}
-                  >
-                    {symptom.name}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Lab Results</label>
-              <Input 
-                value={caseLabResults} 
-                onChange={(e) => setCaseLabResults(e.target.value)}
-                placeholder="e.g., COVID+ PCR, Flu A+"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Notes</label>
-              <Textarea value={caseNotes} onChange={(e) => setCaseNotes(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setShowEditCaseModal(false); resetCaseForm(); setEditingLineListing(null); }}>Cancel</Button>
-            <Button onClick={handleUpdateCase}>Update</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Case Modal - Using new template-based modal */}
+      <LineListingCaseModal
+        open={showEditCaseModal}
+        onOpenChange={(open) => {
+          setShowEditCaseModal(open);
+          if (!open) setEditingLineListing(null);
+        }}
+        outbreak={selectedOutbreak || (editingLineListing ? activeOutbreaks.find(o => o.id === editingLineListing.outbreakId) || null : null)}
+        residents={residents}
+        onSubmit={handleUpdateCaseFromModal}
+        editingEntry={editingLineListing}
+        mode="edit"
+      />
 
 
       {/* Contact Tracing Modal */}
