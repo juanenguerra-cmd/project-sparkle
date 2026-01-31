@@ -54,6 +54,7 @@ import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
 import SurveyModePanel from '@/components/reports/SurveyModePanel';
 import FloorLayoutHeatmap from '@/components/reports/FloorLayoutHeatmap';
+import TrendPredictionPanel from '@/components/analytics/TrendPredictionPanel';
 import NewAdmissionScreeningForm from '@/components/reports/NewAdmissionScreeningForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -745,6 +746,11 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           </CollapsibleContent>
         </SectionCard>
       </Collapsible>
+
+      {/* Trend Prediction Analytics */}
+      <SectionCard title="Trend Prediction & Forecasting">
+        <TrendPredictionPanel />
+      </SectionCard>
 
       {/* Antibiotic & Infection Surveillance Reports */}
       <Collapsible open={surveillanceOpen} onOpenChange={setSurveillanceOpen}>
