@@ -8,7 +8,7 @@
  * - CDC RSV: Seasonal, similar to influenza pattern
  */
 
-import { VaxRecord } from './types';
+import { VaxRecord, Outbreak } from './types';
 
 export interface ReofferCandidate {
   record: VaxRecord;
@@ -16,6 +16,8 @@ export interface ReofferCandidate {
   priority: 'high' | 'medium' | 'low';
   daysSinceDecline: number;
   seasonalContext?: string;
+  outbreakLinked?: boolean;
+  outbreakName?: string;
 }
 
 // Flu season: October 1 through March 31
@@ -89,12 +91,21 @@ const daysSince = (dateStr: string | undefined): number => {
 
 export const getReofferCandidates = (
   vaxRecords: VaxRecord[],
-  activeMrns: Set<string>
+  activeMrns: Set<string>,
+  activeOutbreaks?: Outbreak[]
 ): ReofferCandidate[] => {
   const now = new Date();
   const inFluSeason = isInFluSeason(now);
   const month = now.getMonth();
   const isPeakFluSeason = month >= 11 || month <= 1; // Dec, Jan, Feb
+  
+  // Check for active respiratory or GI outbreaks to boost priority
+  const hasRespiratoryOutbreak = activeOutbreaks?.some(o => 
+    o.status === 'active' && o.type === 'respiratory'
+  );
+  const respiratoryOutbreakName = activeOutbreaks?.find(o => 
+    o.status === 'active' && o.type === 'respiratory'
+  )?.name;
   
   const candidates: ReofferCandidate[] = [];
   
@@ -127,14 +138,22 @@ export const getReofferCandidates = (
     // INFLUENZA / FLU
     if (vaccineType.includes('FLU') || vaccineType.includes('INFLUENZA')) {
       if (inFluSeason && days >= 30) {
+        // Boost priority if respiratory outbreak is active
+        const outbreakBoost = hasRespiratoryOutbreak;
+        const basePriority = isPeakFluSeason || outbreakBoost ? 'high' : 'medium';
+        
         candidates.push({
           record,
-          reason: isPeakFluSeason 
-            ? 'Peak flu season - strongly recommend re-offer' 
-            : 'Active flu season - recommend re-offer',
-          priority: isPeakFluSeason ? 'high' : 'medium',
+          reason: outbreakBoost 
+            ? `URGENT: Active respiratory outbreak - prioritize flu re-offer`
+            : isPeakFluSeason 
+              ? 'Peak flu season - strongly recommend re-offer' 
+              : 'Active flu season - recommend re-offer',
+          priority: basePriority,
           daysSinceDecline: days,
-          seasonalContext: `Flu Season ${getCurrentFluSeason().start.getFullYear()}-${getCurrentFluSeason().end.getFullYear()}`
+          seasonalContext: `Flu Season ${getCurrentFluSeason().start.getFullYear()}-${getCurrentFluSeason().end.getFullYear()}`,
+          outbreakLinked: outbreakBoost,
+          outbreakName: outbreakBoost ? respiratoryOutbreakName : undefined
         });
       }
       continue;
@@ -143,11 +162,19 @@ export const getReofferCandidates = (
     // COVID-19
     if (vaccineType.includes('COVID')) {
       if (days >= 60) {
+        // Boost priority if respiratory outbreak is active
+        const outbreakBoost = hasRespiratoryOutbreak;
+        const basePriority = days >= 180 || outbreakBoost ? 'high' : 'medium';
+        
         candidates.push({
           record,
-          reason: 'CDC recommends updated COVID vaccine annually',
-          priority: days >= 180 ? 'high' : 'medium',
-          daysSinceDecline: days
+          reason: outbreakBoost 
+            ? `URGENT: Active respiratory outbreak - prioritize COVID re-offer`
+            : 'CDC recommends updated COVID vaccine annually',
+          priority: basePriority,
+          daysSinceDecline: days,
+          outbreakLinked: outbreakBoost,
+          outbreakName: outbreakBoost ? respiratoryOutbreakName : undefined
         });
       }
       continue;

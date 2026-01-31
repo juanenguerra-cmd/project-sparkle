@@ -92,7 +92,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
 
       {/* Worklist Summary */}
       <SectionCard title="Worklist Summary">
-        <WorklistSummary />
+        <WorklistSummary onNavigateVax={() => onNavigate('vax')} />
       </SectionCard>
 
       {/* Two Column Layout */}
