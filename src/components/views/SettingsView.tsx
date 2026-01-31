@@ -5,10 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 import SectionCard from '@/components/dashboard/SectionCard';
+import LineListingFieldsSettings from '@/components/settings/LineListingFieldsSettings';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { generateUserGuidePdf, generateTrackerCapabilitiesPdf } from '@/lib/pdf/userGuidePdf';
+import type { CustomLineListingConfig } from '@/lib/lineListingTemplates';
 
 const SettingsView = () => {
   const { toast } = useToast();
@@ -20,6 +24,10 @@ const SettingsView = () => {
   const [autoCloseGraceDays, setAutoCloseGraceDays] = useState(db.settings.autoCloseGraceDays);
   const [ebpReviewDays, setEbpReviewDays] = useState(db.settings.ipRules.ebpReviewDays);
   const [isolationReviewDays, setIsolationReviewDays] = useState(db.settings.ipRules.isolationReviewDays);
+  const [lineListingConfigs, setLineListingConfigs] = useState<Record<string, CustomLineListingConfig>>(
+    (db.settings.lineListingConfigs as Record<string, CustomLineListingConfig>) || {}
+  );
+  const [showLineListingSettings, setShowLineListingSettings] = useState(false);
 
   const handleSaveSettings = () => {
     const db = loadDB();
@@ -34,6 +42,7 @@ const SettingsView = () => {
         ebpReviewDays,
         isolationReviewDays,
       },
+      lineListingConfigs,
     };
     addAudit(db, 'settings_updated', `Facility: ${facilityName}`, 'settings');
     saveDB(db);
@@ -213,6 +222,38 @@ const SettingsView = () => {
           </div>
         </SectionCard>
       </div>
+
+      {/* Line Listing Form Configuration */}
+      <Collapsible open={showLineListingSettings} onOpenChange={setShowLineListingSettings}>
+        <SectionCard 
+          title="Line Listing Form Configuration"
+          actions={
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronDown className={`w-4 h-4 transition-transform ${showLineListingSettings ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+          }
+        >
+          <CollapsibleContent>
+            <LineListingFieldsSettings
+              customConfigs={lineListingConfigs}
+              onSave={(configs) => {
+                setLineListingConfigs(configs);
+                // Auto-save when configs change
+                const db = loadDB();
+                db.settings.lineListingConfigs = configs;
+                saveDB(db);
+              }}
+            />
+          </CollapsibleContent>
+          {!showLineListingSettings && (
+            <p className="text-sm text-muted-foreground">
+              Click to expand and customize line listing form fields for each outbreak type
+            </p>
+          )}
+        </SectionCard>
+      </Collapsible>
     </div>
   );
 };
