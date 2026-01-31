@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Bell, Trash2, Plus, Users, Mail, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
+import { addNotification } from '@/components/notifications/NotificationCenter';
 
 interface ScheduledReport {
   id: string;
@@ -120,6 +121,17 @@ const ScheduledReportsPanel = () => {
           const recipientInfo = schedule.recipients.length > 0 
             ? ` (Recipients: ${schedule.recipients.join(', ')})` 
             : '';
+          
+          // Add to notification center
+          addNotification({
+            type: 'report_reminder',
+            title: `Report Due: ${schedule.reportName}`,
+            message: `Scheduled ${schedule.frequency} report is ready to generate.${recipientInfo}`,
+            reportId: schedule.reportId,
+            recipients: schedule.recipients,
+          });
+          
+          // Also show toast for immediate visibility
           toast.info(`📋 Reminder: Generate "${schedule.reportName}"${recipientInfo}`, {
             duration: 15000,
             action: {

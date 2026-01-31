@@ -1,5 +1,6 @@
 import { Download, Upload, Shield, Plus, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 interface AppHeaderProps {
   surveyorMode: boolean;
@@ -24,6 +25,7 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <NotificationCenter />
           <Button
             variant="ghost"
             size="sm"
