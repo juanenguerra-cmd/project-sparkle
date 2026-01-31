@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, TestTube, FileText, BookOpen, Download } from 'lucide-react';
+import { Save, TestTube, FileText, BookOpen, Download, ScrollText, FileEdit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,8 +12,9 @@ import LineListingFieldsSettings from '@/components/settings/LineListingFieldsSe
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { generateUserGuidePdf, generateTrackerCapabilitiesPdf } from '@/lib/pdf/userGuidePdf';
+import { generateReleaseNotesPdf } from '@/lib/pdf/releaseNotesPdf';
+import { downloadUserGuideAsWord } from '@/lib/userGuideHtml';
 import type { CustomLineListingConfig } from '@/lib/lineListingTemplates';
-
 const SettingsView = () => {
   const { toast } = useToast();
   const db = loadDB();
@@ -205,6 +206,20 @@ const SettingsView = () => {
               variant="outline" 
               className="w-full justify-start"
               onClick={() => {
+                downloadUserGuideAsWord(facilityName || 'Healthcare Facility');
+                toast({
+                  title: 'User Guide Downloaded',
+                  description: 'Editable Word document has been saved - add your screenshots!'
+                });
+              }}
+            >
+              <FileEdit className="w-4 h-4 mr-2" />
+              Download User Guide (Word - Editable)
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
                 const doc = generateTrackerCapabilitiesPdf(facilityName || 'Healthcare Facility');
                 doc.save('ICN_Hub_Tracker_Capabilities.pdf');
                 toast({
@@ -216,8 +231,23 @@ const SettingsView = () => {
               <FileText className="w-4 h-4 mr-2" />
               Download Capabilities List (PDF)
             </Button>
+            <Button 
+              variant="outline" 
+              className="w-full justify-start"
+              onClick={() => {
+                const doc = generateReleaseNotesPdf(facilityName || 'Healthcare Facility');
+                doc.save('ICN_Hub_Release_Notes.pdf');
+                toast({
+                  title: 'Release Notes Downloaded',
+                  description: 'Feature milestones and capabilities PDF has been saved'
+                });
+              }}
+            >
+              <ScrollText className="w-4 h-4 mr-2" />
+              Download Release Notes (PDF)
+            </Button>
             <p className="text-xs text-muted-foreground">
-              Download documentation for training and reference
+              Download documentation for training and reference. The Word guide includes placeholders for screenshots.
             </p>
           </div>
         </SectionCard>
