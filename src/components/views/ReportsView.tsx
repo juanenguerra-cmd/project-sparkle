@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, Edit2, RotateCcw, TrendingUp, BarChart3 } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,8 +45,9 @@ import {
   getQuarterDates,
   SurveillanceReportData
 } from '@/lib/reports/surveillanceReports';
-import { getReportDescription, saveReportDescription, resetReportDescription } from '@/lib/reportDescriptions';
+import { getReportDescription } from '@/lib/reportDescriptions';
 import ReportPreview from '@/components/reports/ReportPreview';
+import ReportListItem from '@/components/reports/ReportListItem';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
 import SurveyModePanel from '@/components/reports/SurveyModePanel';
@@ -89,10 +90,8 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   const [surveyorIncludeABT, setSurveyorIncludeABT] = useState(true);
   const [surveyorIncludeIP, setSurveyorIncludeIP] = useState(true);
   
-  // Editable descriptions
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
-  const [editingDescription, setEditingDescription] = useState('');
-  const [, setDescriptionRefresh] = useState(0); // Force re-render when descriptions change
+  // Description refresh trigger
+  const [, setDescriptionRefresh] = useState(0);
   
   // Surveillance report filters
   const [surveillancePeriodType, setSurveillancePeriodType] = useState<'range' | 'quarter'>('range');
@@ -698,97 +697,15 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           }
         >
           <CollapsibleContent>
-            <div className="grid md:grid-cols-2 gap-4">
-              {executiveReports.map((report) => {
-                const description = getReportDescription(report.id);
-                const isEditing = editingReportId === report.id;
-                
-                return (
-                  <div key={report.id} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <FileText className="w-5 h-5 text-primary mt-0.5" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold">{report.name}</h4>
-                          <div className="flex items-center gap-1">
-                            {isEditing ? (
-                              <>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    saveReportDescription(report.id, editingDescription);
-                                    setEditingReportId(null);
-                                    setDescriptionRefresh(n => n + 1);
-                                    toast.success('Description updated');
-                                  }}
-                                  title="Save"
-                                >
-                                  ✓
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => setEditingReportId(null)}
-                                  title="Cancel"
-                                >
-                                  ✕
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    const defaultDesc = resetReportDescription(report.id);
-                                    setEditingDescription(defaultDesc);
-                                    setDescriptionRefresh(n => n + 1);
-                                    toast.success('Reset to default');
-                                  }}
-                                  title="Reset to default"
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                </Button>
-                              </>
-                            ) : (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
-                                onClick={() => {
-                                  setEditingReportId(report.id);
-                                  setEditingDescription(description);
-                                }}
-                                title="Edit description"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {isEditing ? (
-                          <Textarea
-                            value={editingDescription}
-                            onChange={(e) => setEditingDescription(e.target.value)}
-                            className="text-sm mb-3 min-h-[60px]"
-                            placeholder="Enter report description..."
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground mb-3">{description}</p>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleGenerateReport(report.id)}
-                        >
-                          Generate
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="divide-y divide-border">
+              {executiveReports.map((report) => (
+                <ReportListItem
+                  key={report.id}
+                  report={report}
+                  onGenerate={handleGenerateReport}
+                  onDescriptionChange={() => setDescriptionRefresh(n => n + 1)}
+                />
+              ))}
             </div>
           </CollapsibleContent>
         </SectionCard>
@@ -806,97 +723,15 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           }
         >
           <CollapsibleContent>
-            <div className="grid md:grid-cols-2 gap-4">
-              {operationalReports.map((report) => {
-                const description = getReportDescription(report.id);
-                const isEditing = editingReportId === report.id;
-                
-                return (
-                  <div key={report.id} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <FileText className="w-5 h-5 text-primary mt-0.5" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold">{report.name}</h4>
-                          <div className="flex items-center gap-1">
-                            {isEditing ? (
-                              <>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    saveReportDescription(report.id, editingDescription);
-                                    setEditingReportId(null);
-                                    setDescriptionRefresh(n => n + 1);
-                                    toast.success('Description updated');
-                                  }}
-                                  title="Save"
-                                >
-                                  ✓
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => setEditingReportId(null)}
-                                  title="Cancel"
-                                >
-                                  ✕
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    const defaultDesc = resetReportDescription(report.id);
-                                    setEditingDescription(defaultDesc);
-                                    setDescriptionRefresh(n => n + 1);
-                                    toast.success('Reset to default');
-                                  }}
-                                  title="Reset to default"
-                                >
-                                  <RotateCcw className="w-3 h-3" />
-                                </Button>
-                              </>
-                            ) : (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
-                                onClick={() => {
-                                  setEditingReportId(report.id);
-                                  setEditingDescription(description);
-                                }}
-                                title="Edit description"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {isEditing ? (
-                          <Textarea
-                            value={editingDescription}
-                            onChange={(e) => setEditingDescription(e.target.value)}
-                            className="text-sm mb-3 min-h-[60px]"
-                            placeholder="Enter report description..."
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground mb-3">{description}</p>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleGenerateReport(report.id)}
-                        >
-                          Generate
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="divide-y divide-border">
+              {operationalReports.map((report) => (
+                <ReportListItem
+                  key={report.id}
+                  report={report}
+                  onGenerate={handleGenerateReport}
+                  onDescriptionChange={() => setDescriptionRefresh(n => n + 1)}
+                />
+              ))}
             </div>
           </CollapsibleContent>
         </SectionCard>
@@ -1006,85 +841,16 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
               </p>
             </div>
 
-            {/* Report Cards */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {surveillanceReports.map((report) => {
-                const description = getReportDescription(report.id) || report.description;
-                const isEditing = editingReportId === report.id;
-                
-                return (
-                  <div key={report.id} className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors">
-                    <div className="flex items-start gap-3">
-                      <BarChart3 className="w-5 h-5 text-primary mt-0.5" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-semibold text-sm">{report.name}</h4>
-                          <div className="flex items-center gap-1">
-                            {isEditing ? (
-                              <>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => {
-                                    saveReportDescription(report.id, editingDescription);
-                                    setEditingReportId(null);
-                                    setDescriptionRefresh(n => n + 1);
-                                    toast.success('Description updated');
-                                  }}
-                                  title="Save"
-                                >
-                                  ✓
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-6 w-6 p-0"
-                                  onClick={() => setEditingReportId(null)}
-                                  title="Cancel"
-                                >
-                                  ✕
-                                </Button>
-                              </>
-                            ) : (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
-                                onClick={() => {
-                                  setEditingReportId(report.id);
-                                  setEditingDescription(description);
-                                }}
-                                title="Edit description"
-                              >
-                                <Edit2 className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        {isEditing ? (
-                          <Textarea
-                            value={editingDescription}
-                            onChange={(e) => setEditingDescription(e.target.value)}
-                            className="text-xs mb-3 min-h-[50px]"
-                            placeholder="Enter report description..."
-                          />
-                        ) : (
-                          <p className="text-xs text-muted-foreground mb-3">{description}</p>
-                        )}
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => handleGenerateReport(report.id)}
-                        >
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          Generate
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Report List */}
+            <div className="divide-y divide-border">
+              {surveillanceReports.map((report) => (
+                <ReportListItem
+                  key={report.id}
+                  report={report}
+                  onGenerate={handleGenerateReport}
+                  onDescriptionChange={() => setDescriptionRefresh(n => n + 1)}
+                />
+              ))}
             </div>
           </CollapsibleContent>
         </SectionCard>
