@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
@@ -97,12 +98,13 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Add Vaccination Record</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Resident *</Label>
             <Select value={formData.mrn} onValueChange={(v) => setFormData(p => ({ ...p, mrn: v }))}>
@@ -184,7 +186,8 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
               onChange={(e) => setFormData(p => ({ ...p, notes: e.target.value }))}
             />
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
