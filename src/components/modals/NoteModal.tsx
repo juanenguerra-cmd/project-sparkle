@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident } from '@/lib/types';
 import { loadDB, saveDB, addAudit, classifySymptoms, getResidentLineListing } from '@/lib/database';
@@ -175,12 +176,13 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{note ? 'Edit Note' : 'Add Clinical Note'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-4 py-4">
           {/* Resident Selection */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Resident</label>
@@ -336,7 +338,8 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
               </div>
             )}
           </div>
-        </div>
+          </div>
+        </ScrollArea>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4 border-t">

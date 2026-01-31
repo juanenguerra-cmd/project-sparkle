@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertTriangle, CheckCircle2, Users, Pill, Shield, Syringe, FileText, AlertCircle } from 'lucide-react';
 import { canonicalMRN } from '@/lib/parsers';
 
@@ -108,7 +109,7 @@ const ImportPreviewModal = ({ open, file, onClose, onConfirm, preview, loading }
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {preview?.isValid ? (
@@ -131,7 +132,8 @@ const ImportPreviewModal = ({ open, file, onClose, onConfirm, preview, loading }
         )}
 
         {!loading && preview && (
-          <div className="space-y-4">
+          <ScrollArea className="flex-1 -mx-6 px-6">
+            <div className="space-y-4 py-1">
             {/* Errors */}
             {preview.errors.length > 0 && (
               <Card className="border-destructive bg-destructive/5">
@@ -225,7 +227,8 @@ const ImportPreviewModal = ({ open, file, onClose, onConfirm, preview, loading }
                 )}
               </>
             )}
-          </div>
+            </div>
+          </ScrollArea>
         )}
 
         <DialogFooter className="gap-2">
