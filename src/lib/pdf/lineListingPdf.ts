@@ -22,61 +22,68 @@ export const generateLineListingPdf = (params: LineListingPdfParams) => {
     ? template.fields.filter(f => enabledFields.includes(f.id))
     : template.fields.filter(f => f.defaultEnabled);
   
-  // Determine orientation based on field count
-  const orientation = fieldsToShow.length > 10 ? 'landscape' : 'portrait';
-  
+  // Always use landscape for line listings to fit all columns
   const doc = new jsPDF({ 
     unit: 'pt', 
     format: 'letter', 
-    orientation 
+    orientation: 'landscape' 
   });
 
   const FONT = {
-    title: 14,
-    subtitle: 11,
-    table: 7,
+    title: 12,
+    subtitle: 10,
+    table: 6,
+    tableHeader: 6,
   };
 
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 30;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
   const black: Rgb = [0, 0, 0];
   const headerBg = getThemeRgb('--warning', [251, 191, 36]);
+  const lightGray: Rgb = [240, 240, 240];
 
   // Header
-  let y = 35;
+  let y = 25;
   doc.setTextColor(...black);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(FONT.title);
   
-  // Title based on outbreak type
-  const title = outbreak.name.toUpperCase().includes('INFLUENZA') 
-    ? 'INFLUENZA-LIKE ILLNESS'
-    : outbreak.name.toUpperCase();
+  // Title based on outbreak type - matching CDC format
+  let title = outbreak.name.toUpperCase();
+  if (title.includes('INFLUENZA') || title.includes('ILI')) {
+    title = 'INFLUENZA-LIKE ILLNESS (ILI)';
+  }
   
   doc.text(title, margin, y);
   
   // Facility and Date on right
-  doc.text(`FACILITY: ${facility}`, pageWidth - margin, y, { align: 'right' });
-  
-  y += 16;
   doc.setFontSize(FONT.subtitle);
+  doc.text(`FACILITY: ${facility.toUpperCase()}`, pageWidth - margin, y, { align: 'right' });
+  
+  y += 14;
   doc.text('LINE LIST', margin, y);
   doc.text(`DATE: ${new Date().toLocaleDateString()}`, pageWidth - margin, y, { align: 'right' });
   
-  y += 8;
+  y += 6;
 
-  // Build headers - Room, Resident, then dynamic fields
+  // Build headers matching the exact CDC template layout
+  // Fixed columns: #, Room, Resident Name, Onset Date
   const headers = [
+    '#',
     'Rm',
-    'Resident', 
+    'Resident Name', 
+    'Onset',
     ...fieldsToShow.map(f => f.shortLabel || f.label)
   ];
 
   // Build rows
-  const rows = entries.map(entry => {
+  const rows = entries.map((entry, index) => {
     const baseRow = [
+      String(index + 1),
       entry.room,
       entry.residentName.replace('[Staff/Visitor] ', ''),
+      entry.onsetDate ? new Date(entry.onsetDate).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' }) : '',
     ];
     
     // Add dynamic field values
@@ -105,32 +112,38 @@ export const generateLineListingPdf = (params: LineListingPdfParams) => {
     return [...baseRow, ...fieldValues];
   });
 
-  // Add empty rows for manual entry (at least 15 total rows)
-  const minRows = 15;
+  // Add empty rows for manual entry (fill the page)
+  const minRows = 25;
   const emptyRowsNeeded = Math.max(0, minRows - rows.length);
   for (let i = 0; i < emptyRowsNeeded; i++) {
-    rows.push(Array(headers.length).fill(''));
+    const rowNum = rows.length + 1;
+    rows.push([String(rowNum), '', '', '', ...Array(fieldsToShow.length).fill('')]);
   }
 
-  // Calculate column widths
+  // Calculate column widths to fit landscape letter size
   const availableWidth = pageWidth - margin * 2;
-  const roomWidth = 35;
-  const nameWidth = 80;
-  const remainingWidth = availableWidth - roomWidth - nameWidth;
-  const fieldWidth = Math.max(30, remainingWidth / fieldsToShow.length);
+  const numWidth = 18;
+  const roomWidth = 28;
+  const nameWidth = 85;
+  const onsetWidth = 38;
+  const fixedWidth = numWidth + roomWidth + nameWidth + onsetWidth;
+  const remainingWidth = availableWidth - fixedWidth;
+  const fieldWidth = Math.max(28, remainingWidth / fieldsToShow.length);
 
   const columnStyles: Record<number, { cellWidth: number; halign: 'left' | 'center' }> = {
-    0: { cellWidth: roomWidth, halign: 'left' },
-    1: { cellWidth: nameWidth, halign: 'left' },
+    0: { cellWidth: numWidth, halign: 'center' },
+    1: { cellWidth: roomWidth, halign: 'center' },
+    2: { cellWidth: nameWidth, halign: 'left' },
+    3: { cellWidth: onsetWidth, halign: 'center' },
   };
   
   fieldsToShow.forEach((_, idx) => {
-    columnStyles[idx + 2] = { cellWidth: fieldWidth, halign: 'center' };
+    columnStyles[idx + 4] = { cellWidth: fieldWidth, halign: 'center' };
   });
 
   autoTable(doc, {
-    startY: y + 10,
-    margin: { left: margin, right: margin, top: 50, bottom: 30 },
+    startY: y + 6,
+    margin: { left: margin, right: margin, top: 40, bottom: 20 },
     head: [headers],
     body: rows,
     tableLineColor: black,
@@ -141,39 +154,54 @@ export const generateLineListingPdf = (params: LineListingPdfParams) => {
       textColor: black,
       lineColor: black,
       lineWidth: 0.5,
-      cellPadding: { top: 2, right: 2, bottom: 2, left: 2 },
+      cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
       valign: 'middle',
       overflow: 'linebreak',
+      minCellHeight: 16,
     },
     headStyles: {
       fillColor: headerBg,
       textColor: black,
       fontStyle: 'bold',
+      fontSize: FONT.tableHeader,
       halign: 'center',
       valign: 'middle',
-      minCellHeight: 28,
+      minCellHeight: 22,
     },
     bodyStyles: {
       fillColor: [255, 255, 255],
-      minCellHeight: 18,
+      minCellHeight: 16,
+    },
+    alternateRowStyles: {
+      fillColor: lightGray,
     },
     columnStyles,
     showHead: 'everyPage',
     didDrawPage: (data) => {
-      const pageNumber = doc.getNumberOfPages();
-      if (pageNumber > 1 && data.pageNumber > 1) {
-        doc.setFontSize(10);
+      const currentPage = data.pageNumber;
+      // Header on subsequent pages
+      if (currentPage > 1) {
+        doc.setFontSize(FONT.subtitle);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...black);
-        doc.text(`${title} - LINE LIST (cont.)`, margin, 25);
-        doc.text(facility, pageWidth - margin, 25, { align: 'right' });
+        doc.text(`${title} - LINE LIST (cont.)`, margin, 20);
+        doc.text(facility.toUpperCase(), pageWidth - margin, 20, { align: 'right' });
       }
+      
+      // Page number footer
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `Page ${currentPage}`,
+        pageWidth / 2,
+        pageHeight - 10,
+        { align: 'center' }
+      );
     },
   });
 
   return doc;
 };
-
 // Generate blank template for printing
 export const generateBlankLineListingPdf = (
   templateId: string,

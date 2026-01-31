@@ -18,7 +18,7 @@ export interface LineListingTemplate {
   fields: LineListingFieldConfig[];
 }
 
-// Default ILI (Influenza-Like Illness) template matching CDC/CMS requirements
+// Default ILI (Influenza-Like Illness) template matching CDC/CMS requirements exactly
 export const ILI_TEMPLATE: LineListingTemplate = {
   id: 'ili',
   name: 'Influenza-Like Illness (ILI)',
@@ -27,40 +27,60 @@ export const ILI_TEMPLATE: LineListingTemplate = {
     // Demographics
     { id: 'age', label: 'Age', shortLabel: 'Age', type: 'number', category: 'demographics', defaultEnabled: true },
     { id: 'sex', label: 'Sex', shortLabel: 'Sex', type: 'select', options: ['M', 'F'], category: 'demographics', defaultEnabled: true },
+    { id: 'unit', label: 'Unit/Floor', shortLabel: 'Unit', type: 'text', category: 'demographics', defaultEnabled: false },
     
     // Vaccinations
     { id: 'influenzaVaccine', label: 'Influenza Vaccine', shortLabel: 'Flu Vax', type: 'select', options: ['Y', 'N', 'Unk'], category: 'vaccines', defaultEnabled: true },
-    { id: 'pneumoniaVaccine', label: 'Pneumonia Vaccine', shortLabel: 'Pneum Vax', type: 'select', options: ['Y', 'N', 'Unk'], category: 'vaccines', defaultEnabled: true },
+    { id: 'influenzaVaxDate', label: 'Flu Vaccine Date', shortLabel: 'Flu Date', type: 'date', category: 'vaccines', defaultEnabled: false },
+    { id: 'pneumoniaVaccine', label: 'Pneumonia Vaccine', shortLabel: 'Pneu Vax', type: 'select', options: ['Y', 'N', 'Unk'], category: 'vaccines', defaultEnabled: true },
+    { id: 'pneumoniaVaxDate', label: 'Pneumonia Vax Date', shortLabel: 'Pneu Date', type: 'date', category: 'vaccines', defaultEnabled: false },
     
-    // Predisposing Factors
+    // Predisposing Factors - matching exact CDC template
     { id: 'cvd', label: 'CVD', shortLabel: 'CVD', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
     { id: 'copd', label: 'COPD', shortLabel: 'COPD', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
-    { id: 'dm', label: 'Diabetes', shortLabel: 'DM', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
+    { id: 'dm', label: 'Diabetes Mellitus', shortLabel: 'DM', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
     { id: 'anemia', label: 'Anemia', shortLabel: 'Anemia', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
     { id: 'renal', label: 'Renal Disease', shortLabel: 'Renal', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
     { id: 'ca', label: 'Cancer', shortLabel: 'CA', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
-    { id: 'steroids', label: 'Steroids', shortLabel: 'Steroids', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
+    { id: 'steroids', label: 'Steroids/Immunosupp', shortLabel: 'Steroids', type: 'checkbox', category: 'predisposing', defaultEnabled: true },
+    { id: 'chf', label: 'CHF', shortLabel: 'CHF', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'asthma', label: 'Asthma', shortLabel: 'Asthma', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'liver', label: 'Liver Disease', shortLabel: 'Liver', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'obesity', label: 'Obesity', shortLabel: 'Obesity', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'smoker', label: 'Smoker', shortLabel: 'Smoker', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
     
-    // Symptoms
-    { id: 'highestTemp', label: 'Highest Temp', shortLabel: 'Temp', type: 'text', category: 'symptoms', defaultEnabled: true },
+    // Symptoms - matching exact CDC ILI template
+    { id: 'highestTemp', label: 'Highest Temp (°F)', shortLabel: 'Temp°F', type: 'text', category: 'symptoms', defaultEnabled: true },
+    { id: 'feverDate', label: 'Date of Fever', shortLabel: 'Fever Dt', type: 'date', category: 'symptoms', defaultEnabled: false },
     { id: 'cough', label: 'Cough', shortLabel: 'Cough', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'congestion', label: 'Congestion', shortLabel: 'Congesti', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'pharyngitis', label: 'Pharyngitis', shortLabel: 'Pharyngit', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'rhinitis', label: 'Rhinitis', shortLabel: 'Rhinitis', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'headache', label: 'Headache', shortLabel: 'Headach', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'congestion', label: 'Congestion', shortLabel: 'Congest', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'pharyngitis', label: 'Pharyngitis/Sore Throat', shortLabel: 'Pharyn', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'rhinitis', label: 'Rhinitis/Runny Nose', shortLabel: 'Rhinit', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'headache', label: 'Headache', shortLabel: 'H/A', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'myalgia', label: 'Myalgia/Body Aches', shortLabel: 'Myalgia', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'chills', label: 'Chills', shortLabel: 'Chills', type: 'checkbox', category: 'symptoms', defaultEnabled: false },
+    { id: 'fatigue', label: 'Fatigue/Malaise', shortLabel: 'Fatigue', type: 'checkbox', category: 'symptoms', defaultEnabled: false },
+    { id: 'sob', label: 'Shortness of Breath', shortLabel: 'SOB', type: 'checkbox', category: 'symptoms', defaultEnabled: false },
+    { id: 'otherSymptoms', label: 'Other Symptoms', shortLabel: 'Other', type: 'text', category: 'symptoms', defaultEnabled: false },
     
-    // Outcomes
-    { id: 'feverDuration', label: 'Duration of Fever', shortLabel: 'Fever Dur', type: 'text', category: 'outcomes', defaultEnabled: true },
-    { id: 'hospDate', label: 'Hosp. Date', shortLabel: 'Hosp Date', type: 'date', category: 'outcomes', defaultEnabled: true },
-    { id: 'dateDied', label: 'Date Died', shortLabel: 'Died', type: 'date', category: 'outcomes', defaultEnabled: true },
+    // Outcomes - matching exact CDC template
+    { id: 'feverDuration', label: 'Duration of Fever (days)', shortLabel: 'Fev Dur', type: 'text', category: 'outcomes', defaultEnabled: true },
     { id: 'labResults', label: 'Lab Results', shortLabel: 'Lab', type: 'text', category: 'outcomes', defaultEnabled: true },
-    { id: 'antibiotic', label: 'Antibiotic', shortLabel: 'ABT', type: 'text', category: 'outcomes', defaultEnabled: true },
-    { id: 'xray', label: 'X-Ray', shortLabel: 'X-Ray', type: 'text', category: 'outcomes', defaultEnabled: true },
-    { id: 'pneumonia', label: 'Pneumonia', shortLabel: 'Pneum', type: 'checkbox', category: 'outcomes', defaultEnabled: true },
+    { id: 'testType', label: 'Test Type', shortLabel: 'Test', type: 'select', options: ['PCR', 'Rapid', 'Culture', 'None'], category: 'outcomes', defaultEnabled: false },
+    { id: 'testDate', label: 'Test Date', shortLabel: 'Test Dt', type: 'date', category: 'outcomes', defaultEnabled: false },
+    { id: 'antibiotic', label: 'Antibiotic Given', shortLabel: 'ABT', type: 'text', category: 'outcomes', defaultEnabled: true },
+    { id: 'antiviral', label: 'Antiviral Given', shortLabel: 'Antivir', type: 'text', category: 'outcomes', defaultEnabled: true },
+    { id: 'xray', label: 'Chest X-Ray', shortLabel: 'CXR', type: 'select', options: ['Normal', 'Abnormal', 'Pending', 'Not Done'], category: 'outcomes', defaultEnabled: true },
+    { id: 'pneumonia', label: 'Pneumonia Dx', shortLabel: 'Pneum', type: 'checkbox', category: 'outcomes', defaultEnabled: true },
+    { id: 'hospDate', label: 'Hospitalization Date', shortLabel: 'Hosp Dt', type: 'date', category: 'outcomes', defaultEnabled: true },
+    { id: 'hospDays', label: 'Days Hospitalized', shortLabel: 'Hosp #', type: 'number', category: 'outcomes', defaultEnabled: false },
+    { id: 'dateDied', label: 'Date Died', shortLabel: 'Died', type: 'date', category: 'outcomes', defaultEnabled: true },
+    { id: 'resolved', label: 'Resolved', shortLabel: 'Resolvd', type: 'checkbox', category: 'outcomes', defaultEnabled: false },
+    { id: 'resolvedDate', label: 'Resolution Date', shortLabel: 'Res Dt', type: 'date', category: 'outcomes', defaultEnabled: false },
   ]
 };
 
-// GI Outbreak template
+// GI Outbreak template - comprehensive fields
 export const GI_TEMPLATE: LineListingTemplate = {
   id: 'gi',
   name: 'Gastrointestinal Illness',
@@ -69,22 +89,40 @@ export const GI_TEMPLATE: LineListingTemplate = {
     // Demographics
     { id: 'age', label: 'Age', shortLabel: 'Age', type: 'number', category: 'demographics', defaultEnabled: true },
     { id: 'sex', label: 'Sex', shortLabel: 'Sex', type: 'select', options: ['M', 'F'], category: 'demographics', defaultEnabled: true },
+    { id: 'unit', label: 'Unit/Floor', shortLabel: 'Unit', type: 'text', category: 'demographics', defaultEnabled: false },
     
-    // Symptoms
+    // Predisposing Factors
+    { id: 'recentAbx', label: 'Recent Antibiotics', shortLabel: 'Abx', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'ppi', label: 'PPI Use', shortLabel: 'PPI', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    { id: 'tubeFeeding', label: 'Tube Feeding', shortLabel: 'Tube', type: 'checkbox', category: 'predisposing', defaultEnabled: false },
+    
+    // Symptoms - detailed
     { id: 'nausea', label: 'Nausea', shortLabel: 'Nausea', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
     { id: 'vomiting', label: 'Vomiting', shortLabel: 'Vomit', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'vomitEpisodes', label: 'Vomit Episodes', shortLabel: '# Vomit', type: 'number', category: 'symptoms', defaultEnabled: true },
-    { id: 'diarrhea', label: 'Diarrhea', shortLabel: 'Diarrhea', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
-    { id: 'diarrheaEpisodes', label: 'Diarrhea Episodes', shortLabel: '# BMs', type: 'number', category: 'symptoms', defaultEnabled: true },
+    { id: 'vomitEpisodes', label: 'Vomit Episodes/24h', shortLabel: '# Vomit', type: 'number', category: 'symptoms', defaultEnabled: true },
+    { id: 'vomitOnset', label: 'Vomit Onset Date', shortLabel: 'Vom Dt', type: 'date', category: 'symptoms', defaultEnabled: false },
+    { id: 'diarrhea', label: 'Diarrhea', shortLabel: 'Diarr', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'diarrheaEpisodes', label: 'Diarrhea Episodes/24h', shortLabel: '# BMs', type: 'number', category: 'symptoms', defaultEnabled: true },
+    { id: 'diarrheaOnset', label: 'Diarrhea Onset Date', shortLabel: 'Diarr Dt', type: 'date', category: 'symptoms', defaultEnabled: false },
+    { id: 'bloodyStool', label: 'Bloody Stool', shortLabel: 'Blood', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
     { id: 'fever', label: 'Fever', shortLabel: 'Fever', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'highestTemp', label: 'Highest Temp (°F)', shortLabel: 'Temp°F', type: 'text', category: 'symptoms', defaultEnabled: false },
     { id: 'abdominalPain', label: 'Abdominal Pain', shortLabel: 'Abd Pain', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
     { id: 'bodyAches', label: 'Body Aches', shortLabel: 'Aches', type: 'checkbox', category: 'symptoms', defaultEnabled: true },
+    { id: 'chills', label: 'Chills', shortLabel: 'Chills', type: 'checkbox', category: 'symptoms', defaultEnabled: false },
+    { id: 'headache', label: 'Headache', shortLabel: 'H/A', type: 'checkbox', category: 'symptoms', defaultEnabled: false },
     
-    // Outcomes
+    // Outcomes/Treatment
     { id: 'ivFluids', label: 'IV Fluids', shortLabel: 'IV', type: 'checkbox', category: 'outcomes', defaultEnabled: true },
-    { id: 'hospDate', label: 'Hosp. Date', shortLabel: 'Hosp Date', type: 'date', category: 'outcomes', defaultEnabled: true },
+    { id: 'antiemetics', label: 'Antiemetics Given', shortLabel: 'Antiemt', type: 'checkbox', category: 'outcomes', defaultEnabled: false },
     { id: 'stoolSpecimen', label: 'Stool Specimen', shortLabel: 'Stool', type: 'select', options: ['Pending', 'Positive', 'Negative', 'Not Done'], category: 'outcomes', defaultEnabled: true },
+    { id: 'stoolDate', label: 'Stool Collection Date', shortLabel: 'Stool Dt', type: 'date', category: 'outcomes', defaultEnabled: false },
     { id: 'labResults', label: 'Lab Results', shortLabel: 'Lab', type: 'text', category: 'outcomes', defaultEnabled: true },
+    { id: 'pathogen', label: 'Pathogen Identified', shortLabel: 'Pathogen', type: 'text', category: 'outcomes', defaultEnabled: true },
+    { id: 'hospDate', label: 'Hospitalization Date', shortLabel: 'Hosp Dt', type: 'date', category: 'outcomes', defaultEnabled: true },
+    { id: 'dateDied', label: 'Date Died', shortLabel: 'Died', type: 'date', category: 'outcomes', defaultEnabled: true },
+    { id: 'resolved', label: 'Resolved', shortLabel: 'Resolvd', type: 'checkbox', category: 'outcomes', defaultEnabled: false },
+    { id: 'resolvedDate', label: 'Resolution Date', shortLabel: 'Res Dt', type: 'date', category: 'outcomes', defaultEnabled: false },
   ]
 };
 
