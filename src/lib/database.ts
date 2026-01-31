@@ -457,16 +457,20 @@ const getActiveCensusMrns = (db: ICNDatabase): Set<string> => {
   );
 };
 
-// ABT helpers - excludes discharged residents and discontinued treatments
-// Status check is case-insensitive
+// ABT helpers - excludes discharged residents and completed/discontinued treatments
+// Matches ABT View logic: status not completed/discontinued AND (status='active' OR no endDate OR endDate >= today)
 export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
   const activeMrns = getActiveCensusMrns(db);
+  const today = new Date().toISOString().slice(0, 10);
   return db.records.abx.filter(r => {
     const status = (r.status || '').toLowerCase();
     if (status === 'completed' || status === 'discontinued') return false;
     // Hard exclude discharged residents regardless of date
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
-    return true;
+    // Match ABT View logic: active if status='active', no endDate, or endDate in future
+    const endDate = r.endDate || r.end_date;
+    const isActive = status === 'active' || !endDate || endDate >= today;
+    return isActive;
   });
 };
 
