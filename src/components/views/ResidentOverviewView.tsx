@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, User, Pill, ShieldAlert, Syringe, FileText, Plus, AlertTriangle, Eye } from 'lucide-react';
+import { Search, User, Pill, ShieldAlert, Syringe, FileText, Plus, AlertTriangle, Eye, ChevronRight, Zap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import SectionCard from '@/components/dashboard/SectionCard';
 import ResidentDetailModal from '@/components/modals/ResidentDetailModal';
+import QuickAddModal from '@/components/modals/QuickAddModal';
+import IPCaseModal from '@/components/modals/IPCaseModal';
+import ABTCaseModal from '@/components/modals/ABTCaseModal';
+import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { Resident, Note } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +30,14 @@ const ResidentOverviewView = () => {
   const [noteResident, setNoteResident] = useState<Resident | null>(null);
   const [noteText, setNoteText] = useState('');
   const [noteCategory, setNoteCategory] = useState('General');
+  const [expandedMrns, setExpandedMrns] = useState<Set<string>>(new Set());
+  
+  // Quick add modal states
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddResident, setQuickAddResident] = useState<Resident | null>(null);
+  const [showIPModal, setShowIPModal] = useState(false);
+  const [showABTModal, setShowABTModal] = useState(false);
+  const [showVAXModal, setShowVAXModal] = useState(false);
 
   const residents = getActiveResidents(db);
 
@@ -143,187 +156,208 @@ const ResidentOverviewView = () => {
         </div>
       </div>
 
-      {/* Resident Cards Grid */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {sortedResidents.map((resident) => {
-          const status = residentStatus[resident.mrn];
-          const records = selectedResident?.mrn === resident.mrn ? getResidentRecords(resident.mrn) : null;
-          const isExpanded = selectedResident?.mrn === resident.mrn;
+      {/* Resident List - Single line expandable */}
+      <SectionCard title={`Residents (${sortedResidents.length})`} noPadding>
+        <div className="divide-y divide-border">
+          {sortedResidents.map((resident) => {
+            const status = residentStatus[resident.mrn];
+            const isExpanded = expandedMrns.has(resident.mrn);
+            const records = isExpanded ? getResidentRecords(resident.mrn) : null;
+            
+            const toggleExpanded = () => {
+              setExpandedMrns(prev => {
+                const next = new Set(prev);
+                if (next.has(resident.mrn)) next.delete(resident.mrn);
+                else next.add(resident.mrn);
+                return next;
+              });
+            };
 
-          return (
-            <div
-              key={resident.mrn}
-              className={`section-card transition-all duration-200 ${isExpanded ? 'md:col-span-2 xl:col-span-3' : ''}`}
-            >
-              {/* Card Header */}
-              <div 
-                className="section-card-header cursor-pointer"
-                onClick={() => setSelectedResident(isExpanded ? null : resident)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-full ${status?.hasAlert ? 'bg-destructive/10' : 'bg-primary/10'}`}>
-                    {status?.hasAlert ? (
-                      <AlertTriangle className="w-5 h-5 text-destructive" />
-                    ) : (
-                      <User className="w-5 h-5 text-primary" />
+            return (
+              <Collapsible key={resident.mrn} open={isExpanded} onOpenChange={toggleExpanded}>
+                {/* Collapsed single line */}
+                <div className="flex items-center gap-3 py-2 px-4 hover:bg-muted/50 transition-colors">
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
+                      <ChevronRight className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  
+                  {/* Alert indicator */}
+                  {status?.hasAlert ? (
+                    <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+                  ) : (
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                  )}
+                  
+                  {/* Room */}
+                  <span className="text-sm font-medium w-16 shrink-0">{resident.room}</span>
+                  
+                  {/* Name */}
+                  <span className="font-medium flex-1 truncate">{resident.name}</span>
+                  
+                  {/* Status badges */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {status?.activeAbt > 0 && (
+                      <Badge variant="outline" className="text-xs bg-destructive/10 text-destructive border-destructive/30">
+                        <Pill className="w-3 h-3 mr-1" />{status.activeAbt}
+                      </Badge>
+                    )}
+                    {status?.activeIp > 0 && (
+                      <Badge variant="outline" className="text-xs bg-warning/10 text-warning border-warning/30">
+                        <ShieldAlert className="w-3 h-3 mr-1" />{status.activeIp}
+                      </Badge>
+                    )}
+                    {status?.vaxDue > 0 && (
+                      <Badge variant="outline" className="text-xs bg-info/10 text-info border-info/30">
+                        <Syringe className="w-3 h-3 mr-1" />{status.vaxDue}
+                      </Badge>
+                    )}
+                    {status?.notes > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        <FileText className="w-3 h-3 mr-1" />{status.notes}
+                      </Badge>
                     )}
                   </div>
-                  <div>
-                    <div className="font-semibold text-foreground">{resident.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      MRN: {resident.mrn} • {resident.unit}/{resident.room}
-                    </div>
+                  
+                  {/* Quick actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQuickAddResident(resident);
+                        setShowQuickAdd(true);
+                      }}
+                      title="Quick Add"
+                    >
+                      <Zap className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailResident(resident);
+                      }}
+                      title="View Details"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddNote(resident);
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Note
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDetailResident(resident);
-                    }}
-                    title="View Details"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddNote(resident);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Note
-                  </Button>
-                </div>
-              </div>
-
-              {/* Status Summary Bar */}
-              <div className="grid grid-cols-4 gap-2 px-4 py-3 bg-muted/30 border-b">
-                <div className="text-center">
-                  <div className={`text-sm font-bold ${status?.activeAbt > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {status?.activeAbt || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <Pill className="w-3 h-3" /> ABT
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className={`text-sm font-bold ${status?.activeIp > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
-                    {status?.activeIp || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <ShieldAlert className="w-3 h-3" /> IP
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className={`text-sm font-bold ${status?.vaxDue > 0 ? 'text-info' : 'text-muted-foreground'}`}>
-                    {status?.vaxDue || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <Syringe className="w-3 h-3" /> VAX
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-sm font-bold text-success">
-                    {status?.notes || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                    <FileText className="w-3 h-3" /> Notes
-                  </div>
-                </div>
-              </div>
-
-              {/* Expanded Details */}
-              {isExpanded && records && (
-                <div className="section-card-body space-y-4">
-                  {/* Active ABT */}
-                  {records.abt.filter(r => r.status === 'active').length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-destructive flex items-center gap-2 mb-2">
-                        <Pill className="w-4 h-4" /> Active Antibiotics
-                      </h4>
-                      <div className="space-y-2">
-                        {records.abt.filter(r => r.status === 'active').map(r => (
-                          <div key={r.id} className="p-2 bg-destructive/5 rounded-lg border border-destructive/20 text-sm">
-                            <span className="font-medium">{r.medication || r.med_name}</span>
-                            <span className="text-muted-foreground"> • {r.dose} {r.route}</span>
-                            {r.indication && <span className="text-muted-foreground"> • {r.indication}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Active IP */}
-                  {records.ip.filter(r => r.status === 'Active').length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-warning flex items-center gap-2 mb-2">
-                        <ShieldAlert className="w-4 h-4" /> Active IP Cases
-                      </h4>
-                      <div className="space-y-2">
-                        {records.ip.filter(r => r.status === 'Active').map(r => (
-                          <div key={r.id} className="p-2 bg-warning/5 rounded-lg border border-warning/20 text-sm">
-                            <span className="font-medium">{r.infectionType || r.infection_type}</span>
-                            <Badge variant="outline" className="ml-2 text-xs">{r.protocol}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* VAX Due */}
-                  {records.vax.filter(r => r.status === 'due' || r.status === 'overdue').length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-info flex items-center gap-2 mb-2">
-                        <Syringe className="w-4 h-4" /> Vaccinations Due
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {records.vax.filter(r => r.status === 'due' || r.status === 'overdue').map(r => (
-                          <Badge 
-                            key={r.id} 
-                            variant={r.status === 'overdue' ? 'destructive' : 'outline'}
-                          >
-                            {r.vaccine || r.vaccine_type}
-                            {r.status === 'overdue' && ' (Overdue)'}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recent Notes */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-success flex items-center gap-2 mb-2">
-                      <FileText className="w-4 h-4" /> Recent Notes
-                    </h4>
-                    {records.notes.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No notes for this resident.</p>
-                    ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {records.notes.slice(0, 5).map(n => (
-                          <div key={n.id} className="p-2 bg-muted/50 rounded-lg text-sm">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="secondary" className="text-xs">{n.category}</Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(n.createdAt).toLocaleDateString()}
-                              </span>
+                
+                {/* Expanded Details */}
+                <CollapsibleContent>
+                  {records && (
+                    <div className="px-10 py-4 bg-muted/20 space-y-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* Resident Info */}
+                        <div className="text-sm">
+                          <p className="text-muted-foreground">MRN: {resident.mrn}</p>
+                          <p className="text-muted-foreground">Unit: {resident.unit}</p>
+                          {resident.physician && <p className="text-muted-foreground">Dr: {resident.physician}</p>}
+                        </div>
+                        
+                        {/* Active ABT */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-destructive flex items-center gap-1 mb-1">
+                            <Pill className="w-3 h-3" /> Active ABT
+                          </h4>
+                          {records.abt.filter(r => r.status === 'active').length === 0 ? (
+                            <p className="text-xs text-muted-foreground">None</p>
+                          ) : (
+                            records.abt.filter(r => r.status === 'active').map(r => (
+                              <div key={r.id} className="text-xs p-1 bg-destructive/5 rounded mb-1">
+                                {r.medication || r.med_name} • {r.dose}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        
+                        {/* Active IP */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-warning flex items-center gap-1 mb-1">
+                            <ShieldAlert className="w-3 h-3" /> Active IP
+                          </h4>
+                          {records.ip.filter(r => r.status === 'Active').length === 0 ? (
+                            <p className="text-xs text-muted-foreground">None</p>
+                          ) : (
+                            records.ip.filter(r => r.status === 'Active').map(r => (
+                              <div key={r.id} className="text-xs p-1 bg-warning/5 rounded mb-1">
+                                {r.infectionType || r.infection_type} • {r.protocol}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        
+                        {/* VAX Due */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-info flex items-center gap-1 mb-1">
+                            <Syringe className="w-3 h-3" /> VAX Due
+                          </h4>
+                          {records.vax.filter(r => r.status === 'due' || r.status === 'overdue').length === 0 ? (
+                            <p className="text-xs text-muted-foreground">None</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {records.vax.filter(r => r.status === 'due' || r.status === 'overdue').map(r => (
+                                <Badge 
+                                  key={r.id} 
+                                  variant={r.status === 'overdue' ? 'destructive' : 'outline'}
+                                  className="text-xs"
+                                >
+                                  {r.vaccine || r.vaccine_type}
+                                </Badge>
+                              ))}
                             </div>
-                            <p className="text-foreground">{n.text}</p>
-                          </div>
-                        ))}
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                      
+                      {/* Recent Notes */}
+                      {records.notes.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-success flex items-center gap-1 mb-2">
+                            <FileText className="w-3 h-3" /> Recent Notes
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {records.notes.slice(0, 4).map(n => (
+                              <div key={n.id} className="p-2 bg-muted/50 rounded text-xs">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Badge variant="secondary" className="text-xs">{n.category}</Badge>
+                                  <span className="text-muted-foreground">
+                                    {new Date(n.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <p className="text-foreground truncate">{n.text}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+            );
+          })}
+        </div>
+      </SectionCard>
 
       {sortedResidents.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
@@ -380,6 +414,21 @@ const ResidentOverviewView = () => {
         }}
         resident={detailResident}
       />
+
+      {/* Quick Add Modal */}
+      <QuickAddModal
+        open={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        resident={quickAddResident}
+        onSelectIPCase={() => setShowIPModal(true)}
+        onSelectABTCase={() => setShowABTModal(true)}
+        onSelectVAXCase={() => setShowVAXModal(true)}
+        onSelectOutbreakCase={() => {}}
+      />
+
+      <IPCaseModal open={showIPModal} onClose={() => setShowIPModal(false)} onSave={() => setDb(loadDB())} editCase={null} />
+      <ABTCaseModal open={showABTModal} onClose={() => setShowABTModal(false)} onSave={() => setDb(loadDB())} editRecord={null} />
+      <VAXCaseModal open={showVAXModal} onClose={() => setShowVAXModal(false)} onSave={() => setDb(loadDB())} editRecord={null} />
     </div>
   );
 };

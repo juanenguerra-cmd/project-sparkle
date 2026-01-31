@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, AlertTriangle, Users, FileText, ChevronDown, Check, Clock, X, UserPlus, UserRoundPlus } from 'lucide-react';
+import { Plus, AlertTriangle, Users, FileText, ChevronDown, Check, Clock, X, UserPlus, UserRoundPlus, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import SectionCard from '@/components/dashboard/SectionCard';
 import { 
   loadDB, 
@@ -42,22 +44,42 @@ const OutbreakView = () => {
   const [showNewOutbreakModal, setShowNewOutbreakModal] = useState(false);
   const [showAddCaseModal, setShowAddCaseModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showEditCaseModal, setShowEditCaseModal] = useState(false);
   const [selectedOutbreak, setSelectedOutbreak] = useState<Outbreak | null>(null);
   const [selectedLineListing, setSelectedLineListing] = useState<LineListingEntry | null>(null);
+  const [editingLineListing, setEditingLineListing] = useState<LineListingEntry | null>(null);
   const [expandedOutbreaks, setExpandedOutbreaks] = useState<Set<string>>(new Set());
 
   const db = loadDB();
   const activeOutbreaks = getActiveOutbreaks(db);
   const resolvedOutbreaks = db.records.outbreaks.filter(o => o.status === 'resolved');
-  const residents = Object.values(db.census.residentsByMrn).filter(r => r.active_on_census);
+  const residents = Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .sort((a, b) => a.name.localeCompare(b.name)); // Alphabetical sorting
+
+  // Predefined outbreak name options
+  const OUTBREAK_NAME_OPTIONS = [
+    'COVID-19 Outbreak',
+    'Influenza Outbreak',
+    'Norovirus/GI Outbreak',
+    'Respiratory Illness Outbreak',
+    'Scabies Outbreak',
+    'MRSA Cluster',
+    'C. diff Cluster',
+    'Other'
+  ];
 
   // New Outbreak Form State
-  const [newOutbreakName, setNewOutbreakName] = useState('');
+  const [outbreakNameType, setOutbreakNameType] = useState<string>('COVID-19 Outbreak');
+  const [customOutbreakName, setCustomOutbreakName] = useState('');
   const [newOutbreakType, setNewOutbreakType] = useState<SymptomCategory>('respiratory');
   const [newOutbreakNotes, setNewOutbreakNotes] = useState('');
+  const [outbreakStartDate, setOutbreakStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   // Add Case Form State
+  const [isStaffOrVisitor, setIsStaffOrVisitor] = useState(false);
   const [caseMrn, setCaseMrn] = useState('');
+  const [staffVisitorName, setStaffVisitorName] = useState('');
   const [caseOnsetDate, setCaseOnsetDate] = useState(new Date().toISOString().slice(0, 10));
   const [caseSymptoms, setCaseSymptoms] = useState<string[]>([]);
   const [caseLabResults, setCaseLabResults] = useState('');
@@ -83,47 +105,73 @@ const OutbreakView = () => {
   };
 
   const handleCreateOutbreak = () => {
-    if (!newOutbreakName.trim()) {
+    const finalName = outbreakNameType === 'Other' ? customOutbreakName.trim() : outbreakNameType;
+    
+    if (!finalName) {
       toast.error('Please enter an outbreak name');
       return;
     }
 
     const db = loadDB();
     createOutbreak(db, {
-      name: newOutbreakName,
+      name: finalName,
       type: newOutbreakType,
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: outbreakStartDate,
       status: 'active',
       affectedUnits: [],
       notes: newOutbreakNotes
     });
     saveDB(db);
 
-    toast.success(`Outbreak "${newOutbreakName}" created`);
+    toast.success(`Outbreak "${finalName}" created`);
     setShowNewOutbreakModal(false);
-    setNewOutbreakName('');
+    setOutbreakNameType('COVID-19 Outbreak');
+    setCustomOutbreakName('');
     setNewOutbreakNotes('');
+    setOutbreakStartDate(new Date().toISOString().slice(0, 10));
     setRefreshKey(k => k + 1);
   };
 
   const handleAddCase = () => {
-    if (!caseMrn || !selectedOutbreak) {
+    if (!selectedOutbreak) return;
+    
+    if (!isStaffOrVisitor && !caseMrn) {
       toast.error('Please select a resident');
       return;
     }
-
-    const resident = residents.find(r => r.mrn === caseMrn);
-    if (!resident) {
-      toast.error('Invalid resident');
+    if (isStaffOrVisitor && !staffVisitorName.trim()) {
+      toast.error('Please enter staff/visitor name');
       return;
+    }
+
+    let residentName = '';
+    let unit = '';
+    let room = '';
+    let mrn = '';
+
+    if (isStaffOrVisitor) {
+      residentName = `[Staff/Visitor] ${staffVisitorName}`;
+      mrn = `staff_${Date.now()}`;
+      unit = 'N/A';
+      room = 'N/A';
+    } else {
+      const resident = residents.find(r => r.mrn === caseMrn);
+      if (!resident) {
+        toast.error('Invalid resident');
+        return;
+      }
+      residentName = resident.name;
+      mrn = resident.mrn;
+      unit = resident.unit;
+      room = resident.room;
     }
 
     const db = loadDB();
     addToLineListing(db, {
-      mrn: caseMrn,
-      residentName: resident.name,
-      unit: resident.unit,
-      room: resident.room,
+      mrn,
+      residentName,
+      unit,
+      room,
       outbreakId: selectedOutbreak.id,
       onsetDate: caseOnsetDate,
       symptoms: caseSymptoms,
@@ -134,9 +182,58 @@ const OutbreakView = () => {
     });
     saveDB(db);
 
-    toast.success(`${resident.name} added to line listing`);
+    toast.success(`${residentName} added to line listing`);
     setShowAddCaseModal(false);
     resetCaseForm();
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleEditCase = (entry: LineListingEntry) => {
+    setEditingLineListing(entry);
+    setCaseMrn(entry.mrn);
+    setStaffVisitorName(entry.residentName.replace('[Staff/Visitor] ', ''));
+    setIsStaffOrVisitor(entry.mrn.startsWith('staff_'));
+    setCaseOnsetDate(entry.onsetDate);
+    setCaseSymptoms(entry.symptoms);
+    setCaseLabResults(entry.labResults || '');
+    setCaseNotes(entry.notes || '');
+    setShowEditCaseModal(true);
+  };
+
+  const handleUpdateCase = () => {
+    if (!editingLineListing) return;
+    
+    const db = loadDB();
+    const idx = db.records.line_listings.findIndex(l => l.id === editingLineListing.id);
+    if (idx >= 0) {
+      db.records.line_listings[idx] = {
+        ...db.records.line_listings[idx],
+        onsetDate: caseOnsetDate,
+        symptoms: caseSymptoms,
+        labResults: caseLabResults,
+        notes: caseNotes,
+        updatedAt: new Date().toISOString()
+      };
+      addAudit(db, 'line_listing_updated', `Updated: ${editingLineListing.residentName}`, 'ip');
+      saveDB(db);
+      toast.success(`${editingLineListing.residentName} updated`);
+      setShowEditCaseModal(false);
+      resetCaseForm();
+      setEditingLineListing(null);
+      setRefreshKey(k => k + 1);
+    }
+  };
+
+  const handleDeleteCase = (entry: LineListingEntry) => {
+    if (!confirm(`Delete ${entry.residentName} from line listing?`)) return;
+    
+    const db = loadDB();
+    db.records.line_listings = db.records.line_listings.filter(l => l.id !== entry.id);
+    // Also delete associated contacts
+    db.records.contacts = db.records.contacts.filter(c => c.lineListingId !== entry.id);
+    addAudit(db, 'line_listing_deleted', `Deleted: ${entry.residentName}`, 'ip');
+    saveDB(db);
+    toast.success(`${entry.residentName} removed from line listing`);
     setRefreshKey(k => k + 1);
   };
 
@@ -213,6 +310,8 @@ const OutbreakView = () => {
 
   const resetCaseForm = () => {
     setCaseMrn('');
+    setStaffVisitorName('');
+    setIsStaffOrVisitor(false);
     setCaseOnsetDate(new Date().toISOString().slice(0, 10));
     setCaseSymptoms([]);
     setCaseLabResults('');
@@ -309,16 +408,34 @@ const OutbreakView = () => {
                     </Button>
                   </td>
                   <td>
-                    {entry.outcome === 'active' && (
+                    <div className="flex items-center gap-1">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleResolveCase(entry)}
+                        onClick={() => handleEditCase(entry)}
+                        title="Edit"
                       >
-                        <Check className="h-4 w-4 mr-1" />
-                        Resolve
+                        <Edit className="h-4 w-4" />
                       </Button>
-                    )}
+                      {entry.outcome === 'active' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResolveCase(entry)}
+                          title="Resolve"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteCase(entry)}
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -526,10 +643,31 @@ const OutbreakView = () => {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Outbreak Name</label>
-              <Input
-                value={newOutbreakName}
-                onChange={(e) => setNewOutbreakName(e.target.value)}
-                placeholder="e.g., COVID-19 Unit A Jan 2024"
+              <Select value={outbreakNameType} onValueChange={setOutbreakNameType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select outbreak type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {OUTBREAK_NAME_OPTIONS.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {outbreakNameType === 'Other' && (
+                <Input
+                  value={customOutbreakName}
+                  onChange={(e) => setCustomOutbreakName(e.target.value)}
+                  placeholder="Enter custom outbreak name..."
+                  className="mt-2"
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Start Date</label>
+              <Input 
+                type="date" 
+                value={outbreakStartDate} 
+                onChange={(e) => setOutbreakStartDate(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
@@ -570,21 +708,48 @@ const OutbreakView = () => {
             <DialogTitle>Add Case to Line Listing</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Resident</label>
-              <Select value={caseMrn} onValueChange={setCaseMrn}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select resident..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {residents.map(r => (
-                    <SelectItem key={r.mrn} value={r.mrn}>
-                      {r.name} - {r.room} ({r.unit})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Staff/Visitor Toggle */}
+            <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+              <Checkbox 
+                id="staffVisitor" 
+                checked={isStaffOrVisitor}
+                onCheckedChange={(checked) => {
+                  setIsStaffOrVisitor(checked === true);
+                  if (checked) setCaseMrn('');
+                }}
+              />
+              <Label htmlFor="staffVisitor" className="text-sm font-medium cursor-pointer">
+                Staff or Visitor (not a resident)
+              </Label>
             </div>
+
+            {isStaffOrVisitor ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Staff/Visitor Name</label>
+                <Input 
+                  value={staffVisitorName}
+                  onChange={(e) => setStaffVisitorName(e.target.value)}
+                  placeholder="Enter name..."
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Resident</label>
+                <Select value={caseMrn} onValueChange={setCaseMrn}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select resident..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {residents.map(r => (
+                      <SelectItem key={r.mrn} value={r.mrn}>
+                        {r.name} - {r.room} ({r.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">Onset Date</label>
               <Input type="date" value={caseOnsetDate} onChange={(e) => setCaseOnsetDate(e.target.value)} />
@@ -629,6 +794,59 @@ const OutbreakView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Case Modal */}
+      <Dialog open={showEditCaseModal} onOpenChange={setShowEditCaseModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Case: {editingLineListing?.residentName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Onset Date</label>
+              <Input type="date" value={caseOnsetDate} onChange={(e) => setCaseOnsetDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Symptoms</label>
+              <div className="flex flex-wrap gap-2 p-3 border rounded-lg max-h-40 overflow-y-auto">
+                {SYMPTOM_OPTIONS.map(symptom => (
+                  <Badge
+                    key={symptom.id}
+                    variant={caseSymptoms.includes(symptom.id) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      setCaseSymptoms(prev => 
+                        prev.includes(symptom.id) 
+                          ? prev.filter(s => s !== symptom.id)
+                          : [...prev, symptom.id]
+                      );
+                    }}
+                  >
+                    {symptom.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Lab Results</label>
+              <Input 
+                value={caseLabResults} 
+                onChange={(e) => setCaseLabResults(e.target.value)}
+                placeholder="e.g., COVID+ PCR, Flu A+"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes</label>
+              <Textarea value={caseNotes} onChange={(e) => setCaseNotes(e.target.value)} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setShowEditCaseModal(false); resetCaseForm(); setEditingLineListing(null); }}>Cancel</Button>
+            <Button onClick={handleUpdateCase}>Update</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Contact Tracing Modal */}
       <Dialog open={showContactModal} onOpenChange={setShowContactModal}>

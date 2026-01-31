@@ -97,20 +97,20 @@ const remapRoomId = (roomId: string, unit: number): string => {
   return roomId.replace(/^2/, newHundreds);
 };
 
-// Get status color for room tile
+// Get status color for room tile - using explicit colors for print/SVG compatibility
 const getStatusColor = (status: 'empty' | 'active-ebp' | 'active-isolation' | 'active-standard' | 'occupied'): string => {
   switch (status) {
     case 'active-isolation':
-      return 'hsl(var(--destructive))';
+      return '#ef4444'; // Red for isolation
     case 'active-ebp':
-      return 'hsl(var(--warning))';
+      return '#3b82f6'; // Blue for EBP (per user request)
     case 'active-standard':
-      return 'hsl(var(--info))';
+      return '#22c55e'; // Green for standard precautions
     case 'occupied':
-      return 'hsl(var(--muted))';
+      return '#e5e7eb'; // Light gray for occupied
     case 'empty':
     default:
-      return 'hsl(var(--background))';
+      return '#ffffff'; // White for empty
   }
 };
 
@@ -233,21 +233,28 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
     
     const facility = db.settings.facilityName || 'Healthcare Facility';
     
+    // Clone SVG and ensure all colors are explicit (not CSS variables)
+    const svgClone = svgElement.cloneNode(true) as SVGElement;
+    
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Floor Layout - Unit ${selectedUnit}</title>
           <style>
-            @page { margin: 0.5in; }
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 18pt; }
+            @page { size: landscape; margin: 0.5in; }
+            @media print {
+              body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }
+            .header { text-align: center; margin-bottom: 15px; }
+            .header h1 { margin: 0; font-size: 16pt; color: #333; }
             .header p { margin: 5px 0; font-size: 10pt; color: #666; }
-            .legend { display: flex; justify-content: center; gap: 20px; margin: 15px 0; font-size: 9pt; }
+            .legend { display: flex; justify-content: center; gap: 20px; margin: 10px 0; font-size: 9pt; }
             .legend-item { display: flex; align-items: center; gap: 5px; }
-            .legend-box { width: 16px; height: 16px; border: 1px solid #333; }
-            svg { width: 100%; max-width: 1400px; height: auto; }
+            .legend-box { width: 14px; height: 14px; border: 1px solid #333; }
+            .svg-container { width: 100%; max-width: 10in; margin: 0 auto; }
+            svg { width: 100%; height: auto; display: block; }
           </style>
         </head>
         <body>
@@ -257,17 +264,19 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
           </div>
           <div class="legend">
             <div class="legend-item"><div class="legend-box" style="background: #ef4444;"></div> Isolation (${caseCounts.isolation})</div>
-            <div class="legend-item"><div class="legend-box" style="background: #f59e0b;"></div> EBP (${caseCounts.ebp})</div>
-            <div class="legend-item"><div class="legend-box" style="background: #3b82f6;"></div> Standard (${caseCounts.standard})</div>
+            <div class="legend-item"><div class="legend-box" style="background: #3b82f6;"></div> EBP (${caseCounts.ebp})</div>
+            <div class="legend-item"><div class="legend-box" style="background: #22c55e;"></div> Standard (${caseCounts.standard})</div>
             <div class="legend-item"><div class="legend-box" style="background: #e5e7eb;"></div> Occupied</div>
-            <div class="legend-item"><div class="legend-box" style="background: #fff;"></div> Empty</div>
+            <div class="legend-item"><div class="legend-box" style="background: #fff; border: 1px solid #ccc;"></div> Empty</div>
           </div>
-          ${svgElement.outerHTML}
+          <div class="svg-container">
+            ${svgClone.outerHTML}
+          </div>
         </body>
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
+    setTimeout(() => printWindow.print(), 100);
   };
   
   const handleDownload = () => {
@@ -338,61 +347,64 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-4 text-xs">
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: 'hsl(var(--destructive))' }} />
+          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#ef4444' }} />
           <span>Isolation ({caseCounts.isolation})</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: 'hsl(var(--warning))' }} />
+          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#3b82f6' }} />
           <span>EBP ({caseCounts.ebp})</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: 'hsl(var(--info))' }} />
+          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#22c55e' }} />
           <span>Standard ({caseCounts.standard})</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border bg-muted" />
+          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#e5e7eb' }} />
           <span>Occupied</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border bg-background" />
+          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#ffffff', borderColor: '#ccc' }} />
           <span>Empty</span>
         </div>
       </div>
       
       {/* SVG Floorplan */}
-      <div className="overflow-x-auto border rounded-lg bg-background p-2">
+      <div className="overflow-x-auto border rounded-lg bg-white p-2">
         <svg
           id="floor-heatmap-svg"
           width={CANVAS_W}
           height={CANVAS_H}
           viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
           className="min-w-[800px]"
+          style={{ backgroundColor: '#ffffff' }}
         >
-          {/* Background */}
-          <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="hsl(var(--background))" />
+          {/* Background - explicit white for print */}
+          <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
           
           {/* Hallway labels */}
-          <text x="350" y="25" fontSize="14" fontWeight="bold" fill="hsl(var(--foreground))" textAnchor="middle">
+          <text x="350" y="25" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             WEST HALLWAY
           </text>
-          <text x="1050" y="25" fontSize="14" fontWeight="bold" fill="hsl(var(--foreground))" textAnchor="middle">
+          <text x="1050" y="25" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             EAST HALLWAY
           </text>
           
           {/* Center divider */}
-          <line x1={CANVAS_W / 2} y1="30" x2={CANVAS_W / 2} y2={CANVAS_H - 30} stroke="hsl(var(--border))" strokeWidth="2" strokeDasharray="5,5" />
+          <line x1={CANVAS_W / 2} y1="30" x2={CANVAS_W / 2} y2={CANVAS_H - 30} stroke="#cccccc" strokeWidth="2" strokeDasharray="5,5" />
           
           {/* Hallway lines */}
-          <line x1="40" y1="170" x2="660" y2="170" stroke="hsl(var(--border))" strokeWidth="1" />
-          <line x1="740" y1="170" x2="1360" y2="170" stroke="hsl(var(--border))" strokeWidth="1" />
-          <line x1="40" y1="380" x2="660" y2="380" stroke="hsl(var(--border))" strokeWidth="1" />
-          <line x1="740" y1="380" x2="1360" y2="380" stroke="hsl(var(--border))" strokeWidth="1" />
+          <line x1="40" y1="170" x2="660" y2="170" stroke="#cccccc" strokeWidth="1" />
+          <line x1="740" y1="170" x2="1360" y2="170" stroke="#cccccc" strokeWidth="1" />
+          <line x1="40" y1="380" x2="660" y2="380" stroke="#cccccc" strokeWidth="1" />
+          <line x1="740" y1="380" x2="1360" y2="380" stroke="#cccccc" strokeWidth="1" />
           
           {/* Room tiles */}
           {ALL_ROOMS.map(room => {
             const mappedRoomId = remapRoomId(room.id, unitNumber);
             const status = getRoomStatus(mappedRoomId);
             const fillColor = getStatusColor(status);
+            // Text color based on status
+            const textColor = status === 'empty' ? '#999999' : (status.startsWith('active') ? '#ffffff' : '#333333');
             
             return (
               <g key={room.id}>
@@ -402,7 +414,7 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
                   width={BOX_W}
                   height={BOX_H}
                   fill={fillColor}
-                  stroke="hsl(var(--border))"
+                  stroke="#999999"
                   strokeWidth="1"
                   rx="3"
                 />
@@ -410,7 +422,7 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
                   x={room.x + BOX_W / 2}
                   y={room.y + BOX_H / 2 + 4}
                   fontSize="10"
-                  fill={status === 'empty' ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))'}
+                  fill={textColor}
                   textAnchor="middle"
                   fontWeight={status.startsWith('active') ? 'bold' : 'normal'}
                 >
@@ -421,7 +433,7 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
           })}
           
           {/* Unit label */}
-          <text x={CANVAS_W / 2} y={CANVAS_H - 10} fontSize="12" fill="hsl(var(--muted-foreground))" textAnchor="middle">
+          <text x={CANVAS_W / 2} y={CANVAS_H - 10} fontSize="12" fill="#666666" textAnchor="middle">
             Unit {selectedUnit} — As of {format(parseISO(asOfDate), 'MM/dd/yyyy')}
           </text>
         </svg>

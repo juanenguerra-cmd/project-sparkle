@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
 import { format, parseISO, differenceInDays, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Printer, Download, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Printer, AlertTriangle, CheckCircle, Clock, X, Edit, XCircle } from 'lucide-react';
 import { loadDB } from '@/lib/database';
 import { Resident } from '@/lib/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { toast } from 'sonner';
 
 interface ScreeningFormData {
   mrn: string;
@@ -39,7 +39,7 @@ interface ScreeningFormData {
   hasWoundCare: boolean;
   hasIndwellingDevice: boolean;
   // Status
-  screeningStatus: 'pending' | 'complete' | 'overdue';
+  screeningStatus: 'pending' | 'complete' | 'overdue' | 'excluded';
   screeningDate?: string;
   screenedBy?: string;
   notes?: string;
@@ -50,8 +50,42 @@ interface NewAdmissionScreeningFormProps {
   onPrintForm?: (resident: ScreeningFormData) => void;
 }
 
+// Persist excluded MRNs and date overrides in localStorage
+const EXCLUDED_KEY = 'icn_screening_excluded';
+const DATE_OVERRIDES_KEY = 'icn_screening_date_overrides';
+
+const getExcludedMrns = (): Set<string> => {
+  try {
+    const data = localStorage.getItem(EXCLUDED_KEY);
+    return data ? new Set(JSON.parse(data)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveExcludedMrns = (mrns: Set<string>) => {
+  localStorage.setItem(EXCLUDED_KEY, JSON.stringify([...mrns]));
+};
+
+const getDateOverrides = (): Record<string, string> => {
+  try {
+    const data = localStorage.getItem(DATE_OVERRIDES_KEY);
+    return data ? JSON.parse(data) : {};
+  } catch {
+    return {};
+  }
+};
+
+const saveDateOverrides = (overrides: Record<string, string>) => {
+  localStorage.setItem(DATE_OVERRIDES_KEY, JSON.stringify(overrides));
+};
+
 const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionScreeningFormProps) => {
   const [selectedMrn, setSelectedMrn] = useState<string | null>(null);
+  const [excludedMrns, setExcludedMrns] = useState<Set<string>>(() => getExcludedMrns());
+  const [dateOverrides, setDateOverrides] = useState<Record<string, string>>(() => getDateOverrides());
+  const [editingDate, setEditingDate] = useState<{ mrn: string; date: string } | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const db = loadDB();
   const today = new Date();
@@ -66,7 +100,11 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     allResidents.forEach((resident: Resident) => {
       if (!resident.active_on_census) return;
       
-      let admitDate = resident.admitDate;
+      // Skip excluded residents
+      if (excludedMrns.has(resident.mrn)) return;
+      
+      // Use date override if available
+      let admitDate = dateOverrides[resident.mrn] || resident.admitDate;
       let isNewAdmission = false;
       
       // Check if resident has a valid admit date within the period
@@ -176,11 +214,34 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       if (!b.admitDate) return -1;
       return parseISO(b.admitDate).getTime() - parseISO(a.admitDate).getTime();
     });
-  }, [db, cutoffDate, today]);
+  }, [db, cutoffDate, today, excludedMrns, dateOverrides, refreshKey]);
   
   const pendingCount = screeningList.filter(s => s.screeningStatus === 'pending').length;
   const overdueCount = screeningList.filter(s => s.screeningStatus === 'overdue').length;
   const completeCount = screeningList.filter(s => s.screeningStatus === 'complete').length;
+  
+  const handleExclude = (mrn: string, name: string) => {
+    const newExcluded = new Set(excludedMrns);
+    newExcluded.add(mrn);
+    setExcludedMrns(newExcluded);
+    saveExcludedMrns(newExcluded);
+    toast.success(`${name} excluded from screening list`);
+    setRefreshKey(k => k + 1);
+  };
+  
+  const handleEditDate = (mrn: string, currentDate: string) => {
+    setEditingDate({ mrn, date: currentDate });
+  };
+  
+  const handleSaveDate = () => {
+    if (!editingDate) return;
+    const newOverrides = { ...dateOverrides, [editingDate.mrn]: editingDate.date };
+    setDateOverrides(newOverrides);
+    saveDateOverrides(newOverrides);
+    toast.success('Admission date updated');
+    setEditingDate(null);
+    setRefreshKey(k => k + 1);
+  };
   
   const generatePDF = (formData: ScreeningFormData) => {
     const doc = new jsPDF();
@@ -402,14 +463,32 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
                     </div>
                   </td>
                   <td>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => generatePDF(item)}
-                    >
-                      <Printer className="w-3 h-3 mr-1" />
-                      Form
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => generatePDF(item)}
+                        title="Print Form"
+                      >
+                        <Printer className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleEditDate(item.mrn, item.admitDate)}
+                        title="Edit Admission Date"
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleExclude(item.mrn, item.name)}
+                        title="Exclude from Screening"
+                      >
+                        <XCircle className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -423,6 +502,29 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
         <p>Per CMS F880/F881/F883: New admissions must be screened for infection status, MDRO history, and vaccination status within 72 hours.</p>
         <p className="mt-1">Vaccination offers include: Pneumococcal, Influenza, COVID-19, and RSV per F883/F887 requirements.</p>
       </div>
+      
+      {/* Edit Date Modal */}
+      <Dialog open={!!editingDate} onOpenChange={(open) => !open && setEditingDate(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Admission Date</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Admission Date</Label>
+              <Input 
+                type="date" 
+                value={editingDate?.date || ''} 
+                onChange={(e) => setEditingDate(prev => prev ? { ...prev, date: e.target.value } : null)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingDate(null)}>Cancel</Button>
+            <Button onClick={handleSaveDate}>Save</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
