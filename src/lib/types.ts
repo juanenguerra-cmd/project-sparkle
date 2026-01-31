@@ -122,6 +122,8 @@ export interface VaxRecord {
   // F883/F887 Enhanced Fields
   offerDate?: string;
   educationProvided?: boolean;
+  educationDate?: string;
+  educationOutcome?: 'accepted' | 'declined' | 'deferred';
   manufacturer?: string;
   lotNumber?: string;
   administrationSite?: string;

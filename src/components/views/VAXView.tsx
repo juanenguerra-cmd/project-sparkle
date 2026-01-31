@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,22 +9,28 @@ import { loadDB, getVaxDue, saveDB, addAudit } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
 import VAXImportModal from '@/components/modals/VAXImportModal';
 import VAXCaseModal from '@/components/modals/VAXCaseModal';
+import VaxEducationModal from '@/components/modals/VaxEducationModal';
+import SwipeableVaxRow from '@/components/vax/SwipeableVaxRow';
 import { useToast } from '@/hooks/use-toast';
 import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib/vaccineReofferLogic';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
 const VAXView = () => {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [db, setDb] = useState(() => loadDB());
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<VAXFilter>('due');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCaseModal, setShowCaseModal] = useState(false);
+  const [showEducationModal, setShowEducationModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<VaxRecord | null>(null);
   
   const records = db.records.vax;
+  const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
 
   // Get active resident MRNs from census
   const activeCensusMrns = new Set(
@@ -35,10 +41,10 @@ const VAXView = () => {
 
   const dueRecords = getVaxDue(db);
   
-  // CDC-based re-offer candidates (must be defined before use in filtering)
+  // CDC-based re-offer candidates with outbreak integration
   const reofferCandidates = useMemo(() => 
-    getReofferCandidates(records, activeCensusMrns), 
-    [records, activeCensusMrns]
+    getReofferCandidates(records, activeCensusMrns, activeOutbreaks), 
+    [records, activeCensusMrns, activeOutbreaks]
   );
   const reofferSummary = useMemo(() => 
     getReofferSummary(reofferCandidates), 
@@ -48,6 +54,9 @@ const VAXView = () => {
     new Set(reofferCandidates.map(c => `${c.record.mrn}_${c.record.vaccine || c.record.vaccine_type}`)), 
     [reofferCandidates]
   );
+  
+  // Count outbreak-linked re-offers
+  const outbreakLinkedCount = reofferCandidates.filter(c => c.outbreakLinked).length;
 
   const filteredRecords = activeFilter === 'reoffer' 
     ? reofferCandidates.map(c => c.record).filter(r => {
@@ -247,6 +256,11 @@ const VAXView = () => {
     }
   };
 
+  const handleOpenEducation = (record: VaxRecord) => {
+    setEditingRecord(record);
+    setShowEducationModal(true);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'given':
@@ -394,20 +408,28 @@ const VAXView = () => {
 
       {/* Re-offer Alert Banner */}
       {reofferCount > 0 && activeFilter !== 'reoffer' && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+        <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10 border border-warning/30">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            {outbreakLinkedCount > 0 ? (
+              <Flame className="w-4 h-4 text-destructive" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-warning" />
+            )}
+            <span className="text-sm font-medium text-foreground">
               {reofferCount} vaccine{reofferCount !== 1 ? 's' : ''} due for re-offer
               {reofferSummary.highPriority > 0 && (
-                <span className="text-amber-600"> ({reofferSummary.highPriority} high priority)</span>
+                <span className="text-destructive"> ({reofferSummary.highPriority} high priority)</span>
+              )}
+              {outbreakLinkedCount > 0 && (
+                <span className="text-destructive font-semibold ml-1">
+                  • {outbreakLinkedCount} outbreak-linked
+                </span>
               )}
             </span>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
-            className="border-amber-500 text-amber-700 hover:bg-amber-100"
             onClick={() => setActiveFilter('reoffer')}
           >
             View List
@@ -417,20 +439,33 @@ const VAXView = () => {
 
       {/* Re-offer Print Action */}
       {activeFilter === 'reoffer' && reofferCount > 0 && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted border border-border">
           <div className="text-sm">
             <span className="font-medium">{reofferCount} residents</span> on re-offer list
             {reofferSummary.highPriority > 0 && (
               <span className="ml-2 text-destructive">• {reofferSummary.highPriority} high priority</span>
             )}
             {reofferSummary.mediumPriority > 0 && (
-              <span className="ml-2 text-amber-600">• {reofferSummary.mediumPriority} medium priority</span>
+              <span className="ml-2 text-warning">• {reofferSummary.mediumPriority} medium priority</span>
+            )}
+            {outbreakLinkedCount > 0 && (
+              <span className="ml-2 text-destructive font-semibold">
+                <Flame className="w-3 h-3 inline mr-1" />
+                {outbreakLinkedCount} linked to active outbreak
+              </span>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={handlePrintReofferList}>
-            <Printer className="w-4 h-4 mr-2" />
-            Print Re-offer List
-          </Button>
+          <div className="flex gap-2">
+            {isMobile && (
+              <span className="text-xs text-muted-foreground flex items-center">
+                ← Swipe rows for quick actions →
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={handlePrintReofferList}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+          </div>
         </div>
       )}
 
@@ -469,12 +504,33 @@ const VAXView = () => {
               <tbody>
                 {filteredRecords.map((record) => {
                   const reofferInfo = activeFilter === 'reoffer' ? getReofferInfo(record) : undefined;
-                  return (
+                  
+                  const rowContent = (
                     <tr key={record.id}>
-                      <td className="font-medium">{record.residentName || record.name || '—'}</td>
+                      <td className="font-medium">
+                        {record.residentName || record.name || '—'}
+                        {record.educationProvided && (
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            <BookOpen className="w-3 h-3 mr-1" />
+                            Educated
+                          </Badge>
+                        )}
+                      </td>
                       <td>{record.unit} / {record.room}</td>
                       <td>
-                        <span className="badge-status badge-vax">{record.vaccine || record.vaccine_type || '—'}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="badge-status badge-vax">{record.vaccine || record.vaccine_type || '—'}</span>
+                          {reofferInfo?.outbreakLinked && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Flame className="w-4 h-4 text-destructive" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Linked to outbreak: {reofferInfo.outbreakName}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
                       </td>
                       {activeFilter === 'reoffer' && reofferInfo ? (
                         <>
@@ -482,9 +538,10 @@ const VAXView = () => {
                           <td>
                             <Badge 
                               variant={reofferInfo.priority === 'high' ? 'destructive' : 'secondary'}
-                              className={reofferInfo.priority === 'medium' ? 'bg-amber-500 text-white' : ''}
+                              className={reofferInfo.priority === 'medium' ? 'bg-warning text-warning-foreground' : ''}
                             >
                               {reofferInfo.priority.toUpperCase()}
+                              {reofferInfo.outbreakLinked && ' 🔥'}
                             </Badge>
                           </td>
                           <td className="text-xs max-w-[200px]">
@@ -506,6 +563,19 @@ const VAXView = () => {
                         <div className="flex items-center gap-1">
                           {activeFilter === 'reoffer' ? (
                             <>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button 
+                                    type="button"
+                                    className="row-action-btn text-primary" 
+                                    title="Provide Education"
+                                    onClick={() => handleOpenEducation(record)}
+                                  >
+                                    <BookOpen className="w-4 h-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Provide Education</TooltipContent>
+                              </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button 
@@ -593,6 +663,23 @@ const VAXView = () => {
                       </td>
                     </tr>
                   );
+                  
+                  // On mobile re-offer view, use swipeable rows
+                  if (isMobile && activeFilter === 'reoffer') {
+                    return (
+                      <SwipeableVaxRow
+                        key={record.id}
+                        onMarkGiven={() => handleMarkGiven(record)}
+                        onClearReoffer={() => handleClearReoffer(record)}
+                        onEdit={() => { setEditingRecord(record); setShowCaseModal(true); }}
+                        onEducation={() => handleOpenEducation(record)}
+                      >
+                        {rowContent}
+                      </SwipeableVaxRow>
+                    );
+                  }
+                  
+                  return rowContent;
                 })}
               </tbody>
             </table>
@@ -611,6 +698,13 @@ const VAXView = () => {
         onClose={() => { setShowCaseModal(false); setEditingRecord(null); }}
         onSave={() => setDb(loadDB())}
         editRecord={editingRecord}
+      />
+
+      <VaxEducationModal
+        open={showEducationModal}
+        onClose={() => { setShowEducationModal(false); setEditingRecord(null); }}
+        record={editingRecord}
+        onSave={() => setDb(loadDB())}
       />
     </div>
   );
