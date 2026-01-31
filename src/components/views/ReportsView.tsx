@@ -30,6 +30,9 @@ import {
   generateHandHygieneReport,
   generatePPEUsageReport,
   generateHHPPEAuditSummary,
+  generateAntibioticDurationReport,
+  generateNewAdmissionScreeningReport,
+  generateOutbreakSummaryReport,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
 import {
@@ -186,10 +189,13 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   const operationalReports = [
     { id: 'daily_ip', name: 'Daily IP Worklist', description: 'Active isolation precautions and EBP cases' },
     { id: 'abt_review', name: 'ABT Review Worklist', description: 'Antibiotic courses requiring review' },
+    { id: 'abt_duration', name: 'Antibiotic Duration Analysis', description: 'Prolonged ABT courses (≥7 days) requiring stewardship review' },
     { id: 'vax_due', name: 'Vaccination Due List', description: 'Residents with upcoming or overdue vaccinations' },
     { id: 'vax_reoffer', name: 'Vaccine Re-offer List', description: 'Residents due for vaccine re-offer (Flu: 30 days, COVID: 180 days)' },
     { id: 'precautions_list', name: 'Active Precautions List', description: 'Current isolation precautions by unit' },
     { id: 'exposure_log', name: 'Exposure Tracking Log', description: 'Potential exposure events and follow-ups' },
+    { id: 'new_admit_screening', name: 'New Admission Screening', description: 'Recent admissions needing IP screening (flags overdue >3 days)' },
+    { id: 'outbreak_summary', name: 'Outbreak Summary', description: 'Infection pattern analysis with outbreak alerts' },
     { id: 'vax_snapshot', name: 'Vaccination Snapshot', description: 'Active residents vaccination count (excludes discharged)' },
     { id: 'standard_of_care', name: 'Standard of Care Report', description: 'Weekly ABT, IP, VAX declinations by date range' },
     { id: 'followup_notes', name: 'Follow-up Notes Report', description: 'Overdue and pending follow-up items' },
@@ -277,6 +283,16 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
         break;
       case 'hh_ppe_summary':
         report = generateHHPPEAuditSummary(db, fromDate || undefined, toDate || undefined);
+        break;
+      // NEW HIGH-VALUE REPORTS
+      case 'abt_duration':
+        report = generateAntibioticDurationReport(db, 7); // 7-day threshold
+        break;
+      case 'new_admit_screening':
+        report = generateNewAdmissionScreeningReport(db, 14); // Last 14 days
+        break;
+      case 'outbreak_summary':
+        report = generateOutbreakSummaryReport(db, 30); // Last 30 days
         break;
       // Surveillance Reports
       case 'surv_trend':

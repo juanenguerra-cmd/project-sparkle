@@ -43,6 +43,11 @@ export const defaultReportDescriptions: Record<string, string> = {
   surv_rate_1000: 'Infection rates per 1,000 resident days by category - standard NHSN surveillance metric.',
   surv_abt_1000: 'Antibiotic prescription starts per 1,000 resident days - key antibiotic stewardship metric.',
   surv_aur: 'Antibiotic Utilization Ratio: Days of therapy (DOT) per 1,000 resident days with national benchmark comparison.',
+  
+  // NEW High-Value Reports
+  abt_duration: 'Flags antibiotic courses exceeding threshold duration (default 7 days) for stewardship review. Highlights high-priority cases >14 days.',
+  new_admit_screening: 'Tracks new admissions requiring infection prevention screening. Flags overdue screenings (>3 days post-admission).',
+  outbreak_summary: 'Identifies potential outbreak patterns by analyzing infection clusters by type and unit. Alerts when thresholds exceeded.',
 };
 
 /**

@@ -1762,3 +1762,307 @@ export const generateHHPPEAuditSummary = (
     }
   };
 };
+
+// ============ NEW HIGH-VALUE REPORTS ============
+
+// 1. Antibiotic Duration Analysis Report
+// Tracks prolonged antibiotic courses that may need stewardship review
+export const generateAntibioticDurationReport = (
+  db: ICNDatabase,
+  thresholdDays: number = 7
+): ReportData => {
+  const allABT = db.records.abx;
+  const today = new Date();
+  
+  // Find courses that are active or recently completed with duration >= threshold
+  const longCourses = allABT.filter(abt => {
+    const startDate = abt.startDate || abt.start_date;
+    if (!startDate) return false;
+    
+    const start = parseISO(startDate);
+    const end = abt.endDate || abt.end_date ? parseISO(abt.endDate || abt.end_date || '') : today;
+    const duration = differenceInDays(end, start) + 1;
+    
+    return duration >= thresholdDays;
+  }).sort((a, b) => {
+    const startA = parseISO(a.startDate || a.start_date || '');
+    const startB = parseISO(b.startDate || b.start_date || '');
+    return startB.getTime() - startA.getTime();
+  });
+  
+  const rows = longCourses.map(abt => {
+    const resident = db.census.residentsByMrn[abt.mrn];
+    const residentName = abt.residentName || abt.name || resident?.name || 'Unknown';
+    const startDate = abt.startDate || abt.start_date || '';
+    const endDate = abt.endDate || abt.end_date || 'Ongoing';
+    const start = startDate ? parseISO(startDate) : today;
+    const end = endDate !== 'Ongoing' ? parseISO(endDate) : today;
+    const duration = differenceInDays(end, start) + 1;
+    const medication = abt.medication || abt.med_name || '';
+    
+    // Flag if > 14 days (high priority for review)
+    const priority = duration > 14 ? '⚠️ HIGH' : duration > 10 ? 'MEDIUM' : 'STANDARD';
+    
+    return [
+      abt.room || resident?.room || '',
+      residentName,
+      abt.mrn,
+      medication,
+      abt.indication || '',
+      format(start, 'MM/dd/yyyy'),
+      endDate !== 'Ongoing' ? format(end, 'MM/dd/yyyy') : 'Ongoing',
+      `${duration} days`,
+      priority
+    ];
+  });
+  
+  // Summary statistics
+  const totalLongCourses = longCourses.length;
+  const avgDuration = longCourses.length > 0 
+    ? longCourses.reduce((sum, abt) => {
+        const start = parseISO(abt.startDate || abt.start_date || '');
+        const end = (abt.endDate || abt.end_date) ? parseISO(abt.endDate || abt.end_date || '') : today;
+        return sum + differenceInDays(end, start) + 1;
+      }, 0) / longCourses.length
+    : 0;
+  const highPriorityCount = rows.filter(r => r[8] === '⚠️ HIGH').length;
+  
+  return {
+    title: 'ANTIBIOTIC DURATION ANALYSIS',
+    subtitle: `Courses ≥ ${thresholdDays} Days - Stewardship Review Required`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      threshold: `${thresholdDays}+ days`,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Room', 'Resident', 'MRN', 'Antibiotic', 'Indication', 'Start', 'End', 'Duration', 'Priority'],
+    rows,
+    footer: {
+      preparedBy: '',
+      signature: '',
+      title: '',
+      dateTime: '',
+      disclaimer: `Total courses ≥${thresholdDays} days: ${totalLongCourses} | Average duration: ${avgDuration.toFixed(1)} days | High priority (>14 days): ${highPriorityCount}. Per CMS F881 Antibiotic Stewardship, prolonged courses require documented clinical justification and periodic review.`
+    }
+  };
+};
+
+// 2. New Admission IP Screening Report
+// Tracks residents admitted within specified days who need infection screening
+export const generateNewAdmissionScreeningReport = (
+  db: ICNDatabase,
+  daysBack: number = 14
+): ReportData => {
+  const today = new Date();
+  const cutoffDate = subDays(today, daysBack);
+  
+  // Find recent admissions
+  const recentAdmissions = Object.values(db.census.residentsByMrn)
+    .filter(r => {
+      if (!r.active_on_census) return false;
+      const admitDate = r.admitDate;
+      if (!admitDate) return false;
+      try {
+        const admit = parseISO(admitDate);
+        return admit >= cutoffDate;
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => {
+      const dateA = parseISO(a.admitDate || '');
+      const dateB = parseISO(b.admitDate || '');
+      return dateB.getTime() - dateA.getTime();
+    });
+  
+  // Check if each resident has IP case or screening
+  const rows = recentAdmissions.map(resident => {
+    const admitDate = resident.admitDate || '';
+    const daysSinceAdmit = differenceInDays(today, parseISO(admitDate));
+    
+    // Check for any IP cases
+    const ipCases = db.records.ip_cases.filter(c => c.mrn === resident.mrn);
+    const hasActiveIP = ipCases.some(c => c.status === 'Active');
+    const hasAnyIP = ipCases.length > 0;
+    
+    // Screening status based on IP data
+    let screeningStatus = 'PENDING';
+    let screeningNotes = 'Needs admission screening';
+    
+    if (hasActiveIP) {
+      screeningStatus = 'ACTIVE PRECAUTION';
+      screeningNotes = ipCases.find(c => c.status === 'Active')?.protocol || 'On precautions';
+    } else if (hasAnyIP) {
+      screeningStatus = 'REVIEWED';
+      screeningNotes = 'History noted';
+    } else if (daysSinceAdmit > 3) {
+      screeningStatus = '⚠️ OVERDUE';
+      screeningNotes = 'Screening overdue - review needed';
+    }
+    
+    return [
+      resident.room,
+      resident.name,
+      resident.mrn,
+      resident.unit,
+      format(parseISO(admitDate), 'MM/dd/yyyy'),
+      `${daysSinceAdmit} days`,
+      screeningStatus,
+      screeningNotes
+    ];
+  });
+  
+  const pendingCount = rows.filter(r => r[6] === 'PENDING' || r[6] === '⚠️ OVERDUE').length;
+  const overdueCount = rows.filter(r => r[6] === '⚠️ OVERDUE').length;
+  
+  return {
+    title: 'NEW ADMISSION IP SCREENING',
+    subtitle: `Admissions in Last ${daysBack} Days - Infection Prevention Review`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      period: `Last ${daysBack} days`,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Room', 'Resident', 'MRN', 'Unit', 'Admit Date', 'Days', 'Status', 'Notes'],
+    rows,
+    footer: {
+      preparedBy: '',
+      signature: '',
+      title: '',
+      dateTime: '',
+      disclaimer: `Total new admissions: ${recentAdmissions.length} | Pending screening: ${pendingCount} | Overdue (>3 days): ${overdueCount}. Per CMS guidelines, new admissions should be screened for MDRO history, current infections, and vaccination status within 72 hours.`
+    }
+  };
+};
+
+// 3. Outbreak Summary Report
+// Tracks potential outbreak patterns by infection type and unit
+export const generateOutbreakSummaryReport = (
+  db: ICNDatabase,
+  daysBack: number = 30
+): ReportData => {
+  const today = new Date();
+  const cutoffDate = subDays(today, daysBack);
+  
+  // Get IP cases in the period
+  const recentCases = db.records.ip_cases.filter(c => {
+    const onsetDate = c.onsetDate || c.onset_date;
+    if (!onsetDate) return false;
+    try {
+      const onset = parseISO(onsetDate);
+      return onset >= cutoffDate;
+    } catch {
+      return false;
+    }
+  });
+  
+  // Group by infection type
+  const byInfectionType: Record<string, IPCase[]> = {};
+  recentCases.forEach(c => {
+    const type = c.infectionType || c.infection_type || 'Unknown';
+    if (!byInfectionType[type]) byInfectionType[type] = [];
+    byInfectionType[type].push(c);
+  });
+  
+  // Group by unit
+  const byUnit: Record<string, IPCase[]> = {};
+  recentCases.forEach(c => {
+    const unit = c.unit || 'Unknown';
+    if (!byUnit[unit]) byUnit[unit] = [];
+    byUnit[unit].push(c);
+  });
+  
+  // Identify potential outbreaks (>=3 cases of same type or >=5 cases on same unit)
+  const outbreakAlerts: { type: string; count: number; unit?: string; alert: string }[] = [];
+  
+  Object.entries(byInfectionType).forEach(([type, cases]) => {
+    if (cases.length >= 3) {
+      outbreakAlerts.push({
+        type,
+        count: cases.length,
+        alert: `⚠️ POTENTIAL OUTBREAK: ${cases.length} ${type} cases in ${daysBack} days`
+      });
+    }
+  });
+  
+  Object.entries(byUnit).forEach(([unit, cases]) => {
+    if (cases.length >= 5) {
+      outbreakAlerts.push({
+        type: 'Unit Cluster',
+        count: cases.length,
+        unit,
+        alert: `⚠️ UNIT CLUSTER: ${cases.length} cases on ${unit} in ${daysBack} days`
+      });
+    }
+  });
+  
+  const rows: string[][] = [];
+  
+  // Section 1: Alerts
+  rows.push(['OUTBREAK ALERTS', '', '', '']);
+  if (outbreakAlerts.length > 0) {
+    outbreakAlerts.forEach(alert => {
+      rows.push([alert.alert, alert.count.toString(), alert.unit || 'Facility-wide', 'INVESTIGATE']);
+    });
+  } else {
+    rows.push(['No outbreak patterns detected', '', '', 'CLEAR']);
+  }
+  
+  rows.push(['', '', '', '']);
+  rows.push(['CASES BY INFECTION TYPE', '', '', '']);
+  Object.entries(byInfectionType)
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([type, cases]) => {
+      const status = cases.length >= 3 ? '⚠️ ALERT' : 'MONITOR';
+      rows.push([type, cases.length.toString(), '', status]);
+    });
+  
+  rows.push(['', '', '', '']);
+  rows.push(['CASES BY UNIT', '', '', '']);
+  Object.entries(byUnit)
+    .sort((a, b) => b[1].length - a[1].length)
+    .forEach(([unit, cases]) => {
+      const status = cases.length >= 5 ? '⚠️ CLUSTER' : 'NORMAL';
+      rows.push([unit, cases.length.toString(), '', status]);
+    });
+  
+  rows.push(['', '', '', '']);
+  rows.push(['RECENT CASE DETAIL', '', '', '']);
+  recentCases
+    .sort((a, b) => {
+      const dateA = parseISO(a.onsetDate || a.onset_date || '');
+      const dateB = parseISO(b.onsetDate || b.onset_date || '');
+      return dateB.getTime() - dateA.getTime();
+    })
+    .slice(0, 15) // Show last 15 cases
+    .forEach(c => {
+      const resident = db.census.residentsByMrn[c.mrn];
+      const name = c.residentName || c.name || resident?.name || 'Unknown';
+      const onset = c.onsetDate || c.onset_date || '';
+      rows.push([
+        onset ? format(parseISO(onset), 'MM/dd/yyyy') : '',
+        name,
+        c.unit,
+        c.infectionType || c.infection_type || ''
+      ]);
+    });
+  
+  return {
+    title: 'OUTBREAK SUMMARY REPORT',
+    subtitle: `Infection Pattern Analysis - Last ${daysBack} Days`,
+    generatedAt: new Date().toISOString(),
+    filters: {
+      period: `Last ${daysBack} days`,
+      date: format(new Date(), 'MM/dd/yyyy')
+    },
+    headers: ['Category / Date', 'Count / Resident', 'Unit', 'Status / Type'],
+    rows,
+    footer: {
+      preparedBy: '',
+      signature: '',
+      title: '',
+      dateTime: '',
+      disclaimer: `Total cases in period: ${recentCases.length} | Active alerts: ${outbreakAlerts.length}. Outbreak threshold: ≥3 cases of same infection type OR ≥5 cases on same unit within ${daysBack} days. Per CDC guidelines, clusters should be investigated within 24 hours of identification.`
+    }
+  };
+};
