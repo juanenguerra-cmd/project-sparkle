@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, AlertTriangle, Check, Clock, Filter } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, AlertTriangle, Check, Clock, Filter, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SectionCard from '@/components/dashboard/SectionCard';
 import FollowUpWorklist from '@/components/dashboard/FollowUpWorklist';
 import NoteModal from '@/components/modals/NoteModal';
+import QuickAddModal from '@/components/modals/QuickAddModal';
+import IPCaseModal from '@/components/modals/IPCaseModal';
+import ABTCaseModal from '@/components/modals/ABTCaseModal';
+import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
-import { Note, SYMPTOM_OPTIONS, SymptomCategory } from '@/lib/types';
+import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident } from '@/lib/types';
 import { toast } from 'sonner';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
@@ -26,6 +30,13 @@ const NotesView = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Quick add modal states
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showIPModal, setShowIPModal] = useState(false);
+  const [showABTModal, setShowABTModal] = useState(false);
+  const [showVAXModal, setShowVAXModal] = useState(false);
+  const [quickAddResident, setQuickAddResident] = useState<Resident | null>(null);
   
   const db = loadDB();
   const notes = db.records.notes;
@@ -139,10 +150,16 @@ const NotesView = () => {
           <h2 className="text-2xl font-bold text-foreground">Notes & Symptom Tracking</h2>
           <p className="text-sm text-muted-foreground">Clinical notes with symptom monitoring and follow-up tracking</p>
         </div>
-        <Button size="sm" onClick={() => { setEditingNote(null); setShowModal(true); }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Note
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowQuickAdd(true)}>
+            <Zap className="w-4 h-4 mr-2" />
+            Quick Add
+          </Button>
+          <Button size="sm" onClick={() => { setEditingNote(null); setShowModal(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Note
+          </Button>
+        </div>
       </div>
 
       {/* Follow-up Worklist */}
@@ -277,6 +294,43 @@ const NotesView = () => {
         onClose={() => { setShowModal(false); setEditingNote(null); }}
         onSave={() => setRefreshKey(k => k + 1)}
         note={editingNote}
+      />
+
+      {/* Quick Add Modal */}
+      <QuickAddModal
+        open={showQuickAdd}
+        onClose={() => setShowQuickAdd(false)}
+        resident={quickAddResident}
+        onSelectIPCase={() => setShowIPModal(true)}
+        onSelectABTCase={() => setShowABTModal(true)}
+        onSelectVAXCase={() => setShowVAXModal(true)}
+        onSelectOutbreakCase={() => {
+          toast.info('Navigate to Outbreak view to add cases');
+        }}
+      />
+
+      {/* IP Case Modal */}
+      <IPCaseModal
+        open={showIPModal}
+        onClose={() => setShowIPModal(false)}
+        onSave={() => setRefreshKey(k => k + 1)}
+        editCase={null}
+      />
+
+      {/* ABT Case Modal */}
+      <ABTCaseModal
+        open={showABTModal}
+        onClose={() => setShowABTModal(false)}
+        onSave={() => setRefreshKey(k => k + 1)}
+        editRecord={null}
+      />
+
+      {/* VAX Case Modal */}
+      <VAXCaseModal
+        open={showVAXModal}
+        onClose={() => setShowVAXModal(false)}
+        onSave={() => setRefreshKey(k => k + 1)}
+        editRecord={null}
       />
     </div>
   );

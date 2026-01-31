@@ -18,7 +18,7 @@ interface VAXCaseModalProps {
   editRecord?: VaxRecord | null;
 }
 
-const VACCINE_TYPES = ['FLU', 'COVID', 'PNA', 'Tdap', 'Shingles', 'Hep B', 'Other'];
+const VACCINE_TYPES = ['FLU', 'COVID', 'PNA', 'RSV', 'Tdap', 'Shingles', 'Hep B', 'Other'];
 const STATUS_OPTIONS = ['due', 'given', 'overdue', 'declined'];
 
 const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) => {
@@ -258,9 +258,11 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">Dose</Label>
+                <Label className="text-xs font-semibold text-primary">
+                  {formData.vaccine === 'Other' ? 'Vaccine Name *' : 'Dose'}
+                </Label>
                 <Input 
-                  placeholder="e.g., 0.5mL, Dose 1, Booster..."
+                  placeholder={formData.vaccine === 'Other' ? 'Enter vaccine name...' : 'e.g., 0.5mL, Dose 1, Booster...'}
                   value={formData.dose}
                   onChange={(e) => setFormData(p => ({ ...p, dose: e.target.value }))}
                   className="text-sm"

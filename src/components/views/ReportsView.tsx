@@ -69,9 +69,11 @@ interface ReportsViewProps {
 }
 
 const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
-  const [executiveOpen, setExecutiveOpen] = useState(true);
-  const [operationalOpen, setOperationalOpen] = useState(true);
-  const [surveillanceOpen, setSurveillanceOpen] = useState(true);
+  const [executiveOpen, setExecutiveOpen] = useState(false);
+  const [operationalOpen, setOperationalOpen] = useState(false);
+  const [surveillanceOpen, setSurveillanceOpen] = useState(false);
+  const [floorLayoutOpen, setFloorLayoutOpen] = useState(false);
+  const [admissionScreeningOpen, setAdmissionScreeningOpen] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState('all');
   const [selectedShift, setSelectedShift] = useState('Day');
   const [fromDate, setFromDate] = useState('');
@@ -859,21 +861,47 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
       </Collapsible>
 
       {/* Floor Layout Heatmap */}
-      <SectionCard title="Floor Layout Heatmap">
-        <p className="text-sm text-muted-foreground mb-4">
-          Visual representation of active precautions by room. Select unit and as-of date to view historical status.
-        </p>
-        <FloorLayoutHeatmap />
-      </SectionCard>
+      <Collapsible open={floorLayoutOpen} onOpenChange={setFloorLayoutOpen}>
+        <SectionCard 
+          title="Floor Layout Heatmap"
+          actions={
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronDown className={`w-4 h-4 transition-transform ${floorLayoutOpen ? '' : '-rotate-90'}`} />
+              </Button>
+            </CollapsibleTrigger>
+          }
+        >
+          <CollapsibleContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Visual representation of active precautions by room. Select unit and as-of date to view historical status.
+            </p>
+            <FloorLayoutHeatmap />
+          </CollapsibleContent>
+        </SectionCard>
+      </Collapsible>
 
       {/* New Admission Screening */}
-      <SectionCard title="New Admission IP Screening">
-        <p className="text-sm text-muted-foreground mb-4">
-          Track new admissions requiring infection prevention screening. Flags overdue screenings (&gt;72 hours per CMS).
-          Print individual screening forms with vaccination offers and clinical assessment checkboxes.
-        </p>
-        <NewAdmissionScreeningForm daysBack={14} />
-      </SectionCard>
+      <Collapsible open={admissionScreeningOpen} onOpenChange={setAdmissionScreeningOpen}>
+        <SectionCard 
+          title="New Admission IP Screening"
+          actions={
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <ChevronDown className={`w-4 h-4 transition-transform ${admissionScreeningOpen ? '' : '-rotate-90'}`} />
+              </Button>
+            </CollapsibleTrigger>
+          }
+        >
+          <CollapsibleContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Track new admissions requiring infection prevention screening. Flags overdue screenings (&gt;72 hours per CMS).
+              Print individual screening forms with vaccination offers and clinical assessment checkboxes.
+            </p>
+            <NewAdmissionScreeningForm daysBack={14} />
+          </CollapsibleContent>
+        </SectionCard>
+      </Collapsible>
 
       {/* Binder Organization Tools */}
       <SectionCard title="Infection Control Binder Organization">
