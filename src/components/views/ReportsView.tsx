@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3 } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,6 +51,8 @@ import ReportListItem from '@/components/reports/ReportListItem';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
 import SurveyModePanel from '@/components/reports/SurveyModePanel';
+import FloorLayoutHeatmap from '@/components/reports/FloorLayoutHeatmap';
+import NewAdmissionScreeningForm from '@/components/reports/NewAdmissionScreeningForm';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -855,6 +857,23 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           </CollapsibleContent>
         </SectionCard>
       </Collapsible>
+
+      {/* Floor Layout Heatmap */}
+      <SectionCard title="Floor Layout Heatmap">
+        <p className="text-sm text-muted-foreground mb-4">
+          Visual representation of active precautions by room. Select unit and as-of date to view historical status.
+        </p>
+        <FloorLayoutHeatmap />
+      </SectionCard>
+
+      {/* New Admission Screening */}
+      <SectionCard title="New Admission IP Screening">
+        <p className="text-sm text-muted-foreground mb-4">
+          Track new admissions requiring infection prevention screening. Flags overdue screenings (&gt;72 hours per CMS).
+          Print individual screening forms with vaccination offers and clinical assessment checkboxes.
+        </p>
+        <NewAdmissionScreeningForm daysBack={14} />
+      </SectionCard>
 
       {/* Binder Organization Tools */}
       <SectionCard title="Infection Control Binder Organization">
