@@ -8,13 +8,13 @@ import { loadDB, getActiveIPCases } from '@/lib/database';
 import { IPCase } from '@/lib/types';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 
-// Canvas and geometry constants - optimized for landscape print (fits 10" wide)
-const CANVAS_W = 1100;
-const CANVAS_H = 280;
-const BOX_W = 52;
-const BOX_H = 28;
-const GAP = 4; // gap between boxes
-const SECTION_GAP = 16; // gap between room sections
+// Canvas and geometry constants - optimized for landscape print
+const CANVAS_W = 1400;
+const CANVAS_H = 320;
+const BOX_W = 56;
+const BOX_H = 32;
+const GAP = 2; // gap between boxes in same section
+const SECTION_GAP = 12; // gap between room sections
 
 // Room layout matching the reference image exactly
 // North hallway (top band) - B rooms on top, A rooms below for pairs
@@ -24,8 +24,8 @@ const buildRooms = () => {
   const rooms: { id: string; x: number; y: number }[] = [];
   
   // === NORTH HALLWAY (Top Band) ===
-  const northY = 40;
-  let x = 50;
+  const northY = 50;
+  let x = 60;
   
   // Section 1: 275-B/A, 276-B/A (2x2 pair)
   rooms.push({ id: '275-B', x, y: northY });
@@ -34,11 +34,12 @@ const buildRooms = () => {
   rooms.push({ id: '276-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 2: 277-A, 278-A, 279-A, 280-A (single row, no B)
-  rooms.push({ id: '277-A', x, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: northY + (BOX_H + GAP) / 2 });
+  // Section 2: 277-A, 278-A, 279-A, 280-A (single row centered)
+  const singleRowY = northY + (BOX_H + GAP) / 2;
+  rooms.push({ id: '277-A', x, y: singleRowY });
+  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: singleRowY });
+  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: singleRowY });
+  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: singleRowY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
   // Section 3: 281-B/A, 282-B/A (2x2 pair)
@@ -48,12 +49,12 @@ const buildRooms = () => {
   rooms.push({ id: '282-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 4: 283-A (single room)
-  rooms.push({ id: '283-A', x, y: northY + (BOX_H + GAP) / 2 });
+  // Section 4: 283-A (single room centered)
+  rooms.push({ id: '283-A', x, y: singleRowY });
   x += BOX_W + GAP + SECTION_GAP;
   
-  // Section 5: 250-A (single room)
-  rooms.push({ id: '250-A', x, y: northY + (BOX_H + GAP) / 2 });
+  // Section 5: 250-A (single room centered)
+  rooms.push({ id: '250-A', x, y: singleRowY });
   x += BOX_W + GAP + SECTION_GAP;
   
   // Section 6: 251-B/A, 252-B/A (2x2 pair)
@@ -63,11 +64,11 @@ const buildRooms = () => {
   rooms.push({ id: '252-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 7: 253-A, 254-A, 255-A, 256-A (single row)
-  rooms.push({ id: '253-A', x, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: northY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: northY + (BOX_H + GAP) / 2 });
+  // Section 7: 253-A, 254-A, 255-A, 256-A (single row centered)
+  rooms.push({ id: '253-A', x, y: singleRowY });
+  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: singleRowY });
+  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: singleRowY });
+  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: singleRowY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
   // Section 8: 257-B/A, 258-B/A (2x2 pair)
@@ -77,8 +78,8 @@ const buildRooms = () => {
   rooms.push({ id: '258-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   
   // === SOUTH HALLWAY (Bottom Band) ===
-  const southY = 170;
-  x = 50;
+  const southY = 200;
+  x = 60;
   
   // Section 1: 274-A/B, 273-A/B (2x2 pair) - A on top, B below
   rooms.push({ id: '274-A', x, y: southY });
@@ -87,11 +88,12 @@ const buildRooms = () => {
   rooms.push({ id: '273-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 2: 272-A, 271-A, 270-A, 269-A (single row)
-  rooms.push({ id: '272-A', x, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southY + (BOX_H + GAP) / 2 });
+  // Section 2: 272-A, 271-A, 270-A, 269-A (single row centered)
+  const southSingleY = southY + (BOX_H + GAP) / 2;
+  rooms.push({ id: '272-A', x, y: southSingleY });
+  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southSingleY });
+  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southSingleY });
+  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southSingleY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
   // Section 3: 268-A/B, 267-A/B (2x2 pair)
@@ -99,7 +101,7 @@ const buildRooms = () => {
   rooms.push({ id: '267-A', x: x + BOX_W + GAP, y: southY });
   rooms.push({ id: '268-B', x, y: southY + BOX_H + GAP });
   rooms.push({ id: '267-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP * 3; // Extra gap for center
+  x += (BOX_W + GAP) * 2 + SECTION_GAP * 4; // Large gap in the center
   
   // Section 4: 266-A/B, 265-A/B (2x2 pair)
   rooms.push({ id: '266-A', x, y: southY });
@@ -108,11 +110,11 @@ const buildRooms = () => {
   rooms.push({ id: '265-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 5: 264-A, 263-A, 262-A, 261-A (single row)
-  rooms.push({ id: '264-A', x, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southY + (BOX_H + GAP) / 2 });
-  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southY + (BOX_H + GAP) / 2 });
+  // Section 5: 264-A, 263-A, 262-A, 261-A (single row centered)
+  rooms.push({ id: '264-A', x, y: southSingleY });
+  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southSingleY });
+  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southSingleY });
+  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southSingleY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
   // Section 6: 260-A/B, 259-A/B (2x2 pair)
@@ -418,19 +420,19 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
           width={CANVAS_W}
           height={CANVAS_H}
           viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-          className="w-full max-w-[1100px]"
-          style={{ backgroundColor: '#ffffff' }}
+          className="w-full"
+          style={{ backgroundColor: '#ffffff', maxWidth: '1400px' }}
         >
           {/* Background - explicit white for print */}
           <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
           
           {/* WEST label on far left */}
-          <text x="25" y="75" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+          <text x="30" y="85" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             WEST
           </text>
           
           {/* EAST label on far right */}
-          <text x={CANVAS_W - 25} y="75" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+          <text x={CANVAS_W - 30} y="85" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             EAST
           </text>
           
