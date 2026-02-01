@@ -121,7 +121,7 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-primary/10">
               <User className="w-5 h-5 text-primary" />
@@ -191,7 +191,7 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
+          <ScrollArea className="flex-1 min-h-0 mt-4">
             {/* Overview Tab */}
             <TabsContent value="overview" className="mt-0 space-y-4">
               {/* Alerts Section */}

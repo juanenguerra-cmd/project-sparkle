@@ -176,12 +176,12 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
           <DialogTitle>{editRecord ? 'Edit VAX Record' : 'Add VAX Record'}</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[calc(90vh-120px)] px-6">
+        <ScrollArea className="flex-1 min-h-0 px-6">
           <div className="space-y-4 pb-4">
             {/* Resident Selection */}
             <div className="space-y-1">

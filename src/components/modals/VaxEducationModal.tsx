@@ -85,15 +85,15 @@ const VaxEducationModal = ({ open, onClose, record, onSave }: VaxEducationModalP
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-primary" />
             Vaccine Education - {vaccineType}
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[70vh]">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-6 p-1">
             {/* Resident Info */}
             <div className="p-3 bg-muted rounded-lg">
