@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SectionCard from '@/components/dashboard/SectionCard';
 import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import { loadDB, getVaxDue, saveDB, addAudit } from '@/lib/database';
@@ -18,6 +19,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
+const ITEMS_PER_PAGE = 50;
+
 const VAXView = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -28,6 +31,8 @@ const VAXView = () => {
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [showEducationModal, setShowEducationModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<VaxRecord | null>(null);
+  const [unitFilter, setUnitFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState(1);
   
   const records = db.records.vax;
   const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
@@ -58,21 +63,33 @@ const VAXView = () => {
   // Count outbreak-linked re-offers
   const outbreakLinkedCount = reofferCandidates.filter(c => c.outbreakLinked).length;
 
-  const filteredRecords = activeFilter === 'reoffer' 
-    ? reofferCandidates.map(c => c.record).filter(r => {
-        const name = r.residentName || r.name || '';
-        const vaccine = r.vaccine || r.vaccine_type || '';
-        return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          vaccine.toLowerCase().includes(searchTerm.toLowerCase());
-      })
-    : records.filter(r => {
-        const name = r.residentName || r.name || '';
-        const vaccine = r.vaccine || r.vaccine_type || '';
-        const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          vaccine.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        if (!matchesSearch) return false;
-        
+  // Get unique units for filter
+  const availableUnits = useMemo(() => {
+    const units = new Set(records.map(r => r.unit).filter(Boolean));
+    return Array.from(units).sort();
+  }, [records]);
+
+  const filteredRecords = useMemo(() => {
+    let result = activeFilter === 'reoffer' 
+      ? reofferCandidates.map(c => c.record)
+      : records;
+    
+    // Apply unit filter
+    if (unitFilter !== 'all') {
+      result = result.filter(r => r.unit === unitFilter);
+    }
+    
+    // Apply search filter
+    result = result.filter(r => {
+      const name = r.residentName || r.name || '';
+      const vaccine = r.vaccine || r.vaccine_type || '';
+      return name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vaccine.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+    
+    // Apply status filter (except reoffer which is already filtered)
+    if (activeFilter !== 'reoffer') {
+      result = result.filter(r => {
         // For due/overdue views, exclude discharged residents from census
         if (activeFilter === 'due' || activeFilter === 'overdue') {
           if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
@@ -91,6 +108,28 @@ const VAXView = () => {
             return true;
         }
       });
+    }
+    
+    return result;
+  }, [activeFilter, reofferCandidates, records, unitFilter, searchTerm, activeCensusMrns]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const paginatedRecords = useMemo(() => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredRecords.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [filteredRecords, currentPage]);
+
+  // Reset page when filters change
+  const handleFilterChange = (newFilter: VAXFilter) => {
+    setActiveFilter(newFilter);
+    setCurrentPage(1);
+  };
+
+  const handleUnitFilterChange = (unit: string) => {
+    setUnitFilter(unit);
+    setCurrentPage(1);
+  };
   
   // Helper to get reoffer info for a record
   const getReofferInfo = (record: VaxRecord): ReofferCandidate | undefined => {
@@ -348,35 +387,35 @@ const VAXView = () => {
             <Badge 
               variant={activeFilter === 'all' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setActiveFilter('all')}
+              onClick={() => handleFilterChange('all')}
             >
               All ({records.length})
             </Badge>
             <Badge 
               variant={activeFilter === 'due' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setActiveFilter('due')}
+              onClick={() => handleFilterChange('due')}
             >
               Due ({dueCount})
             </Badge>
             <Badge 
               variant={activeFilter === 'overdue' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setActiveFilter('overdue')}
+              onClick={() => handleFilterChange('overdue')}
             >
               Overdue ({overdueCount})
             </Badge>
             <Badge 
               variant={activeFilter === 'given' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setActiveFilter('given')}
+              onClick={() => handleFilterChange('given')}
             >
               Given ({givenCount})
             </Badge>
             <Badge 
               variant={activeFilter === 'declined' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-              onClick={() => setActiveFilter('declined')}
+              onClick={() => handleFilterChange('declined')}
             >
               Declined ({declinedCount})
             </Badge>
@@ -389,7 +428,7 @@ const VAXView = () => {
                       ? 'bg-amber-500 hover:bg-amber-600' 
                       : 'border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white'
                   }`}
-                  onClick={() => setActiveFilter('reoffer')}
+                  onClick={() => handleFilterChange('reoffer')}
                 >
                   <RotateCcw className="w-3 h-3 mr-1" />
                   Re-offer ({reofferCount})
@@ -403,6 +442,17 @@ const VAXView = () => {
               </TooltipContent>
             </Tooltip>
           </div>
+          <Select value={unitFilter} onValueChange={handleUnitFilterChange}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="All Units" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Units</SelectItem>
+              {availableUnits.map(u => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -502,7 +552,7 @@ const VAXView = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRecords.map((record) => {
+              {paginatedRecords.map((record) => {
                   const reofferInfo = activeFilter === 'reoffer' ? getReofferInfo(record) : undefined;
                   
                   const rowContent = (
@@ -658,8 +708,81 @@ const VAXView = () => {
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
-                          )}
-                        </div>
+          )}
+        </div>
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t">
+            <span className="text-sm text-muted-foreground">
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-sm px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const printContent = `
+                    <html>
+                      <head>
+                        <title>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; }
+                          h1 { font-size: 16px; margin-bottom: 5px; }
+                          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                          th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+                          th { background: #f5f5f5; }
+                        </style>
+                      </head>
+                      <body>
+                        <h1>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter} (${activeFilter})</h1>
+                        <p style="font-size:11px;color:#666;">Page ${currentPage} of ${totalPages} • ${new Date().toLocaleString()}</p>
+                        <table>
+                          <thead><tr><th>Resident</th><th>Unit/Room</th><th>Vaccine</th><th>Status</th><th>Date</th></tr></thead>
+                          <tbody>
+                            ${paginatedRecords.map(r => `<tr>
+                              <td>${r.residentName || r.name || '—'}</td>
+                              <td>${r.unit} / ${r.room}</td>
+                              <td>${r.vaccine || r.vaccine_type || '—'}</td>
+                              <td>${r.status}</td>
+                              <td>${r.dateGiven || r.date_given || r.dueDate || r.due_date || '—'}</td>
+                            </tr>`).join('')}
+                          </tbody>
+                        </table>
+                      </body>
+                    </html>
+                  `;
+                  const w = window.open('', '_blank');
+                  if (w) { w.document.write(printContent); w.document.close(); w.print(); }
+                }}
+              >
+                <Printer className="w-4 h-4 mr-1" />
+                Print View
+              </Button>
+            </div>
+          </div>
+        )}
                       </td>
                     </tr>
                   );
