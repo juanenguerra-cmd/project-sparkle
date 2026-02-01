@@ -8,13 +8,13 @@ import { loadDB, getActiveIPCases } from '@/lib/database';
 import { IPCase } from '@/lib/types';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 
-// Canvas and geometry constants - optimized for landscape print
-const CANVAS_W = 1400;
-const CANVAS_H = 320;
-const BOX_W = 56;
-const BOX_H = 32;
+// Canvas and geometry constants - optimized for landscape print with auto-fit
+const CANVAS_W = 1500;
+const CANVAS_H = 300;
+const BOX_W = 52;
+const BOX_H = 28;
 const GAP = 2; // gap between boxes in same section
-const SECTION_GAP = 12; // gap between room sections
+const SECTION_GAP = 16; // gap between room sections
 
 // Room layout matching the reference image exactly
 // North hallway (top band) - B rooms on top, A rooms below for pairs
@@ -24,62 +24,58 @@ const buildRooms = () => {
   const rooms: { id: string; x: number; y: number }[] = [];
   
   // === NORTH HALLWAY (Top Band) ===
-  const northY = 50;
-  let x = 60;
+  const northY = 40;
+  let x = 70;
   
-  // Section 1: 275-B/A, 276-B/A (2x2 pair)
+  // Section 1: 275-B/A, 276-B/A (2x2 pair) - B on top
   rooms.push({ id: '275-B', x, y: northY });
   rooms.push({ id: '276-B', x: x + BOX_W + GAP, y: northY });
   rooms.push({ id: '275-A', x, y: northY + BOX_H + GAP });
   rooms.push({ id: '276-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 2: 277-A, 278-A, 279-A, 280-A (single row centered)
-  const singleRowY = northY + (BOX_H + GAP) / 2;
-  rooms.push({ id: '277-A', x, y: singleRowY });
-  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: singleRowY });
-  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: singleRowY });
-  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: singleRowY });
+  // Section 2: 277-A, 278-A, 279-A, 280-A (single row - A only, no B rooms)
+  rooms.push({ id: '277-A', x, y: northY });
+  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: northY });
+  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: northY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
-  // Section 3: 281-B/A, 282-B/A (2x2 pair)
+  // Section 3: 281-B/A, 282-B/A (2x2 pair) - B on top
   rooms.push({ id: '281-B', x, y: northY });
   rooms.push({ id: '282-B', x: x + BOX_W + GAP, y: northY });
   rooms.push({ id: '281-A', x, y: northY + BOX_H + GAP });
   rooms.push({ id: '282-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 4: 283-A (single room centered)
-  rooms.push({ id: '283-A', x, y: singleRowY });
-  x += BOX_W + GAP + SECTION_GAP;
+  // Section 4: 283-A, 250-A (single row)
+  rooms.push({ id: '283-A', x, y: northY });
+  rooms.push({ id: '250-A', x: x + BOX_W + GAP, y: northY });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 5: 250-A (single room centered)
-  rooms.push({ id: '250-A', x, y: singleRowY });
-  x += BOX_W + GAP + SECTION_GAP;
-  
-  // Section 6: 251-B/A, 252-B/A (2x2 pair)
+  // Section 5: 251-B/A, 252-B/A (2x2 pair) - B on top
   rooms.push({ id: '251-B', x, y: northY });
   rooms.push({ id: '252-B', x: x + BOX_W + GAP, y: northY });
   rooms.push({ id: '251-A', x, y: northY + BOX_H + GAP });
   rooms.push({ id: '252-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 7: 253-A, 254-A, 255-A, 256-A (single row centered)
-  rooms.push({ id: '253-A', x, y: singleRowY });
-  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: singleRowY });
-  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: singleRowY });
-  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: singleRowY });
+  // Section 6: 253-A, 254-A, 255-A, 256-A (single row - A only)
+  rooms.push({ id: '253-A', x, y: northY });
+  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: northY });
+  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: northY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
-  // Section 8: 257-B/A, 258-B/A (2x2 pair)
+  // Section 7: 257-B/A, 258-B/A (2x2 pair) - B on top
   rooms.push({ id: '257-B', x, y: northY });
   rooms.push({ id: '258-B', x: x + BOX_W + GAP, y: northY });
   rooms.push({ id: '257-A', x, y: northY + BOX_H + GAP });
   rooms.push({ id: '258-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   
   // === SOUTH HALLWAY (Bottom Band) ===
-  const southY = 200;
-  x = 60;
+  const southY = 180;
+  x = 70;
   
   // Section 1: 274-A/B, 273-A/B (2x2 pair) - A on top, B below
   rooms.push({ id: '274-A', x, y: southY });
@@ -88,36 +84,35 @@ const buildRooms = () => {
   rooms.push({ id: '273-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 2: 272-A, 271-A, 270-A, 269-A (single row centered)
-  const southSingleY = southY + (BOX_H + GAP) / 2;
-  rooms.push({ id: '272-A', x, y: southSingleY });
-  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southSingleY });
-  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southSingleY });
-  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southSingleY });
+  // Section 2: 272-A, 271-A, 270-A, 269-A (single row - A only)
+  rooms.push({ id: '272-A', x, y: southY });
+  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southY });
+  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
-  // Section 3: 268-A/B, 267-A/B (2x2 pair)
+  // Section 3: 268-A/B, 267-A/B (2x2 pair) - A on top
   rooms.push({ id: '268-A', x, y: southY });
   rooms.push({ id: '267-A', x: x + BOX_W + GAP, y: southY });
   rooms.push({ id: '268-B', x, y: southY + BOX_H + GAP });
   rooms.push({ id: '267-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP * 4; // Large gap in the center
+  x += (BOX_W + GAP) * 2 + SECTION_GAP * 5; // Large center gap
   
-  // Section 4: 266-A/B, 265-A/B (2x2 pair)
+  // Section 4: 266-A/B, 265-A/B (2x2 pair) - A on top
   rooms.push({ id: '266-A', x, y: southY });
   rooms.push({ id: '265-A', x: x + BOX_W + GAP, y: southY });
   rooms.push({ id: '266-B', x, y: southY + BOX_H + GAP });
   rooms.push({ id: '265-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
   x += (BOX_W + GAP) * 2 + SECTION_GAP;
   
-  // Section 5: 264-A, 263-A, 262-A, 261-A (single row centered)
-  rooms.push({ id: '264-A', x, y: southSingleY });
-  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southSingleY });
-  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southSingleY });
-  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southSingleY });
+  // Section 5: 264-A, 263-A, 262-A, 261-A (single row - A only)
+  rooms.push({ id: '264-A', x, y: southY });
+  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southY });
+  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southY });
   x += (BOX_W + GAP) * 4 + SECTION_GAP;
   
-  // Section 6: 260-A/B, 259-A/B (2x2 pair)
+  // Section 6: 260-A/B, 259-A/B (2x2 pair) - A on top
   rooms.push({ id: '260-A', x, y: southY });
   rooms.push({ id: '259-A', x: x + BOX_W + GAP, y: southY });
   rooms.push({ id: '260-B', x, y: southY + BOX_H + GAP });
@@ -269,8 +264,6 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
-    const facility = db.settings.facilityName || 'Healthcare Facility';
-    
     // Clone SVG and ensure all colors are explicit (not CSS variables)
     const svgClone = svgElement.cloneNode(true) as SVGElement;
     
@@ -280,46 +273,78 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
         <head>
           <title>Floor Layout - Unit ${selectedUnit}</title>
           <style>
-            @page { size: landscape; margin: 0.4in; }
+            @page { size: landscape; margin: 0.3in 0.4in; }
             @media print {
               body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             }
-            body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background: white; }
-            .header { margin-bottom: 8px; }
-            .header h1 { margin: 0; font-size: 14pt; color: #333; font-weight: bold; }
-            .header p { margin: 4px 0 0 0; font-size: 10pt; color: #666; }
-            .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0; font-size: 9pt; }
-            .legend-item { display: flex; align-items: center; gap: 4px; }
-            .legend-box { width: 12px; height: 12px; border: 1px solid #333; }
-            .svg-container { width: 100%; }
-            svg { width: 100%; height: auto; display: block; max-width: 10in; }
-            .footer { margin-top: 12px; font-size: 8pt; color: #666; }
-            .footer-line { display: flex; gap: 24px; margin-bottom: 4px; }
-            .footer-field { display: flex; align-items: baseline; }
+            * { box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0; 
+              padding: 0; 
+              background: white;
+            }
+            .container {
+              width: 100%;
+              max-width: 10in;
+              margin: 0 auto;
+            }
+            .header { margin-bottom: 6px; }
+            .header h1 { margin: 0; font-size: 13pt; color: #333; font-weight: bold; }
+            .legend { 
+              display: flex; 
+              flex-wrap: wrap; 
+              gap: 10px; 
+              margin: 6px 0; 
+              font-size: 8pt; 
+              align-items: center;
+            }
+            .legend-item { 
+              display: inline-flex; 
+              align-items: center; 
+              gap: 3px; 
+              padding: 2px 6px;
+              border: 1px solid;
+              border-radius: 3px;
+            }
+            .svg-container { 
+              width: 100%; 
+              overflow: hidden;
+            }
+            svg { 
+              width: 100%; 
+              height: auto; 
+              display: block;
+            }
+            .footer { margin-top: 10px; font-size: 8pt; color: #666; }
+            .footer-line { margin-bottom: 3px; }
             .footer-field strong { margin-right: 4px; }
-            .footer-field span { border-bottom: 1px solid #333; min-width: 120px; display: inline-block; }
+            .footer-field span { 
+              border-bottom: 1px solid #333; 
+              min-width: 150px; 
+              display: inline-block; 
+              margin-left: 4px;
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Unit ${selectedUnit} Floorplan</h1>
-          </div>
-          <div class="legend">
-            <div class="legend-item"><div class="legend-box" style="background: #ef4444; border-color: #ef4444;"></div> ISO Rooms: ${caseCounts.isolation}</div>
-            <div class="legend-item"><div class="legend-box" style="background: #3b82f6; border-color: #3b82f6;"></div> EBP Rooms: ${caseCounts.ebp}</div>
-            <div class="legend-item"><div class="legend-box" style="background: #22c55e; border-color: #22c55e;"></div> ISO+EBP: 0</div>
-            <div class="legend-item"><div class="legend-box" style="background: #f97316; border-color: #f97316;"></div> Any Precaution: ${caseCounts.isolation + caseCounts.ebp + caseCounts.standard}</div>
-            <span style="margin-left: 12px;">ISO window: ${format(parseISO(asOfDate), 'yyyy-MM-dd')} (as-of) • 28d</span>
-          </div>
-          <div class="svg-container">
-            ${svgClone.outerHTML}
-          </div>
-          <div class="footer">
-            <div class="footer-line">
-              <div class="footer-field"><strong>Isolation Precaution:</strong> <span></span></div>
+          <div class="container">
+            <div class="header">
+              <h1>Unit ${selectedUnit} Floorplan</h1>
             </div>
-            <div class="footer-line">
-              <div class="footer-field"><strong>Enhance Barrier Precaution:</strong> <span></span></div>
+            <div class="legend">
+              <div class="legend-item" style="border-color: #f97316; color: #f97316;">ISO Rooms: ${caseCounts.isolation}</div>
+              <div class="legend-item" style="border-color: #3b82f6; color: #3b82f6;">EBP Rooms: ${caseCounts.ebp}</div>
+              <div class="legend-item" style="border-color: #666; color: #666;">ISO+EBP: 0</div>
+              <div class="legend-item" style="border-color: #22c55e; color: #22c55e;">Any Precaution: ${caseCounts.isolation + caseCounts.ebp + caseCounts.standard}</div>
+              <span style="color: #666; margin-left: 8px;">ISO window: ${format(parseISO(asOfDate), 'yyyy-MM-dd')} (as-of) • 28d</span>
+            </div>
+            <div class="svg-container">
+              ${svgClone.outerHTML}
+            </div>
+            <div class="footer">
+              <div class="footer-line footer-field"><strong>Isolation Precaution:</strong> <span>—</span></div>
+              <div class="footer-line footer-field"><strong>Enhance Barrier Precaution:</strong> <span>—</span></div>
             </div>
           </div>
         </body>
@@ -417,22 +442,21 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
       <div className="overflow-x-auto border rounded-lg bg-white p-2">
         <svg
           id="floor-heatmap-svg"
-          width={CANVAS_W}
-          height={CANVAS_H}
           viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-          className="w-full"
-          style={{ backgroundColor: '#ffffff', maxWidth: '1400px' }}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-auto"
+          style={{ backgroundColor: '#ffffff', minHeight: '200px' }}
         >
           {/* Background - explicit white for print */}
           <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
           
-          {/* WEST label on far left */}
-          <text x="30" y="85" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* WEST label on far left - vertically centered between north and south */}
+          <text x="35" y="145" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             WEST
           </text>
           
-          {/* EAST label on far right */}
-          <text x={CANVAS_W - 30} y="85" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* EAST label on far right - vertically centered */}
+          <text x={CANVAS_W - 35} y="145" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             EAST
           </text>
           
