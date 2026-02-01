@@ -258,25 +258,33 @@ const LineListingCaseModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>
-            {mode === 'edit' ? `Edit Case: ${editingEntry?.residentName}` : 'Add Case to Line Listing'}
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            {outbreak.name} • {template?.name || 'Generic'} Template
-          </p>
-        </DialogHeader>
+      {/*
+        IMPORTANT: Make the modal itself the scroll container.
+        This is the most reliable approach for mouse-wheel scrolling in dialogs on desktop.
+      */}
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-y-auto">
+        <div className="flex min-h-0 flex-col">
+          {/* Sticky header */}
+          <div className="sticky top-0 z-10 bg-background border-b p-6 pb-4 pr-12">
+            <DialogHeader>
+              <DialogTitle>
+                {mode === 'edit' ? `Edit Case: ${editingEntry?.residentName}` : 'Add Case to Line Listing'}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                {outbreak.name} • {template?.name || 'Generic'} Template
+              </p>
+            </DialogHeader>
+          </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
-          <div className="space-y-4 py-4">
+          {/* Content */}
+          <div className="space-y-4 p-6 pt-4 pb-24">
             {/* Basic Info */}
             <div className="space-y-4 border-b pb-4">
               {/* Staff/Visitor Toggle */}
               {mode === 'add' && (
                 <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-                  <Checkbox 
-                    id="staffVisitor" 
+                  <Checkbox
+                    id="staffVisitor"
                     checked={isStaffOrVisitor}
                     onCheckedChange={(checked) => {
                       setIsStaffOrVisitor(checked === true);
@@ -292,7 +300,7 @@ const LineListingCaseModal = ({
               {isStaffOrVisitor ? (
                 <div className="space-y-2">
                   <Label>Staff/Visitor Name</Label>
-                  <Input 
+                  <Input
                     value={staffVisitorName}
                     onChange={(e) => setStaffVisitorName(e.target.value)}
                     placeholder="Enter name..."
@@ -306,7 +314,7 @@ const LineListingCaseModal = ({
                       <SelectValue placeholder="Select resident..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {residents.map(r => (
+                      {residents.map((r) => (
                         <SelectItem key={r.mrn} value={r.mrn}>
                           {r.name} - {r.room} ({r.unit})
                         </SelectItem>
@@ -315,7 +323,7 @@ const LineListingCaseModal = ({
                   </Select>
                 </div>
               ) : null}
-              
+
               <div className="space-y-2">
                 <Label>Onset Date</Label>
                 <Input type="date" value={caseOnsetDate} onChange={(e) => setCaseOnsetDate(e.target.value)} />
@@ -323,36 +331,38 @@ const LineListingCaseModal = ({
             </div>
 
             {/* Template Fields by Category */}
-            {CATEGORY_ORDER.map(category => {
+            {CATEGORY_ORDER.map((category) => {
               const fields = groupedFields[category];
               if (!fields || fields.length === 0) return null;
 
-              const checkboxFields = fields.filter(f => f.type === 'checkbox');
-              const otherFields = fields.filter(f => f.type !== 'checkbox');
+              const checkboxFields = fields.filter((f) => f.type === 'checkbox');
+              const otherFields = fields.filter((f) => f.type !== 'checkbox');
 
               return (
-                <Collapsible 
+                <Collapsible
                   key={category}
                   open={expandedCategories.has(category)}
                   onOpenChange={() => toggleCategory(category)}
                 >
                   <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/50 rounded-lg hover:bg-muted/70">
                     <span className="text-sm font-medium">{CATEGORY_LABELS[category]}</span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${expandedCategories.has(category) ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${expandedCategories.has(category) ? 'rotate-180' : ''}`}
+                    />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="pt-3">
                     <div className="space-y-3">
                       {/* Non-checkbox fields in grid */}
                       {otherFields.length > 0 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {otherFields.map(field => renderField(field))}
+                          {otherFields.map((field) => renderField(field))}
                         </div>
                       )}
-                      
+
                       {/* Checkbox fields in flex wrap */}
                       {checkboxFields.length > 0 && (
                         <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/30 rounded-lg">
-                          {checkboxFields.map(field => renderField(field))}
+                          {checkboxFields.map((field) => renderField(field))}
                         </div>
                       )}
                     </div>
@@ -362,26 +372,26 @@ const LineListingCaseModal = ({
             })}
 
             {/* Legacy Symptoms (for backwards compatibility) */}
-            <Collapsible 
+            <Collapsible
               open={expandedCategories.has('legacy_symptoms')}
               onOpenChange={() => toggleCategory('legacy_symptoms')}
             >
               <CollapsibleTrigger className="flex items-center justify-between w-full p-2 bg-muted/50 rounded-lg hover:bg-muted/70">
                 <span className="text-sm font-medium">Quick Symptoms Select</span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${expandedCategories.has('legacy_symptoms') ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${expandedCategories.has('legacy_symptoms') ? 'rotate-180' : ''}`}
+                />
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-3">
                 <div className="flex flex-wrap gap-2 p-3 border rounded-lg max-h-32 overflow-y-auto">
-                  {getSymptomOptions(outbreak.type).map(symptom => (
+                  {getSymptomOptions(outbreak.type).map((symptom) => (
                     <Badge
                       key={symptom.id}
-                      variant={caseSymptoms.includes(symptom.id) ? "default" : "outline"}
+                      variant={caseSymptoms.includes(symptom.id) ? 'default' : 'outline'}
                       className="cursor-pointer"
                       onClick={() => {
-                        setCaseSymptoms(prev => 
-                          prev.includes(symptom.id) 
-                            ? prev.filter(s => s !== symptom.id)
-                            : [...prev, symptom.id]
+                        setCaseSymptoms((prev) =>
+                          prev.includes(symptom.id) ? prev.filter((s) => s !== symptom.id) : [...prev, symptom.id],
                         );
                       }}
                     >
@@ -396,8 +406,8 @@ const LineListingCaseModal = ({
             <div className="space-y-4 border-t pt-4">
               <div className="space-y-2">
                 <Label>Lab Results</Label>
-                <Input 
-                  value={caseLabResults} 
+                <Input
+                  value={caseLabResults}
                   onChange={(e) => setCaseLabResults(e.target.value)}
                   placeholder="e.g., COVID+ PCR, Flu A+"
                 />
@@ -408,13 +418,16 @@ const LineListingCaseModal = ({
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit}>
-            {mode === 'edit' ? 'Update' : 'Add to Line Listing'}
-          </Button>
+          {/* Sticky footer */}
+          <div className="sticky bottom-0 z-10 bg-background border-t p-6 pt-4">
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit}>{mode === 'edit' ? 'Update' : 'Add to Line Listing'}</Button>
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
