@@ -4,148 +4,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Printer, Download } from 'lucide-react';
-import { loadDB, getActiveIPCases } from '@/lib/database';
+import { loadDB } from '@/lib/database';
 import { IPCase } from '@/lib/types';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
-
-// Canvas and geometry constants - optimized for landscape print with auto-fit
-const CANVAS_W = 1400;
-const CANVAS_H = 260;
-const BOX_W = 54;
-const BOX_H = 26;
-const GAP = 2; // gap between boxes in same section
-const SECTION_GAP = 12; // gap between room sections
-
-// Room layout matching the reference image exactly
-// North hallway (top band) - B rooms on top, A rooms below for pairs
-// South hallway (bottom band) - A rooms on top, B rooms below for pairs
-
-const buildRooms = () => {
-  const rooms: { id: string; x: number; y: number }[] = [];
-  
-  // === NORTH HALLWAY (Top Band) ===
-  const northY = 35;
-  let x = 55;
-  
-  // Section 1: 275-B/A, 276-B/A (2x2 pair) - B on top
-  rooms.push({ id: '275-B', x, y: northY });
-  rooms.push({ id: '276-B', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '275-A', x, y: northY + BOX_H + GAP });
-  rooms.push({ id: '276-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 2: 277-A, 278-A, 279-A, 280-A (single row - A only, no B rooms)
-  rooms.push({ id: '277-A', x, y: northY });
-  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: northY });
-  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: northY });
-  x += (BOX_W + GAP) * 4 + SECTION_GAP;
-  
-  // Section 3: 281-B/A, 282-B/A (2x2 pair) - B on top
-  rooms.push({ id: '281-B', x, y: northY });
-  rooms.push({ id: '282-B', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '281-A', x, y: northY + BOX_H + GAP });
-  rooms.push({ id: '282-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 4: 283-A, 250-A (single row)
-  rooms.push({ id: '283-A', x, y: northY });
-  rooms.push({ id: '250-A', x: x + BOX_W + GAP, y: northY });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 5: 251-B/A, 252-B/A (2x2 pair) - B on top
-  rooms.push({ id: '251-B', x, y: northY });
-  rooms.push({ id: '252-B', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '251-A', x, y: northY + BOX_H + GAP });
-  rooms.push({ id: '252-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 6: 253-A, 254-A, 255-A, 256-A (single row - A only)
-  rooms.push({ id: '253-A', x, y: northY });
-  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: northY });
-  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: northY });
-  x += (BOX_W + GAP) * 4 + SECTION_GAP;
-  
-  // Section 7: 257-B/A, 258-B/A (2x2 pair) - B on top
-  rooms.push({ id: '257-B', x, y: northY });
-  rooms.push({ id: '258-B', x: x + BOX_W + GAP, y: northY });
-  rooms.push({ id: '257-A', x, y: northY + BOX_H + GAP });
-  rooms.push({ id: '258-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
-  
-  // === SOUTH HALLWAY (Bottom Band) ===
-  const southY = 160;
-  x = 55;
-  
-  // Section 1: 274-A/B, 273-A/B (2x2 pair) - A on top, B below
-  rooms.push({ id: '274-A', x, y: southY });
-  rooms.push({ id: '273-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '274-B', x, y: southY + BOX_H + GAP });
-  rooms.push({ id: '273-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 2: 272-A, 271-A, 270-A, 269-A (single row - A only)
-  rooms.push({ id: '272-A', x, y: southY });
-  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southY });
-  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southY });
-  x += (BOX_W + GAP) * 4 + SECTION_GAP;
-  
-  // Section 3: 268-A/B, 267-A/B (2x2 pair) - A on top
-  rooms.push({ id: '268-A', x, y: southY });
-  rooms.push({ id: '267-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '268-B', x, y: southY + BOX_H + GAP });
-  rooms.push({ id: '267-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP * 5; // Large center gap
-  
-  // Section 4: 266-A/B, 265-A/B (2x2 pair) - A on top
-  rooms.push({ id: '266-A', x, y: southY });
-  rooms.push({ id: '265-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '266-B', x, y: southY + BOX_H + GAP });
-  rooms.push({ id: '265-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  x += (BOX_W + GAP) * 2 + SECTION_GAP;
-  
-  // Section 5: 264-A, 263-A, 262-A, 261-A (single row - A only)
-  rooms.push({ id: '264-A', x, y: southY });
-  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southY });
-  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southY });
-  x += (BOX_W + GAP) * 4 + SECTION_GAP;
-  
-  // Section 6: 260-A/B, 259-A/B (2x2 pair) - A on top
-  rooms.push({ id: '260-A', x, y: southY });
-  rooms.push({ id: '259-A', x: x + BOX_W + GAP, y: southY });
-  rooms.push({ id: '260-B', x, y: southY + BOX_H + GAP });
-  rooms.push({ id: '259-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
-  
-  return rooms;
-};
-
-const ALL_ROOMS = buildRooms();
-
-// Remap room ID based on unit (2xx -> 3xx for Unit 3, 2xx -> 4xx for Unit 4)
-const remapRoomId = (roomId: string, unit: number): string => {
-  if (unit === 2) return roomId;
-  const newHundreds = unit.toString();
-  return roomId.replace(/^2/, newHundreds);
-};
-
-// Get status color for room tile - using explicit colors for print/SVG compatibility
-const getStatusColor = (status: 'empty' | 'active-ebp' | 'active-isolation' | 'active-standard' | 'occupied'): string => {
-  switch (status) {
-    case 'active-isolation':
-      return '#ef4444'; // Red for isolation
-    case 'active-ebp':
-      return '#3b82f6'; // Blue for EBP (per user request)
-    case 'active-standard':
-      return '#22c55e'; // Green for standard precautions
-    case 'occupied':
-      return '#e5e7eb'; // Light gray for occupied
-    case 'empty':
-    default:
-      return '#ffffff'; // White for empty
-  }
-};
+import {
+  FLOOR_LAYOUT,
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  remapRoomId,
+  getStatusColor,
+  getTextColor,
+  RoomStatus
+} from './floorLayoutData';
 
 interface FloorLayoutHeatmapProps {
   className?: string;
@@ -176,15 +46,12 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
     const asOf = parseISO(asOfDate);
     const statusMap: Record<string, { status: string; protocol: string; infectionType: string }> = {};
     
-    // Get all IP cases and filter by as-of date
     const allCases = db.records.ip_cases;
     
     allCases.forEach((ipCase: IPCase) => {
       const room = ipCase.room;
       if (!room) return;
       
-      // Check if case was active on the as-of date
-      // Onset <= AsOf AND (Resolution is null OR Resolution >= AsOf)
       const onsetDate = ipCase.onsetDate || ipCase.onset_date;
       const resolutionDate = ipCase.resolutionDate || ipCase.resolution_date;
       
@@ -192,18 +59,16 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
       
       try {
         const onset = parseISO(onsetDate);
-        if (isAfter(onset, asOf)) return; // Onset after as-of date
+        if (isAfter(onset, asOf)) return;
         
         if (resolutionDate) {
           const resolution = parseISO(resolutionDate);
-          if (isBefore(resolution, asOf)) return; // Resolved before as-of date
+          if (isBefore(resolution, asOf)) return;
         } else {
-          // No resolution date - check status
           const status = (ipCase.status || '').toLowerCase();
           if (status === 'resolved' || status === 'discharged') return;
         }
         
-        // Case was active on as-of date
         statusMap[room] = {
           status: ipCase.status,
           protocol: ipCase.protocol,
@@ -218,10 +83,9 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
   }, [db, asOfDate]);
   
   // Get room status for a specific room ID
-  const getRoomStatus = (roomId: string): 'empty' | 'active-ebp' | 'active-isolation' | 'active-standard' | 'occupied' => {
+  const getRoomStatus = (roomId: string): RoomStatus => {
     const caseInfo = roomStatusMap[roomId];
     if (!caseInfo) {
-      // Check if room is occupied by checking census
       const resident = Object.values(db.census.residentsByMrn).find(r => 
         r.room === roomId && r.active_on_census
       );
@@ -264,7 +128,6 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     
-    // Clone SVG and ensure all colors are explicit (not CSS variables)
     const svgClone = svgElement.cloneNode(true) as SVGElement;
     
     printWindow.document.write(`
@@ -289,23 +152,24 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
               max-width: 10in;
               margin: 0 auto;
             }
-            .header { margin-bottom: 6px; }
-            .header h1 { margin: 0; font-size: 13pt; color: #333; font-weight: bold; }
+            .header { margin-bottom: 8px; }
+            .header h1 { margin: 0; font-size: 14pt; color: #333; font-weight: bold; }
             .legend { 
               display: flex; 
               flex-wrap: wrap; 
-              gap: 10px; 
-              margin: 6px 0; 
-              font-size: 8pt; 
+              gap: 12px; 
+              margin: 8px 0; 
+              font-size: 9pt; 
               align-items: center;
             }
             .legend-item { 
               display: inline-flex; 
               align-items: center; 
-              gap: 3px; 
-              padding: 2px 6px;
+              gap: 4px; 
+              padding: 3px 8px;
               border: 1px solid;
-              border-radius: 3px;
+              border-radius: 4px;
+              font-weight: 500;
             }
             .svg-container { 
               width: 100%; 
@@ -316,15 +180,8 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
               height: auto; 
               display: block;
             }
-            .footer { margin-top: 10px; font-size: 8pt; color: #666; }
-            .footer-line { margin-bottom: 3px; }
-            .footer-field strong { margin-right: 4px; }
-            .footer-field span { 
-              border-bottom: 1px solid #333; 
-              min-width: 150px; 
-              display: inline-block; 
-              margin-left: 4px;
-            }
+            .footer { margin-top: 12px; font-size: 9pt; color: #c00; }
+            .footer-line { margin-bottom: 4px; }
           </style>
         </head>
         <body>
@@ -337,14 +194,14 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
               <div class="legend-item" style="border-color: #3b82f6; color: #3b82f6;">EBP Rooms: ${caseCounts.ebp}</div>
               <div class="legend-item" style="border-color: #666; color: #666;">ISO+EBP: 0</div>
               <div class="legend-item" style="border-color: #22c55e; color: #22c55e;">Any Precaution: ${caseCounts.isolation + caseCounts.ebp + caseCounts.standard}</div>
-              <span style="color: #666; margin-left: 8px;">ISO window: ${format(parseISO(asOfDate), 'yyyy-MM-dd')} (as-of) • 28d</span>
+              <span style="color: #666; margin-left: 10px;">ISO window: ${format(parseISO(asOfDate), 'yyyy-MM-dd')} (as-of) • 28d</span>
             </div>
             <div class="svg-container">
               ${svgClone.outerHTML}
             </div>
             <div class="footer">
-              <div class="footer-line footer-field"><strong>Isolation Precaution:</strong> <span>—</span></div>
-              <div class="footer-line footer-field"><strong>Enhance Barrier Precaution:</strong> <span>—</span></div>
+              <div class="footer-line"><strong>Isolation Precaution:</strong> —</div>
+              <div class="footer-line"><strong>Enhance Barrier Precaution:</strong> —</div>
             </div>
           </div>
         </body>
@@ -419,9 +276,9 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
         </div>
       </div>
       
-      {/* Legend - styled like reference with badge pills */}
+      {/* Legend */}
       <div className="flex flex-wrap gap-3 mb-4 text-xs items-center">
-        <div className="flex items-center gap-1 px-2 py-1 rounded border border-red-500 text-red-600">
+        <div className="flex items-center gap-1 px-2 py-1 rounded border border-orange-500 text-orange-600">
           <span className="font-medium">ISO Rooms: {caseCounts.isolation}</span>
         </div>
         <div className="flex items-center gap-1 px-2 py-1 rounded border border-blue-500 text-blue-600">
@@ -442,47 +299,46 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
       <div className="overflow-x-auto border rounded-lg bg-white p-2">
         <svg
           id="floor-heatmap-svg"
-          viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
+          viewBox={`0 0 ${CANVAS_WIDTH} ${CANVAS_HEIGHT}`}
           preserveAspectRatio="xMidYMid meet"
           className="w-full h-auto"
-          style={{ backgroundColor: '#ffffff', minHeight: '200px' }}
+          style={{ backgroundColor: '#ffffff', minHeight: '220px' }}
         >
-          {/* Background - explicit white for print */}
-          <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
+          {/* Background */}
+          <rect x="0" y="0" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} fill="#ffffff" />
           
-          {/* WEST label on far left - positioned at top of layout */}
-          <text x="28" y="50" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* WEST label */}
+          <text x="30" y="55" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             WEST
           </text>
           
-          {/* EAST label on far right - positioned at top of layout */}
-          <text x={CANVAS_W - 28} y="50" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* EAST label */}
+          <text x={CANVAS_WIDTH - 30} y="55" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
             EAST
           </text>
           
           {/* Room tiles */}
-          {ALL_ROOMS.map(room => {
+          {FLOOR_LAYOUT.map(room => {
             const mappedRoomId = remapRoomId(room.id, unitNumber);
             const status = getRoomStatus(mappedRoomId);
             const fillColor = getStatusColor(status);
-            // Text color based on status
-            const textColor = status === 'empty' ? '#666666' : (status.startsWith('active') ? '#ffffff' : '#333333');
+            const textColor = getTextColor(status);
             
             return (
               <g key={room.id}>
                 <rect
                   x={room.x}
                   y={room.y}
-                  width={BOX_W}
-                  height={BOX_H}
+                  width={room.w}
+                  height={room.h}
                   fill={fillColor}
                   stroke="#333333"
                   strokeWidth="1"
                 />
                 <text
-                  x={room.x + BOX_W / 2}
-                  y={room.y + BOX_H / 2 + 4}
-                  fontSize="9"
+                  x={room.x + room.w / 2}
+                  y={room.y + room.h / 2 + 5}
+                  fontSize="11"
                   fill={textColor}
                   textAnchor="middle"
                   fontWeight={status.startsWith('active') ? 'bold' : 'normal'}
