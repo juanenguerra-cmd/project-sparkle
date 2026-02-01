@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { RefreshCw, Download, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SectionCard from '@/components/dashboard/SectionCard';
 import { loadDB, saveDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
 const AuditView = () => {
   const [searchTerm, setSearchTerm] = useState('');

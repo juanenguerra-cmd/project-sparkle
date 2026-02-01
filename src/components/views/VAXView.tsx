@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib/vaccineReofferLogic';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -43,7 +44,8 @@ const VAXView = () => {
   const [editingRecord, setEditingRecord] = useState<VaxRecord | null>(null);
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  
+  const [sortKey, setSortKey] = useState<string | null>('_name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const records = db.records.vax;
   const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
 
@@ -120,15 +122,59 @@ const VAXView = () => {
       });
     }
     
-    return result;
+    // Add sortable fields
+    return result.map(r => ({
+      ...r,
+      _name: r.residentName || r.name || '',
+      _vaccine: r.vaccine || r.vaccine_type || '',
+      _dateGiven: r.dateGiven || r.date_given || '',
+      _dueDate: r.dueDate || r.due_date || ''
+    }));
   }, [activeFilter, reofferCandidates, records, unitFilter, searchTerm, activeCensusMrns]);
 
+  // Sort the filtered records
+  const sortedRecords = useMemo(() => {
+    if (!sortKey || !sortDirection) return filteredRecords;
+    
+    return [...filteredRecords].sort((a, b) => {
+      const aVal = (a as any)[sortKey];
+      const bVal = (b as any)[sortKey];
+      
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return sortDirection === 'asc' ? 1 : -1;
+      if (bVal == null) return sortDirection === 'asc' ? -1 : 1;
+      
+      let comparison = 0;
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        comparison = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' });
+      } else {
+        comparison = String(aVal).localeCompare(String(bVal));
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredRecords, sortKey, sortDirection]);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc');
+      } else if (sortDirection === 'desc') {
+        setSortKey(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
   // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(sortedRecords.length / ITEMS_PER_PAGE);
   const paginatedRecords = useMemo(() => {
     const startIdx = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredRecords.slice(startIdx, startIdx + ITEMS_PER_PAGE);
-  }, [filteredRecords, currentPage]);
+    return sortedRecords.slice(startIdx, startIdx + ITEMS_PER_PAGE);
+  }, [sortedRecords, currentPage]);
 
   // Reset page when filters change
   const handleFilterChange = (newFilter: VAXFilter) => {
@@ -550,7 +596,7 @@ const VAXView = () => {
       {/* Table */}
       <SectionCard title={activeFilter === 'reoffer' ? 'Vaccine Re-offer List' : 'Vaccination Records'} noPadding>
         <div className="overflow-x-auto">
-          {filteredRecords.length === 0 ? (
+          {sortedRecords.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <p>No vaccination records found.</p>
               <p className="text-sm mt-2">Import data or add a new record to get started.</p>
@@ -559,9 +605,9 @@ const VAXView = () => {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Resident</th>
-                  <th>Unit/Room</th>
-                  <th>Vaccine</th>
+                  <SortableTableHeader label="Resident" sortKey="_name" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                  <SortableTableHeader label="Unit/Room" sortKey="unit" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                  <SortableTableHeader label="Vaccine" sortKey="_vaccine" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                   {activeFilter === 'reoffer' ? (
                     <>
                       <th>Days Since Decline</th>
@@ -570,10 +616,10 @@ const VAXView = () => {
                     </>
                   ) : (
                     <>
-                      <th>Dose</th>
-                      <th>Date Given</th>
-                      <th>Due Date</th>
-                      <th>Status</th>
+                      <SortableTableHeader label="Dose" sortKey="dose" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                      <SortableTableHeader label="Date Given" sortKey="_dateGiven" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                      <SortableTableHeader label="Due Date" sortKey="_dueDate" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                      <SortableTableHeader label="Status" sortKey="status" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                     </>
                   )}
                   <th>Actions</th>

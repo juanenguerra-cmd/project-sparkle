@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { loadDB, getActiveABT, saveDB, addAudit } from '@/lib/database';
 import { ABTRecord } from '@/lib/types';
 import { isoDateFromAny, computeTxDays } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
+import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
 // Helper to escape CSV values
 const escapeCSV = (val: string | number | boolean | null | undefined): string => {
@@ -111,12 +112,17 @@ const ABTView = () => {
     return true;
   });
 
-  // Sort by start date descending
-  const sortedRecords = [...filteredRecords].sort((a, b) => {
-    const dateA = isoDateFromAny(a.startDate || a.start_date || '');
-    const dateB = isoDateFromAny(b.startDate || b.start_date || '');
-    return dateB.localeCompare(dateA);
-  });
+  // Prepare data for sorting
+  const recordsWithSortableFields = useMemo(() => filteredRecords.map(r => ({
+    ...r,
+    _name: r.residentName || r.name || '',
+    _medication: r.medication || r.med_name || '',
+    _startDate: isoDateFromAny(r.startDate || r.start_date || ''),
+    _endDate: isoDateFromAny(r.endDate || r.end_date || ''),
+    _txDays: r.tx_days || r.daysOfTherapy || 0
+  })), [filteredRecords]);
+
+  const { sortKey, sortDirection, handleSort, sortedData: sortedRecords } = useSortableTable(recordsWithSortableFields, '_startDate', 'desc');
 
   const activeCount = records.filter(r => {
     if (r.status === 'discontinued') return false;
@@ -306,17 +312,17 @@ const ABTView = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Resident</th>
-                <th>Unit/Room</th>
-                <th>Medication</th>
-                <th>Dose</th>
-                <th>Route</th>
-                <th>Indication</th>
+                <SortableTableHeader label="Resident" sortKey="_name" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Unit/Room" sortKey="unit" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Medication" sortKey="_medication" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Dose" sortKey="dose" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Route" sortKey="route" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Indication" sortKey="indication" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                 <th>Source</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Days</th>
-                <th>Status</th>
+                <SortableTableHeader label="Start" sortKey="_startDate" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="End" sortKey="_endDate" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Days" sortKey="_txDays" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Status" sortKey="status" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                 <th>Actions</th>
               </tr>
             </thead>
