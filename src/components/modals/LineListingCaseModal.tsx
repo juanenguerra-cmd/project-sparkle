@@ -260,7 +260,7 @@ const LineListingCaseModal = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>
             {mode === 'edit' ? `Edit Case: ${editingEntry?.residentName}` : 'Add Case to Line Listing'}
           </DialogTitle>
@@ -269,7 +269,7 @@ const LineListingCaseModal = ({
           </p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
           <div className="space-y-4 py-4">
             {/* Basic Info */}
             <div className="space-y-4 border-b pb-4">
