@@ -4,14 +4,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SectionCard from '@/components/dashboard/SectionCard';
-import { getRecentAudit } from '@/lib/mockData';
+import { loadDB, saveDB } from '@/lib/database';
+import { useToast } from '@/hooks/use-toast';
 
 const AuditView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [entityFilter, setEntityFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { toast } = useToast();
 
-  const auditEntries = getRecentAudit(50);
+  const db = loadDB();
+  const auditEntries = db.audit_log.slice(0, 100);
+
+  // Date filter logic
+  const getDateCutoff = () => {
+    const now = new Date();
+    switch (dateFilter) {
+      case 'today':
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      case 'week':
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        return weekAgo.toISOString();
+      case 'month':
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        return monthAgo.toISOString();
+      default:
+        return null;
+    }
+  };
 
   const filteredEntries = auditEntries.filter(entry => {
     const matchesSearch = 
@@ -20,8 +43,34 @@ const AuditView = () => {
     
     const matchesEntity = entityFilter === 'all' || entry.entityType === entityFilter;
     
-    return matchesSearch && matchesEntity;
+    const dateCutoff = getDateCutoff();
+    const matchesDate = !dateCutoff || entry.timestamp >= dateCutoff;
+    
+    return matchesSearch && matchesEntity && matchesDate;
   });
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const handleClear = () => {
+    const db = loadDB();
+    db.audit_log = [];
+    saveDB(db);
+    setRefreshKey(prev => prev + 1);
+    toast({ title: 'Audit log cleared' });
+  };
+
+  const handleExport = () => {
+    const data = JSON.stringify(filteredEntries, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('en-US', {
@@ -55,15 +104,15 @@ const AuditView = () => {
           <p className="text-sm text-muted-foreground">Track all system actions and changes</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="destructive" size="sm">
+          <Button variant="destructive" size="sm" onClick={handleClear}>
             <Trash2 className="w-4 h-4 mr-2" />
             Clear
           </Button>

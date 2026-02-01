@@ -1,8 +1,14 @@
-import { loadDB } from '@/lib/database';
-import { Clock } from 'lucide-react';
+import { useState } from 'react';
+import { loadDB, saveDB } from '@/lib/database';
+import { Clock, Trash2 } from 'lucide-react';
 import { AuditEntry } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 const RecentActivity = () => {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { toast } = useToast();
+  
   const db = loadDB();
   
   // Filter for clinical events only (ABT, IP, VAX, Notes) - exclude administrative noise
@@ -37,6 +43,17 @@ const RecentActivity = () => {
     }
   };
 
+  const handleClearActivity = () => {
+    const db = loadDB();
+    // Only clear clinical activity entries
+    db.audit_log = db.audit_log.filter(
+      entry => !clinicalEntityTypes.includes(entry.entityType)
+    );
+    saveDB(db);
+    setRefreshKey(prev => prev + 1);
+    toast({ title: 'Clinical activity cleared' });
+  };
+
   if (activities.length === 0) {
     return (
       <div className="text-center py-10 text-muted-foreground">
@@ -47,18 +64,31 @@ const RecentActivity = () => {
   }
 
   return (
-    <div className="divide-y divide-border">
-      {activities.map((activity) => (
-        <div key={activity.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-lg flex-shrink-0">
-            {getActionIcon(activity.entityType)}
+    <div key={refreshKey}>
+      <div className="divide-y divide-border">
+        {activities.map((activity) => (
+          <div key={activity.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-lg flex-shrink-0">
+              {getActionIcon(activity.entityType)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{activity.details}</p>
+              <p className="text-xs text-muted-foreground">{formatTimeAgo(activity.timestamp)}</p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-medium text-sm truncate">{activity.details}</p>
-            <p className="text-xs text-muted-foreground">{formatTimeAgo(activity.timestamp)}</p>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <div className="mt-4 pt-3 border-t border-border">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="w-full text-muted-foreground hover:text-destructive"
+          onClick={handleClearActivity}
+        >
+          <Trash2 className="w-3 h-3 mr-2" />
+          Clear Activity
+        </Button>
+      </div>
     </div>
   );
 };
