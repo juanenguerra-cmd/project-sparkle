@@ -411,7 +411,7 @@ const LineListingCaseModal = ({
           </div>
         </ScrollArea>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit}>
             {mode === 'edit' ? 'Update' : 'Add to Line Listing'}
