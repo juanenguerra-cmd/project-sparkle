@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Upload, Download, Search, UserPlus, Eye, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import CensusImportModal from '@/components/modals/CensusImportModal';
 import ResidentDetailModal from '@/components/modals/ResidentDetailModal';
 import { loadDB } from '@/lib/database';
 import { Resident } from '@/lib/types';
+import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
 const CensusView = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,11 +18,13 @@ const CensusView = () => {
   const residents = Object.values(db.census.residentsByMrn);
   const activeCount = residents.filter(r => r.active_on_census).length;
 
-  const filteredResidents = residents.filter(r => 
+  const filteredResidents = useMemo(() => residents.filter(r => 
     (r.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (r.mrn || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (r.unit || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ), [residents, searchTerm]);
+
+  const { sortKey, sortDirection, handleSort, sortedData: sortedResidents } = useSortableTable(filteredResidents, 'name');
 
   const handleRowClick = (resident: Resident) => {
     setSelectedResident(resident);
@@ -86,25 +89,25 @@ const CensusView = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>MRN</th>
-                <th>Unit</th>
-                <th>Room</th>
-                <th>DOB</th>
-                <th>Status</th>
-                <th>Active</th>
+                <SortableTableHeader label="Name" sortKey="name" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="MRN" sortKey="mrn" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Unit" sortKey="unit" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Room" sortKey="room" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="DOB" sortKey="dob" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Status" sortKey="status" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Active" sortKey="active_on_census" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredResidents.length === 0 ? (
+              {sortedResidents.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-8 text-muted-foreground">
                     No residents found. Import a census to get started.
                   </td>
                 </tr>
               ) : (
-                filteredResidents.map((resident) => (
+                sortedResidents.map((resident) => (
                   <tr 
                     key={resident.mrn} 
                     className="cursor-pointer hover:bg-muted/50"

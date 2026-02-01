@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Search, Edit, Trash2, AlertTriangle, Check, Clock, Filter, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident } from '@/lib/types';
 import { toast } from 'sonner';
+import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
   respiratory: 'bg-blue-100 text-blue-800',
@@ -41,7 +42,7 @@ const NotesView = () => {
   const db = loadDB();
   const notes = db.records.notes;
 
-  const filteredNotes = notes.filter(n => {
+  const filteredNotes = useMemo(() => notes.filter(n => {
     const name = n.residentName || n.name || '';
     const text = n.text || '';
     const category = n.category || '';
@@ -54,7 +55,13 @@ const NotesView = () => {
     const matchesSymptom = symptomFilter === 'all' || n.symptomCategory === symptomFilter;
     
     return matchesSearch && matchesCategory && matchesSymptom;
-  });
+  }).map(n => ({
+    ...n,
+    _name: n.residentName || n.name || '',
+    _createdAt: n.createdAt || n.created_at || ''
+  })), [notes, searchTerm, categoryFilter, symptomFilter]);
+
+  const { sortKey, sortDirection, handleSort, sortedData: sortedNotes } = useSortableTable(filteredNotes, '_createdAt', 'desc');
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString('en-US', {
@@ -222,30 +229,30 @@ const NotesView = () => {
       </div>
 
       {/* Notes Table */}
-      <SectionCard title={`All Notes (${filteredNotes.length})`} noPadding>
+      <SectionCard title={`All Notes (${sortedNotes.length})`} noPadding>
         <div className="overflow-x-auto">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Date/Time</th>
-                <th>Name</th>
-                <th>Room</th>
-                <th>Category</th>
+                <SortableTableHeader label="Date/Time" sortKey="_createdAt" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Name" sortKey="_name" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Room" sortKey="room" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
+                <SortableTableHeader label="Category" sortKey="category" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                 <th>Symptoms</th>
                 <th>Note</th>
-                <th>Follow-up</th>
+                <SortableTableHeader label="Follow-up" sortKey="followUpDate" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredNotes.length === 0 ? (
+              {sortedNotes.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-8 text-muted-foreground">
                     No notes found
                   </td>
                 </tr>
               ) : (
-                filteredNotes.map((note) => (
+                sortedNotes.map((note) => (
                   <tr key={note.id}>
                     <td className="text-sm whitespace-nowrap">{formatDate(note.createdAt || note.created_at || '')}</td>
                     <td className="font-medium">{note.residentName || note.name}</td>
