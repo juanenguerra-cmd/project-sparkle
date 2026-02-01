@@ -7,7 +7,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown } from 'lucide-react';
 import { 
@@ -269,7 +268,7 @@ const LineListingCaseModal = ({
           </p>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
           <div className="space-y-4 py-4">
             {/* Basic Info */}
             <div className="space-y-4 border-b pb-4">
@@ -409,7 +408,7 @@ const LineListingCaseModal = ({
               </div>
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
