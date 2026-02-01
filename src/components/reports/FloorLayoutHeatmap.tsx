@@ -9,12 +9,12 @@ import { IPCase } from '@/lib/types';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 
 // Canvas and geometry constants - optimized for landscape print with auto-fit
-const CANVAS_W = 1500;
-const CANVAS_H = 300;
-const BOX_W = 52;
-const BOX_H = 28;
+const CANVAS_W = 1400;
+const CANVAS_H = 260;
+const BOX_W = 54;
+const BOX_H = 26;
 const GAP = 2; // gap between boxes in same section
-const SECTION_GAP = 16; // gap between room sections
+const SECTION_GAP = 12; // gap between room sections
 
 // Room layout matching the reference image exactly
 // North hallway (top band) - B rooms on top, A rooms below for pairs
@@ -24,8 +24,8 @@ const buildRooms = () => {
   const rooms: { id: string; x: number; y: number }[] = [];
   
   // === NORTH HALLWAY (Top Band) ===
-  const northY = 40;
-  let x = 70;
+  const northY = 35;
+  let x = 55;
   
   // Section 1: 275-B/A, 276-B/A (2x2 pair) - B on top
   rooms.push({ id: '275-B', x, y: northY });
@@ -74,8 +74,8 @@ const buildRooms = () => {
   rooms.push({ id: '258-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
   
   // === SOUTH HALLWAY (Bottom Band) ===
-  const southY = 180;
-  x = 70;
+  const southY = 160;
+  x = 55;
   
   // Section 1: 274-A/B, 273-A/B (2x2 pair) - A on top, B below
   rooms.push({ id: '274-A', x, y: southY });
@@ -450,13 +450,13 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
           {/* Background - explicit white for print */}
           <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
           
-          {/* WEST label on far left - vertically centered between north and south */}
-          <text x="35" y="145" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* WEST label on far left - positioned at top of layout */}
+          <text x="28" y="50" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
             WEST
           </text>
           
-          {/* EAST label on far right - vertically centered */}
-          <text x={CANVAS_W - 35} y="145" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
+          {/* EAST label on far right - positioned at top of layout */}
+          <text x={CANVAS_W - 28} y="50" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
             EAST
           </text>
           
