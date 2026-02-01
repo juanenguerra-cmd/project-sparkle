@@ -14,6 +14,16 @@ type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved'
 type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol';
 type SortDir = 'asc' | 'desc';
 
+// Helper to escape CSV values
+const escapeCSV = (val: string | number | boolean | null | undefined): string => {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
 const IPView = () => {
   const { toast } = useToast();
   const [db, setDb] = useState(() => loadDB());
@@ -207,23 +217,47 @@ const IPView = () => {
   };
 
   const handleExport = () => {
-    const csvRows = [
-      ['Resident', 'MRN', 'Unit', 'Room', 'Infection Type', 'Protocol', 'Source', 'Onset Date', 'Next Review', 'Status'].join(','),
-      ...records.map(r => [
-        `"${r.residentName || r.name || ''}"`,
-        r.mrn,
-        r.unit,
-        r.room,
-        r.infectionType || r.infection_type || '',
-        r.protocol,
-        r.sourceOfInfection || r.source_of_infection || '',
-        r.onsetDate || r.onset_date || '',
-        r.nextReviewDate || r.next_review_date || '',
-        r.status
-      ].join(','))
+    const headers = [
+      'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Infection Type', 'Protocol',
+      'Isolation Type', 'Source of Infection', 'Onset Date', 'Resolution Date',
+      'Status', 'Next Review Date', 'Last Review Date', 'Review Notes',
+      'Trigger Reason', 'High Contact Care', 'Signage Posted', 'Supplies Stocked',
+      'Room Check Date', 'Exposure Linked', 'Outbreak ID', 'Required PPE',
+      'Auto Closed', 'Auto Closed Reason', 'Notes', 'Created At'
     ];
     
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const rows = records.map(r => [
+      escapeCSV(r.id),
+      escapeCSV(r.mrn),
+      escapeCSV(r.residentName || r.name),
+      escapeCSV(r.unit),
+      escapeCSV(r.room),
+      escapeCSV(r.infectionType || r.infection_type),
+      escapeCSV(r.protocol),
+      escapeCSV(r.isolationType || r.isolation_type),
+      escapeCSV(r.sourceOfInfection || r.source_of_infection),
+      escapeCSV(r.onsetDate || r.onset_date),
+      escapeCSV(r.resolutionDate || r.resolution_date),
+      escapeCSV(r.status),
+      escapeCSV(r.nextReviewDate || r.next_review_date),
+      escapeCSV(r.lastReviewDate),
+      escapeCSV(r.reviewNotes),
+      escapeCSV(r.triggerReason),
+      escapeCSV(r.highContactCare?.join('; ')),
+      escapeCSV(r.signagePosted),
+      escapeCSV(r.suppliesStocked),
+      escapeCSV(r.roomCheckDate),
+      escapeCSV(r.exposureLinked),
+      escapeCSV(r.outbreakId),
+      escapeCSV(r.requiredPPE),
+      escapeCSV(r._autoClosed),
+      escapeCSV(r._autoClosedReason),
+      escapeCSV(r.notes),
+      escapeCSV(r.createdAt)
+    ].join(','));
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

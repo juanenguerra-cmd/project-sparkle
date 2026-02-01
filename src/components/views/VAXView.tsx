@@ -21,6 +21,16 @@ type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
 const ITEMS_PER_PAGE = 50;
 
+// Helper to escape CSV values
+const escapeCSV = (val: string | number | boolean | null | undefined): string => {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
 const VAXView = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -174,22 +184,40 @@ const VAXView = () => {
   };
 
   const handleExport = () => {
-    const csvRows = [
-      ['Resident', 'MRN', 'Unit', 'Room', 'Vaccine', 'Dose', 'Date Given', 'Due Date', 'Status'].join(','),
-      ...records.map(r => [
-        `"${r.residentName || r.name || ''}"`,
-        r.mrn,
-        r.unit,
-        r.room,
-        r.vaccine || r.vaccine_type || '',
-        r.dose || '',
-        r.dateGiven || r.date_given || '',
-        r.dueDate || r.due_date || '',
-        r.status
-      ].join(','))
+    const headers = [
+      'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Vaccine', 'Dose', 'Status',
+      'Date Given', 'Due Date', 'Next Due Date', 'Offer Date', 'Education Provided',
+      'Education Date', 'Education Outcome', 'Manufacturer', 'Lot Number',
+      'Administration Site', 'Decline Reason', 'Consent Form Attached', 'Notes', 'Created At'
     ];
     
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const rows = records.map(r => [
+      escapeCSV(r.id),
+      escapeCSV(r.mrn),
+      escapeCSV(r.residentName || r.name),
+      escapeCSV(r.unit),
+      escapeCSV(r.room),
+      escapeCSV(r.vaccine || r.vaccine_type),
+      escapeCSV(r.dose),
+      escapeCSV(r.status),
+      escapeCSV(r.dateGiven || r.date_given),
+      escapeCSV(r.dueDate || r.due_date),
+      escapeCSV(r.nextDueDate),
+      escapeCSV(r.offerDate),
+      escapeCSV(r.educationProvided),
+      escapeCSV(r.educationDate),
+      escapeCSV(r.educationOutcome),
+      escapeCSV(r.manufacturer),
+      escapeCSV(r.lotNumber),
+      escapeCSV(r.administrationSite),
+      escapeCSV(r.declineReason),
+      escapeCSV(r.consentFormAttached),
+      escapeCSV(r.notes),
+      escapeCSV(r.createdAt)
+    ].join(','));
+    
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
