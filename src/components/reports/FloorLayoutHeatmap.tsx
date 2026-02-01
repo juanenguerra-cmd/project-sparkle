@@ -8,87 +8,123 @@ import { loadDB, getActiveIPCases } from '@/lib/database';
 import { IPCase } from '@/lib/types';
 import { format, parseISO, isBefore, isAfter } from 'date-fns';
 
-// Canvas and geometry constants (per spec)
-const CANVAS_W = 1400;
-const CANVAS_H = 420;
-const BOX_W = 64;
-const BOX_H = 40;
-const DX = BOX_W + 2;
-const DY = BOX_H + 2;
+// Canvas and geometry constants - optimized for landscape print (fits 10" wide)
+const CANVAS_W = 1100;
+const CANVAS_H = 280;
+const BOX_W = 52;
+const BOX_H = 28;
+const GAP = 4; // gap between boxes
+const SECTION_GAP = 16; // gap between room sections
 
-// Room inventory with exact coordinates (2xx master set)
-// WEST — Top band
-const WEST_TOP_ROOMS = [
-  { id: '275-B', x: 50, y: 40 },
-  { id: '276-B', x: 50 + DX, y: 40 },
-  { id: '275-A', x: 50, y: 40 + DY },
-  { id: '276-A', x: 50 + DX, y: 40 + DY },
-  { id: '277-A', x: 50 + DX * 2.5, y: 40 + DY / 2 },
-  { id: '278-A', x: 50 + DX * 3.5, y: 40 + DY / 2 },
-  { id: '279-A', x: 50 + DX * 4.5, y: 40 + DY / 2 },
-  { id: '280-A', x: 50 + DX * 5.5, y: 40 + DY / 2 },
-  { id: '281-B', x: 50 + DX * 7, y: 40 },
-  { id: '282-B', x: 50 + DX * 8, y: 40 },
-  { id: '281-A', x: 50 + DX * 7, y: 40 + DY },
-  { id: '282-A', x: 50 + DX * 8, y: 40 + DY },
-  { id: '283-A', x: 50 + DX * 9.5, y: 40 + DY / 2 },
-];
+// Room layout matching the reference image exactly
+// North hallway (top band) - B rooms on top, A rooms below for pairs
+// South hallway (bottom band) - A rooms on top, B rooms below for pairs
 
-// EAST — Top band
-const EAST_TOP_ROOMS = [
-  { id: '250-A', x: 750, y: 40 + DY / 2 },
-  { id: '251-B', x: 750 + DX * 1.5, y: 40 },
-  { id: '252-B', x: 750 + DX * 2.5, y: 40 },
-  { id: '251-A', x: 750 + DX * 1.5, y: 40 + DY },
-  { id: '252-A', x: 750 + DX * 2.5, y: 40 + DY },
-  { id: '253-A', x: 750 + DX * 4, y: 40 + DY / 2 },
-  { id: '254-A', x: 750 + DX * 5, y: 40 + DY / 2 },
-  { id: '255-A', x: 750 + DX * 6, y: 40 + DY / 2 },
-  { id: '256-A', x: 750 + DX * 7, y: 40 + DY / 2 },
-  { id: '257-B', x: 750 + DX * 8.5, y: 40 },
-  { id: '258-B', x: 750 + DX * 9.5, y: 40 },
-  { id: '257-A', x: 750 + DX * 8.5, y: 40 + DY },
-  { id: '258-A', x: 750 + DX * 9.5, y: 40 + DY },
-];
+const buildRooms = () => {
+  const rooms: { id: string; x: number; y: number }[] = [];
+  
+  // === NORTH HALLWAY (Top Band) ===
+  const northY = 40;
+  let x = 50;
+  
+  // Section 1: 275-B/A, 276-B/A (2x2 pair)
+  rooms.push({ id: '275-B', x, y: northY });
+  rooms.push({ id: '276-B', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '275-A', x, y: northY + BOX_H + GAP });
+  rooms.push({ id: '276-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
+  
+  // Section 2: 277-A, 278-A, 279-A, 280-A (single row, no B)
+  rooms.push({ id: '277-A', x, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '278-A', x: x + BOX_W + GAP, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '279-A', x: x + (BOX_W + GAP) * 2, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '280-A', x: x + (BOX_W + GAP) * 3, y: northY + (BOX_H + GAP) / 2 });
+  x += (BOX_W + GAP) * 4 + SECTION_GAP;
+  
+  // Section 3: 281-B/A, 282-B/A (2x2 pair)
+  rooms.push({ id: '281-B', x, y: northY });
+  rooms.push({ id: '282-B', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '281-A', x, y: northY + BOX_H + GAP });
+  rooms.push({ id: '282-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
+  
+  // Section 4: 283-A (single room)
+  rooms.push({ id: '283-A', x, y: northY + (BOX_H + GAP) / 2 });
+  x += BOX_W + GAP + SECTION_GAP;
+  
+  // Section 5: 250-A (single room)
+  rooms.push({ id: '250-A', x, y: northY + (BOX_H + GAP) / 2 });
+  x += BOX_W + GAP + SECTION_GAP;
+  
+  // Section 6: 251-B/A, 252-B/A (2x2 pair)
+  rooms.push({ id: '251-B', x, y: northY });
+  rooms.push({ id: '252-B', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '251-A', x, y: northY + BOX_H + GAP });
+  rooms.push({ id: '252-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
+  
+  // Section 7: 253-A, 254-A, 255-A, 256-A (single row)
+  rooms.push({ id: '253-A', x, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '254-A', x: x + BOX_W + GAP, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '255-A', x: x + (BOX_W + GAP) * 2, y: northY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '256-A', x: x + (BOX_W + GAP) * 3, y: northY + (BOX_H + GAP) / 2 });
+  x += (BOX_W + GAP) * 4 + SECTION_GAP;
+  
+  // Section 8: 257-B/A, 258-B/A (2x2 pair)
+  rooms.push({ id: '257-B', x, y: northY });
+  rooms.push({ id: '258-B', x: x + BOX_W + GAP, y: northY });
+  rooms.push({ id: '257-A', x, y: northY + BOX_H + GAP });
+  rooms.push({ id: '258-A', x: x + BOX_W + GAP, y: northY + BOX_H + GAP });
+  
+  // === SOUTH HALLWAY (Bottom Band) ===
+  const southY = 170;
+  x = 50;
+  
+  // Section 1: 274-A/B, 273-A/B (2x2 pair) - A on top, B below
+  rooms.push({ id: '274-A', x, y: southY });
+  rooms.push({ id: '273-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '274-B', x, y: southY + BOX_H + GAP });
+  rooms.push({ id: '273-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
+  
+  // Section 2: 272-A, 271-A, 270-A, 269-A (single row)
+  rooms.push({ id: '272-A', x, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '271-A', x: x + BOX_W + GAP, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '270-A', x: x + (BOX_W + GAP) * 2, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '269-A', x: x + (BOX_W + GAP) * 3, y: southY + (BOX_H + GAP) / 2 });
+  x += (BOX_W + GAP) * 4 + SECTION_GAP;
+  
+  // Section 3: 268-A/B, 267-A/B (2x2 pair)
+  rooms.push({ id: '268-A', x, y: southY });
+  rooms.push({ id: '267-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '268-B', x, y: southY + BOX_H + GAP });
+  rooms.push({ id: '267-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP * 3; // Extra gap for center
+  
+  // Section 4: 266-A/B, 265-A/B (2x2 pair)
+  rooms.push({ id: '266-A', x, y: southY });
+  rooms.push({ id: '265-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '266-B', x, y: southY + BOX_H + GAP });
+  rooms.push({ id: '265-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
+  x += (BOX_W + GAP) * 2 + SECTION_GAP;
+  
+  // Section 5: 264-A, 263-A, 262-A, 261-A (single row)
+  rooms.push({ id: '264-A', x, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '263-A', x: x + BOX_W + GAP, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '262-A', x: x + (BOX_W + GAP) * 2, y: southY + (BOX_H + GAP) / 2 });
+  rooms.push({ id: '261-A', x: x + (BOX_W + GAP) * 3, y: southY + (BOX_H + GAP) / 2 });
+  x += (BOX_W + GAP) * 4 + SECTION_GAP;
+  
+  // Section 6: 260-A/B, 259-A/B (2x2 pair)
+  rooms.push({ id: '260-A', x, y: southY });
+  rooms.push({ id: '259-A', x: x + BOX_W + GAP, y: southY });
+  rooms.push({ id: '260-B', x, y: southY + BOX_H + GAP });
+  rooms.push({ id: '259-B', x: x + BOX_W + GAP, y: southY + BOX_H + GAP });
+  
+  return rooms;
+};
 
-// WEST — Bottom band
-const WEST_BOTTOM_ROOMS = [
-  { id: '274-A', x: 50, y: 210 },
-  { id: '273-A', x: 50 + DX, y: 210 },
-  { id: '274-B', x: 50, y: 210 + DY },
-  { id: '273-B', x: 50 + DX, y: 210 + DY },
-  { id: '272-A', x: 50 + DX * 2.5, y: 210 + DY / 2 },
-  { id: '271-A', x: 50 + DX * 3.5, y: 210 + DY / 2 },
-  { id: '270-A', x: 50 + DX * 4.5, y: 210 + DY / 2 },
-  { id: '269-A', x: 50 + DX * 5.5, y: 210 + DY / 2 },
-  { id: '268-A', x: 50 + DX * 7, y: 210 },
-  { id: '267-A', x: 50 + DX * 8, y: 210 },
-  { id: '268-B', x: 50 + DX * 7, y: 210 + DY },
-  { id: '267-B', x: 50 + DX * 8, y: 210 + DY },
-];
-
-// EAST — Bottom band
-const EAST_BOTTOM_ROOMS = [
-  { id: '266-A', x: 750, y: 210 },
-  { id: '265-A', x: 750 + DX, y: 210 },
-  { id: '266-B', x: 750, y: 210 + DY },
-  { id: '265-B', x: 750 + DX, y: 210 + DY },
-  { id: '264-A', x: 750 + DX * 2.5, y: 210 + DY / 2 },
-  { id: '263-A', x: 750 + DX * 3.5, y: 210 + DY / 2 },
-  { id: '262-A', x: 750 + DX * 4.5, y: 210 + DY / 2 },
-  { id: '261-A', x: 750 + DX * 5.5, y: 210 + DY / 2 },
-  { id: '260-A', x: 750 + DX * 7, y: 210 },
-  { id: '259-A', x: 750 + DX * 8, y: 210 },
-  { id: '260-B', x: 750 + DX * 7, y: 210 + DY },
-  { id: '259-B', x: 750 + DX * 8, y: 210 + DY },
-];
-
-const ALL_ROOMS = [
-  ...WEST_TOP_ROOMS,
-  ...EAST_TOP_ROOMS,
-  ...WEST_BOTTOM_ROOMS,
-  ...EAST_BOTTOM_ROOMS,
-];
+const ALL_ROOMS = buildRooms();
 
 // Remap room ID based on unit (2xx -> 3xx for Unit 3, 2xx -> 4xx for Unit 4)
 const remapRoomId = (roomId: string, unit: number): string => {
@@ -242,35 +278,47 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
         <head>
           <title>Floor Layout - Unit ${selectedUnit}</title>
           <style>
-            @page { size: landscape; margin: 0.5in; }
+            @page { size: landscape; margin: 0.4in; }
             @media print {
               body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             }
-            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; }
-            .header { text-align: center; margin-bottom: 15px; }
-            .header h1 { margin: 0; font-size: 16pt; color: #333; }
-            .header p { margin: 5px 0; font-size: 10pt; color: #666; }
-            .legend { display: flex; justify-content: center; gap: 20px; margin: 10px 0; font-size: 9pt; }
-            .legend-item { display: flex; align-items: center; gap: 5px; }
-            .legend-box { width: 14px; height: 14px; border: 1px solid #333; }
-            .svg-container { width: 100%; max-width: 10in; margin: 0 auto; }
-            svg { width: 100%; height: auto; display: block; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background: white; }
+            .header { margin-bottom: 8px; }
+            .header h1 { margin: 0; font-size: 14pt; color: #333; font-weight: bold; }
+            .header p { margin: 4px 0 0 0; font-size: 10pt; color: #666; }
+            .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0; font-size: 9pt; }
+            .legend-item { display: flex; align-items: center; gap: 4px; }
+            .legend-box { width: 12px; height: 12px; border: 1px solid #333; }
+            .svg-container { width: 100%; }
+            svg { width: 100%; height: auto; display: block; max-width: 10in; }
+            .footer { margin-top: 12px; font-size: 8pt; color: #666; }
+            .footer-line { display: flex; gap: 24px; margin-bottom: 4px; }
+            .footer-field { display: flex; align-items: baseline; }
+            .footer-field strong { margin-right: 4px; }
+            .footer-field span { border-bottom: 1px solid #333; min-width: 120px; display: inline-block; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>${facility}</h1>
-            <p>Floor Layout Heatmap - Unit ${selectedUnit} | As of ${format(parseISO(asOfDate), 'MM/dd/yyyy')}</p>
+            <h1>Unit ${selectedUnit} Floorplan</h1>
           </div>
           <div class="legend">
-            <div class="legend-item"><div class="legend-box" style="background: #ef4444;"></div> Isolation (${caseCounts.isolation})</div>
-            <div class="legend-item"><div class="legend-box" style="background: #3b82f6;"></div> EBP (${caseCounts.ebp})</div>
-            <div class="legend-item"><div class="legend-box" style="background: #22c55e;"></div> Standard (${caseCounts.standard})</div>
-            <div class="legend-item"><div class="legend-box" style="background: #e5e7eb;"></div> Occupied</div>
-            <div class="legend-item"><div class="legend-box" style="background: #fff; border: 1px solid #ccc;"></div> Empty</div>
+            <div class="legend-item"><div class="legend-box" style="background: #ef4444; border-color: #ef4444;"></div> ISO Rooms: ${caseCounts.isolation}</div>
+            <div class="legend-item"><div class="legend-box" style="background: #3b82f6; border-color: #3b82f6;"></div> EBP Rooms: ${caseCounts.ebp}</div>
+            <div class="legend-item"><div class="legend-box" style="background: #22c55e; border-color: #22c55e;"></div> ISO+EBP: 0</div>
+            <div class="legend-item"><div class="legend-box" style="background: #f97316; border-color: #f97316;"></div> Any Precaution: ${caseCounts.isolation + caseCounts.ebp + caseCounts.standard}</div>
+            <span style="margin-left: 12px;">ISO window: ${format(parseISO(asOfDate), 'yyyy-MM-dd')} (as-of) • 28d</span>
           </div>
           <div class="svg-container">
             ${svgClone.outerHTML}
+          </div>
+          <div class="footer">
+            <div class="footer-line">
+              <div class="footer-field"><strong>Isolation Precaution:</strong> <span></span></div>
+            </div>
+            <div class="footer-line">
+              <div class="footer-field"><strong>Enhance Barrier Precaution:</strong> <span></span></div>
+            </div>
           </div>
         </body>
       </html>
@@ -344,28 +392,23 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
         </div>
       </div>
       
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 mb-4 text-xs">
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#ef4444' }} />
-          <span>Isolation ({caseCounts.isolation})</span>
+      {/* Legend - styled like reference with badge pills */}
+      <div className="flex flex-wrap gap-3 mb-4 text-xs items-center">
+        <div className="flex items-center gap-1 px-2 py-1 rounded border border-red-500 text-red-600">
+          <span className="font-medium">ISO Rooms: {caseCounts.isolation}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#3b82f6' }} />
-          <span>EBP ({caseCounts.ebp})</span>
+        <div className="flex items-center gap-1 px-2 py-1 rounded border border-blue-500 text-blue-600">
+          <span className="font-medium">EBP Rooms: {caseCounts.ebp}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#22c55e' }} />
-          <span>Standard ({caseCounts.standard})</span>
+        <div className="flex items-center gap-1 px-2 py-1 rounded border border-gray-400 text-gray-600">
+          <span className="font-medium">ISO+EBP: 0</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#e5e7eb' }} />
-          <span>Occupied</span>
+        <div className="flex items-center gap-1 px-2 py-1 rounded border border-green-500 text-green-600">
+          <span className="font-medium">Any Precaution: {caseCounts.isolation + caseCounts.ebp + caseCounts.standard}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded border" style={{ backgroundColor: '#ffffff', borderColor: '#ccc' }} />
-          <span>Empty</span>
-        </div>
+        <span className="text-muted-foreground ml-2">
+          ISO window: {asOfDate} (as-of) • 28d
+        </span>
       </div>
       
       {/* SVG Floorplan */}
@@ -375,28 +418,21 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
           width={CANVAS_W}
           height={CANVAS_H}
           viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`}
-          className="min-w-[800px]"
+          className="w-full max-w-[1100px]"
           style={{ backgroundColor: '#ffffff' }}
         >
           {/* Background - explicit white for print */}
           <rect x="0" y="0" width={CANVAS_W} height={CANVAS_H} fill="#ffffff" />
           
-          {/* Hallway labels */}
-          <text x="350" y="25" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
-            WEST HALLWAY
-          </text>
-          <text x="1050" y="25" fontSize="14" fontWeight="bold" fill="#333333" textAnchor="middle">
-            EAST HALLWAY
+          {/* WEST label on far left */}
+          <text x="25" y="75" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+            WEST
           </text>
           
-          {/* Center divider */}
-          <line x1={CANVAS_W / 2} y1="30" x2={CANVAS_W / 2} y2={CANVAS_H - 30} stroke="#cccccc" strokeWidth="2" strokeDasharray="5,5" />
-          
-          {/* Hallway lines */}
-          <line x1="40" y1="170" x2="660" y2="170" stroke="#cccccc" strokeWidth="1" />
-          <line x1="740" y1="170" x2="1360" y2="170" stroke="#cccccc" strokeWidth="1" />
-          <line x1="40" y1="380" x2="660" y2="380" stroke="#cccccc" strokeWidth="1" />
-          <line x1="740" y1="380" x2="1360" y2="380" stroke="#cccccc" strokeWidth="1" />
+          {/* EAST label on far right */}
+          <text x={CANVAS_W - 25} y="75" fontSize="12" fontWeight="bold" fill="#333333" textAnchor="middle">
+            EAST
+          </text>
           
           {/* Room tiles */}
           {ALL_ROOMS.map(room => {
@@ -404,7 +440,7 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
             const status = getRoomStatus(mappedRoomId);
             const fillColor = getStatusColor(status);
             // Text color based on status
-            const textColor = status === 'empty' ? '#999999' : (status.startsWith('active') ? '#ffffff' : '#333333');
+            const textColor = status === 'empty' ? '#666666' : (status.startsWith('active') ? '#ffffff' : '#333333');
             
             return (
               <g key={room.id}>
@@ -414,14 +450,13 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
                   width={BOX_W}
                   height={BOX_H}
                   fill={fillColor}
-                  stroke="#999999"
+                  stroke="#333333"
                   strokeWidth="1"
-                  rx="3"
                 />
                 <text
                   x={room.x + BOX_W / 2}
                   y={room.y + BOX_H / 2 + 4}
-                  fontSize="10"
+                  fontSize="9"
                   fill={textColor}
                   textAnchor="middle"
                   fontWeight={status.startsWith('active') ? 'bold' : 'normal'}
@@ -431,11 +466,6 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
               </g>
             );
           })}
-          
-          {/* Unit label */}
-          <text x={CANVAS_W / 2} y={CANVAS_H - 10} fontSize="12" fill="#666666" textAnchor="middle">
-            Unit {selectedUnit} — As of {format(parseISO(asOfDate), 'MM/dd/yyyy')}
-          </text>
         </svg>
       </div>
     </div>
