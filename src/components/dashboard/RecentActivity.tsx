@@ -1,8 +1,16 @@
-import { getRecentAudit } from '@/lib/mockData';
+import { loadDB } from '@/lib/database';
 import { Clock } from 'lucide-react';
+import { AuditEntry } from '@/lib/types';
 
 const RecentActivity = () => {
-  const activities = getRecentAudit(5);
+  const db = loadDB();
+  
+  // Filter for clinical events only (ABT, IP, VAX, Notes) - exclude administrative noise
+  const clinicalEntityTypes: AuditEntry['entityType'][] = ['abt', 'ip', 'vax', 'notes', 'abx'];
+  
+  const activities = db.audit_log
+    .filter(entry => clinicalEntityTypes.includes(entry.entityType))
+    .slice(0, 5);
 
   const formatTimeAgo = (timestamp: string) => {
     const now = new Date();
@@ -20,8 +28,8 @@ const RecentActivity = () => {
 
   const getActionIcon = (entityType: string) => {
     switch (entityType) {
-      case 'census': return '👥';
-      case 'abt': return '💊';
+      case 'abt':
+      case 'abx': return '💊';
       case 'ip': return '🛡️';
       case 'vax': return '💉';
       case 'notes': return '📝';
@@ -33,7 +41,7 @@ const RecentActivity = () => {
     return (
       <div className="text-center py-10 text-muted-foreground">
         <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-        <p>No recent activity</p>
+        <p>No recent clinical activity</p>
       </div>
     );
   }
