@@ -45,6 +45,16 @@ import {
   getQuarterDates,
   SurveillanceReportData
 } from '@/lib/reports/surveillanceReports';
+import {
+  generateQAPIInfectionControlReport,
+  generateQAPIIPReport,
+  generateQAPIVaxReport
+} from '@/lib/reports/qapiReport';
+import {
+  buildQAPIInfectionControlPdf,
+  buildQAPIIPPdf,
+  buildQAPIVaxPdf
+} from '@/lib/pdf/qapiPdf';
 import { getReportDescription } from '@/lib/reportDescriptions';
 import { generateLineListingPdf, generateBlankLineListingPdf } from '@/lib/pdf/lineListingPdf';
 import { ALL_TEMPLATES } from '@/lib/lineListingTemplates';
@@ -189,6 +199,9 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
     { id: 'survey_readiness', name: 'Survey Readiness Packet', description: 'Comprehensive compliance documentation for CMS surveys' },
     { id: 'surveyor_packet', name: 'Surveyor Census Packet', description: 'Active residents list with ABT/IP status for surveyor reference' },
     { id: 'qapi', name: 'QAPI Report', description: 'Quality metrics and performance indicators' },
+    { id: 'qapi_infection', name: 'QAPI: Infection Control/ABT', description: 'Full PDCA report with 5 tables: infection rates, ABT starts, AUR' },
+    { id: 'qapi_ip', name: 'QAPI: Infection Prevention (IP)', description: 'Precautions summary, resolution rates, room check compliance' },
+    { id: 'qapi_vax', name: 'QAPI: Vaccination', description: 'Coverage rates, declinations, re-offer tracking by vaccine type' },
     { id: 'infection_trends', name: 'Infection Rate Trends', description: 'Monthly/quarterly infection rate analysis' },
     { id: 'compliance', name: 'Compliance Crosswalk', description: 'Regulatory compliance status overview' },
     { id: 'medicare_compliance', name: 'Medicare ABT Compliance', description: 'Flag inappropriate antibiotic indications' },
@@ -303,6 +316,34 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
       case 'outbreak_summary':
         report = generateOutbreakSummaryReport(db, 30); // Last 30 days
         break;
+      // QAPI Reports (PDF only)
+      case 'qapi_infection': {
+        const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
+        const year = parseInt(surveillanceYear);
+        const qapiData = generateQAPIInfectionControlReport(db, quarterNum, year);
+        const pdfDoc = buildQAPIInfectionControlPdf(qapiData);
+        pdfDoc.save(`QAPI_Infection_Control_${qapiData.quarter}_${year}.pdf`);
+        toast.success('QAPI Infection Control/ABT report downloaded');
+        return;
+      }
+      case 'qapi_ip': {
+        const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
+        const year = parseInt(surveillanceYear);
+        const ipData = generateQAPIIPReport(db, quarterNum, year);
+        const pdfDoc = buildQAPIIPPdf(ipData);
+        pdfDoc.save(`QAPI_IP_${ipData.quarter}_${year}.pdf`);
+        toast.success('QAPI IP (Precautions) report downloaded');
+        return;
+      }
+      case 'qapi_vax': {
+        const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
+        const year = parseInt(surveillanceYear);
+        const vaxData = generateQAPIVaxReport(db, quarterNum, year);
+        const pdfDoc = buildQAPIVaxPdf(vaxData);
+        pdfDoc.save(`QAPI_VAX_${vaxData.quarter}_${year}.pdf`);
+        toast.success('QAPI Vaccination report downloaded');
+        return;
+      }
       // Surveillance Reports
       case 'surv_trend':
       case 'surv_acquired':
