@@ -55,6 +55,12 @@ import {
   buildQAPIIPPdf,
   buildQAPIVaxPdf
 } from '@/lib/pdf/qapiPdf';
+import {
+  buildQAPIInfectionControlDocx,
+  buildQAPIIPDocx,
+  buildQAPIVaxDocx,
+  saveDocx
+} from '@/lib/docx/qapiDocx';
 import { getReportDescription } from '@/lib/reportDescriptions';
 import { generateLineListingPdf, generateBlankLineListingPdf } from '@/lib/pdf/lineListingPdf';
 import { ALL_TEMPLATES } from '@/lib/lineListingTemplates';
@@ -108,6 +114,9 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
   // Surveyor packet options
   const [surveyorIncludeABT, setSurveyorIncludeABT] = useState(true);
   const [surveyorIncludeIP, setSurveyorIncludeIP] = useState(true);
+  
+  // QAPI export format preference
+  const [qapiExportFormat, setQapiExportFormat] = useState<'word' | 'pdf'>('word');
   
   // Description refresh trigger
   const [, setDescriptionRefresh] = useState(0);
@@ -227,7 +236,7 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
     { id: 'ppe_usage', name: 'PPE Usage Tracking Report', description: 'Personal protective equipment monitoring by unit' },
   ];
 
-  const handleGenerateReport = (reportId: string) => {
+  const handleGenerateReport = async (reportId: string) => {
     const db = loadDB();
     let report: ReportData | null = null;
 
@@ -316,32 +325,53 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
       case 'outbreak_summary':
         report = generateOutbreakSummaryReport(db, 30); // Last 30 days
         break;
-      // QAPI Reports (PDF only)
+      // QAPI Reports (Word or PDF based on selection)
       case 'qapi_infection': {
         const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
         const year = parseInt(surveillanceYear);
         const qapiData = generateQAPIInfectionControlReport(db, quarterNum, year);
-        const pdfDoc = buildQAPIInfectionControlPdf(qapiData);
-        pdfDoc.save(`QAPI_Infection_Control_${qapiData.quarter}_${year}.pdf`);
-        toast.success('QAPI Infection Control/ABT report downloaded');
+        
+        if (qapiExportFormat === 'word') {
+          const docx = buildQAPIInfectionControlDocx(qapiData);
+          await saveDocx(docx, `QAPI_Infection_Control_${qapiData.quarter}_${year}.docx`);
+          toast.success('QAPI Infection Control/ABT report downloaded (Word)');
+        } else {
+          const pdfDoc = buildQAPIInfectionControlPdf(qapiData);
+          pdfDoc.save(`QAPI_Infection_Control_${qapiData.quarter}_${year}.pdf`);
+          toast.success('QAPI Infection Control/ABT report downloaded (PDF)');
+        }
         return;
       }
       case 'qapi_ip': {
         const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
         const year = parseInt(surveillanceYear);
         const ipData = generateQAPIIPReport(db, quarterNum, year);
-        const pdfDoc = buildQAPIIPPdf(ipData);
-        pdfDoc.save(`QAPI_IP_${ipData.quarter}_${year}.pdf`);
-        toast.success('QAPI IP (Precautions) report downloaded');
+        
+        if (qapiExportFormat === 'word') {
+          const docx = buildQAPIIPDocx(ipData);
+          await saveDocx(docx, `QAPI_IP_${ipData.quarter}_${year}.docx`);
+          toast.success('QAPI IP (Precautions) report downloaded (Word)');
+        } else {
+          const pdfDoc = buildQAPIIPPdf(ipData);
+          pdfDoc.save(`QAPI_IP_${ipData.quarter}_${year}.pdf`);
+          toast.success('QAPI IP (Precautions) report downloaded (PDF)');
+        }
         return;
       }
       case 'qapi_vax': {
         const quarterNum = parseInt(surveillanceQuarter) as 1 | 2 | 3 | 4;
         const year = parseInt(surveillanceYear);
         const vaxData = generateQAPIVaxReport(db, quarterNum, year);
-        const pdfDoc = buildQAPIVaxPdf(vaxData);
-        pdfDoc.save(`QAPI_VAX_${vaxData.quarter}_${year}.pdf`);
-        toast.success('QAPI Vaccination report downloaded');
+        
+        if (qapiExportFormat === 'word') {
+          const docx = buildQAPIVaxDocx(vaxData);
+          await saveDocx(docx, `QAPI_VAX_${vaxData.quarter}_${year}.docx`);
+          toast.success('QAPI Vaccination report downloaded (Word)');
+        } else {
+          const pdfDoc = buildQAPIVaxPdf(vaxData);
+          pdfDoc.save(`QAPI_VAX_${vaxData.quarter}_${year}.pdf`);
+          toast.success('QAPI Vaccination report downloaded (PDF)');
+        }
         return;
       }
       // Surveillance Reports
@@ -748,6 +778,84 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           }
         >
           <CollapsibleContent>
+            {/* QAPI Reports Settings Panel */}
+            <div className="bg-muted/30 rounded-lg p-4 mb-4">
+              <div className="text-sm font-medium mb-3">QAPI Report Settings</div>
+              <div className="flex flex-wrap items-end gap-4">
+                {/* Quarter Selection */}
+                <div className="min-w-[120px]">
+                  <label className="text-sm font-medium mb-2 block">Quarter</label>
+                  <Select 
+                    value={surveillanceQuarter} 
+                    onValueChange={(v) => setSurveillanceQuarter(v as '1' | '2' | '3' | '4')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Q1 (Jan-Mar)</SelectItem>
+                      <SelectItem value="2">Q2 (Apr-Jun)</SelectItem>
+                      <SelectItem value="3">Q3 (Jul-Sep)</SelectItem>
+                      <SelectItem value="4">Q4 (Oct-Dec)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Year Selection - Extended range */}
+                <div className="min-w-[100px]">
+                  <label className="text-sm font-medium mb-2 block">Year</label>
+                  <Select value={surveillanceYear} onValueChange={setSurveillanceYear}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[
+                        new Date().getFullYear() - 3,
+                        new Date().getFullYear() - 2,
+                        new Date().getFullYear() - 1,
+                        new Date().getFullYear(),
+                        new Date().getFullYear() + 1
+                      ].map(y => (
+                        <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Export Format Selection */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Export Format</label>
+                  <div className="inline-flex rounded-md border border-input overflow-hidden">
+                    <button
+                      className={`px-4 py-2 text-sm font-medium transition-colors ${
+                        qapiExportFormat === 'word'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                      onClick={() => setQapiExportFormat('word')}
+                    >
+                      Word (.docx)
+                    </button>
+                    <button
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-l border-input ${
+                        qapiExportFormat === 'pdf'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-foreground hover:bg-muted'
+                      }`}
+                      onClick={() => setQapiExportFormat('pdf')}
+                    >
+                      PDF
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                {qapiExportFormat === 'word' 
+                  ? 'Word format allows editing narrative sections (ACT, Executive Summary) before submission.'
+                  : 'PDF format provides a finalized, non-editable document.'}
+              </p>
+            </div>
+            
             <div className="divide-y divide-border">
               {executiveReports.map((report) => (
                 <ReportListItem
