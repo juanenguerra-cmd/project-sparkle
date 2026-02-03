@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { ABTRecord, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { computeTxDays, nowISO } from '@/lib/parsers';
+import { computeTxDays, nowISO, isoDateFromAny, todayISO } from '@/lib/parsers';
 
 interface ABTCaseModalProps {
   open: boolean;
@@ -68,10 +68,21 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     r.mrn.includes(searchTerm)
   );
 
+  const deriveStatus = (endDate: string, status: 'active' | 'completed' | 'discontinued') => {
+    if (status === 'discontinued') return 'discontinued';
+    const today = todayISO();
+    const isoEndDate = endDate ? isoDateFromAny(endDate) : '';
+    if (isoEndDate && isoEndDate < today) return 'completed';
+    return 'active';
+  };
+
   useEffect(() => {
     if (editRecord) {
       const resident = db.census.residentsByMrn[editRecord.mrn];
       if (resident) setSelectedResident(resident);
+      const endDate = editRecord.endDate || editRecord.end_date || '';
+      const plannedStopDate = endDate || editRecord.plannedStopDate || '';
+      const status = deriveStatus(endDate, editRecord.status);
       
       setFormData({
         mrn: editRecord.mrn,
@@ -85,9 +96,9 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
         indication: editRecord.indication,
         infectionSource: editRecord.infection_source || 'Other',
         startDate: editRecord.startDate || editRecord.start_date || '',
-        endDate: editRecord.endDate || editRecord.end_date || '',
-        plannedStopDate: editRecord.plannedStopDate || '',
-        status: editRecord.status,
+        endDate,
+        plannedStopDate,
+        status,
         notes: editRecord.notes || '',
         prescriber: editRecord.prescriber || '',
         cultureCollected: editRecord.cultureCollected || false,
@@ -118,7 +129,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       frequency: '',
       indication: '',
       infectionSource: 'Other',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: todayISO(),
       endDate: '',
       plannedStopDate: '',
       status: 'active',
@@ -185,7 +196,10 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     }
 
     const now = nowISO();
-    const txDays = computeTxDays(formData.startDate, formData.endDate || new Date().toISOString().slice(0, 10));
+    const today = todayISO();
+    const txDays = computeTxDays(formData.startDate, formData.endDate || today);
+    const plannedStopDate = formData.endDate || formData.plannedStopDate;
+    const normalizedStatus = deriveStatus(formData.endDate, formData.status);
     
     const recordData: ABTRecord = {
       id: editRecord?.id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -206,8 +220,8 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       start_date: formData.startDate,
       endDate: formData.endDate,
       end_date: formData.endDate,
-      plannedStopDate: formData.plannedStopDate,
-      status: formData.status,
+      plannedStopDate,
+      status: normalizedStatus,
       tx_days: txDays,
       daysOfTherapy: txDays,
       notes: formData.notes,
@@ -437,18 +451,35 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                 <Label className="text-xs font-semibold text-primary">Planned Stop Date *</Label>
                 <Input 
                   type="date"
-                  value={formData.plannedStopDate}
-                  onChange={(e) => setFormData(p => ({ ...p, plannedStopDate: e.target.value }))}
+                  value={formData.endDate || formData.plannedStopDate}
+                  onChange={(e) => {
+                    if (formData.endDate) return;
+                    setFormData(p => ({ ...p, plannedStopDate: e.target.value }));
+                  }}
                   className="text-sm"
+                  disabled={Boolean(formData.endDate)}
                 />
-                <p className="text-[10px] text-muted-foreground">Or set Timeout Review</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {formData.endDate ? 'Matches Actual End Date' : 'Or set Timeout Review'}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Actual End Date</Label>
                 <Input 
                   type="date"
                   value={formData.endDate}
-                  onChange={(e) => setFormData(p => ({ ...p, endDate: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const today = todayISO();
+                    setFormData(p => ({
+                      ...p,
+                      endDate: value,
+                      plannedStopDate: value || p.plannedStopDate,
+                      status: p.status === 'discontinued'
+                        ? p.status
+                        : (value && isoDateFromAny(value) < today ? 'completed' : 'active'),
+                    }));
+                  }}
                   className="text-sm"
                 />
               </div>
