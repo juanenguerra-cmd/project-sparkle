@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { ABTRecord, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { computeTxDays, nowISO, isoDateFromAny } from '@/lib/parsers';
+import { computeTxDays, nowISO, isoDateFromAny, todayISO } from '@/lib/parsers';
 
 interface ABTCaseModalProps {
   open: boolean;
@@ -73,6 +73,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       const resident = db.census.residentsByMrn[editRecord.mrn];
       if (resident) setSelectedResident(resident);
       
+      const fallbackPlannedStopDate = editRecord.plannedStopDate || editRecord.endDate || editRecord.end_date || '';
       setFormData({
         mrn: editRecord.mrn,
         residentName: editRecord.residentName || editRecord.name || '',
@@ -86,7 +87,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
         infectionSource: editRecord.infection_source || 'Other',
         startDate: editRecord.startDate || editRecord.start_date || '',
         endDate: editRecord.endDate || editRecord.end_date || '',
-        plannedStopDate: editRecord.plannedStopDate || '',
+        plannedStopDate: fallbackPlannedStopDate,
         status: editRecord.status,
         notes: editRecord.notes || '',
         prescriber: editRecord.prescriber || '',
@@ -118,7 +119,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       frequency: '',
       indication: '',
       infectionSource: 'Other',
-      startDate: new Date().toISOString().slice(0, 10),
+      startDate: todayISO(),
       endDate: '',
       plannedStopDate: '',
       status: 'active',
@@ -185,12 +186,12 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     }
 
     const now = nowISO();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const txDays = computeTxDays(formData.startDate, formData.endDate || today);
     const plannedStopDate = formData.endDate || formData.plannedStopDate;
     const normalizedStatus = formData.status === 'discontinued'
       ? 'discontinued'
-      : (formData.endDate && isoDateFromAny(formData.endDate) < today ? 'completed' : 'active');
+      : (formData.endDate && isoDateFromAny(formData.endDate) <= today ? 'completed' : 'active');
     
     const recordData: ABTRecord = {
       id: editRecord?.id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -453,7 +454,14 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                 <Input 
                   type="date"
                   value={formData.endDate}
-                  onChange={(e) => setFormData(p => ({ ...p, endDate: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData(p => ({
+                      ...p,
+                      endDate: value,
+                      plannedStopDate: value ? value : p.plannedStopDate,
+                    }));
+                  }}
                   className="text-sm"
                 />
               </div>
