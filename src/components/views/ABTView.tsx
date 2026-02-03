@@ -9,7 +9,7 @@ import ABTImportModal from '@/components/modals/ABTImportModal';
 import ABTCaseModal from '@/components/modals/ABTCaseModal';
 import { loadDB, getActiveABT, saveDB, addAudit } from '@/lib/database';
 import { ABTRecord, ViewType } from '@/lib/types';
-import { isoDateFromAny, computeTxDays } from '@/lib/parsers';
+import { isoDateFromAny, computeTxDays, todayISO } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
@@ -37,14 +37,13 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   const [db, setDb] = useState(() => loadDB());
   
   const records = db.records.abx;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   const deriveStatus = (record: ABTRecord): 'active' | 'completed' | 'discontinued' => {
     const status = (record.status || '').toLowerCase();
     if (status === 'discontinued') return 'discontinued';
     const endDate = record.endDate || record.end_date;
-    const isoEndDate = endDate ? isoDateFromAny(endDate) : '';
-    if (isoEndDate && isoEndDate < today) return 'completed';
+    if (endDate) return 'completed';
     return 'active';
   };
 

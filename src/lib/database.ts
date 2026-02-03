@@ -20,7 +20,7 @@ import {
   SymptomCategory,
   SYMPTOM_OPTIONS
 } from './types';
-import { nowISO, canonicalMRN, isoDateFromAny } from './parsers';
+import { nowISO, canonicalMRN } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
 
 export interface ICNDatabase {
@@ -459,22 +459,21 @@ const getActiveCensusMrns = (db: ICNDatabase): Set<string> => {
 
 // ABT helpers - excludes discharged residents
 // Matches ABT View logic: exclude discontinued, and treat a course as active if:
-// - status is 'active' OR
-// - no end date OR
-// - end date is today/future
+// - no end date (even if status is blank)
+// - status is explicitly active
 export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
   const activeMrns = getActiveCensusMrns(db);
-  const today = new Date().toISOString().slice(0, 10);
   return db.records.abx.filter(r => {
     const status = (r.status || '').toLowerCase();
     if (status === 'discontinued') return false;
     // Hard exclude discharged residents regardless of date
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
-    // Match ABT View logic: active if status='active', no endDate, or endDate in future
+    // Match ABT View logic: active if status='active' or no endDate
     const endDate = r.endDate || r.end_date;
+    if (endDate) return false;
     if (status === 'active') return true;
     if (!endDate) return true;
-    return isoDateFromAny(endDate) >= today;
+    return false;
   });
 };
 
