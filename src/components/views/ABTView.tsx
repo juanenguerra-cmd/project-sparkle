@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,8 @@ import { ABTRecord, ViewType } from '@/lib/types';
 import { isoDateFromAny, computeTxDays, todayISO } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import TablePagination from '@/components/ui/table-pagination';
 
 // Helper to escape CSV values
 const escapeCSV = (val: string | number | boolean | null | undefined): string => {
@@ -31,13 +33,19 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('active');
+  const [unitFilter, setUnitFilter] = useState('all');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ABTRecord | null>(null);
   const [db, setDb] = useState(() => loadDB());
+  const [currentPage, setCurrentPage] = useState(1);
   
   const records = db.records.abx;
   const today = todayISO();
+  const units = useMemo(
+    () => [...new Set(records.map(r => r.unit).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [records],
+  );
 
   const deriveStatus = (record: ABTRecord): 'active' | 'completed' | 'discontinued' => {
     const status = (record.status || '').toLowerCase();
@@ -104,12 +112,17 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
     const medication = r.medication || r.med_name || '';
     const indication = r.indication || '';
     
-    const matchesSearch = 
-      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      medication.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      indication.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch = normalizedSearch.length === 0
+      || name.toLowerCase().includes(normalizedSearch)
+      || medication.toLowerCase().includes(normalizedSearch)
+      || indication.toLowerCase().includes(normalizedSearch)
+      || (r.unit || '').toLowerCase().includes(normalizedSearch)
+      || (r.room || '').toLowerCase().includes(normalizedSearch);
     
     if (!matchesSearch) return false;
+
+    if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
     
     // Status filter
     if (statusFilter === 'all') return true;
@@ -133,6 +146,22 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   })), [filteredRecords]);
 
   const { sortKey, sortDirection, handleSort, sortedData: sortedRecords } = useSortableTable(recordsWithSortableFields, '_startDate', 'desc');
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(sortedRecords.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedRecords = sortedRecords.slice(startIndex, startIndex + pageSize);
+  const rangeStart = sortedRecords.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + pageSize, sortedRecords.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, unitFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const activeCount = records.filter(r => {
     if (deriveStatus(r) === 'discontinued') return false;
@@ -288,7 +317,19 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
               />
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All units</SelectItem>
+                {units.map(unit => (
+                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Badge 
               variant="outline" 
               className={`cursor-pointer ${statusFilter === 'all' ? 'bg-primary text-primary-foreground' : 'hover:bg-primary hover:text-primary-foreground'}`}
@@ -310,6 +351,17 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
             >
               Completed ({completedCount})
             </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('active');
+                setUnitFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
           </div>
         </div>
       </div>
@@ -342,7 +394,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
                   </td>
                 </tr>
               ) : (
-                sortedRecords.map((record, idx) => (
+                pagedRecords.map((record, idx) => (
                   <tr key={record.id || idx}>
                     <td className="font-medium">{record.residentName || record.name}</td>
                     <td className="text-sm">{record.unit} / {record.room}</td>
@@ -407,6 +459,15 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={sortedRecords.length}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          itemLabel="records"
+        />
       </SectionCard>
 
       <ABTImportModal 

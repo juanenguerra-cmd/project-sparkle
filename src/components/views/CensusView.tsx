@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Upload, Download, Search, UserPlus, Eye, Edit, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Upload, Download, Search, UserPlus, Eye, Edit, Trash2, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -8,6 +8,8 @@ import ResidentDetailModal from '@/components/modals/ResidentDetailModal';
 import { loadDB } from '@/lib/database';
 import { Resident, ViewType } from '@/lib/types';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import TablePagination from '@/components/ui/table-pagination';
 
 interface CensusViewProps {
   onNavigate?: (view: ViewType) => void;
@@ -15,20 +17,51 @@ interface CensusViewProps {
 
 const CensusView = ({ onNavigate }: CensusViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [unitFilter, setUnitFilter] = useState('all');
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
   const [db, setDb] = useState(() => loadDB());
+  const [currentPage, setCurrentPage] = useState(1);
   
   const residents = Object.values(db.census.residentsByMrn);
   const activeCount = residents.filter(r => r.active_on_census).length;
 
-  const filteredResidents = useMemo(() => residents.filter(r => 
-    (r.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.mrn || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.unit || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ), [residents, searchTerm]);
+  const units = useMemo(
+    () => [...new Set(residents.map(r => r.unit).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [residents],
+  );
+
+  const filteredResidents = useMemo(() => residents.filter(r => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch = normalizedSearch.length === 0
+      || (r.name || '').toLowerCase().includes(normalizedSearch)
+      || (r.mrn || '').toLowerCase().includes(normalizedSearch)
+      || (r.unit || '').toLowerCase().includes(normalizedSearch)
+      || (r.room || '').toLowerCase().includes(normalizedSearch);
+    const matchesStatus = statusFilter === 'all'
+      || (statusFilter === 'active' ? r.active_on_census : !r.active_on_census);
+    const matchesUnit = unitFilter === 'all' || r.unit === unitFilter;
+    return matchesSearch && matchesStatus && matchesUnit;
+  }), [residents, searchTerm, statusFilter, unitFilter]);
 
   const { sortKey, sortDirection, handleSort, sortedData: sortedResidents } = useSortableTable(filteredResidents, 'name');
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(sortedResidents.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedResidents = sortedResidents.slice(startIndex, startIndex + pageSize);
+  const rangeStart = sortedResidents.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + pageSize, sortedResidents.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, unitFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleRowClick = (resident: Resident) => {
     setSelectedResident(resident);
@@ -77,14 +110,51 @@ const CensusView = ({ onNavigate }: CensusViewProps) => {
       </div>
 
       <div className="filter-panel">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by name, MRN, or unit..." 
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by name, MRN, unit, or room..." 
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | 'active' | 'inactive')}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active only</SelectItem>
+                <SelectItem value="inactive">Inactive only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All units</SelectItem>
+                {units.map(unit => (
+                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+                setUnitFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -111,7 +181,7 @@ const CensusView = ({ onNavigate }: CensusViewProps) => {
                   </td>
                 </tr>
               ) : (
-                sortedResidents.map((resident) => (
+                pagedResidents.map((resident) => (
                   <tr 
                     key={resident.mrn} 
                     className="cursor-pointer hover:bg-muted/50"
@@ -149,6 +219,15 @@ const CensusView = ({ onNavigate }: CensusViewProps) => {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={sortedResidents.length}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          itemLabel="residents"
+        />
       </SectionCard>
 
       <CensusImportModal 

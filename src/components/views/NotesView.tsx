@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, Edit, Trash2, AlertTriangle, Check, Clock, Filter, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident, ViewType } from '@/li
 import { todayISO } from '@/lib/parsers';
 import { toast } from 'sonner';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
+import TablePagination from '@/components/ui/table-pagination';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
   respiratory: 'bg-blue-100 text-blue-800',
@@ -33,9 +34,11 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [symptomFilter, setSymptomFilter] = useState('all');
+  const [followUpFilter, setFollowUpFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Quick add modal states
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -48,25 +51,59 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
   const notes = db.records.notes;
 
   const filteredNotes = useMemo(() => notes.filter(n => {
+    const today = todayISO();
     const name = n.residentName || n.name || '';
     const text = n.text || '';
     const category = n.category || '';
     
-    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch = normalizedSearch.length === 0
+      || name.toLowerCase().includes(normalizedSearch)
+      || text.toLowerCase().includes(normalizedSearch)
+      || category.toLowerCase().includes(normalizedSearch)
+      || (n.room || '').toLowerCase().includes(normalizedSearch);
     
     const matchesCategory = categoryFilter === 'all' || n.category === categoryFilter;
     const matchesSymptom = symptomFilter === 'all' || n.symptomCategory === symptomFilter;
+
+    let followUpStatus = 'none';
+    if (n.requiresFollowUp) {
+      if (n.followUpStatus === 'completed') {
+        followUpStatus = 'completed';
+      } else if (n.followUpStatus === 'escalated') {
+        followUpStatus = 'escalated';
+      } else if (n.followUpDate && n.followUpDate < today) {
+        followUpStatus = 'overdue';
+      } else {
+        followUpStatus = 'pending';
+      }
+    }
+    const matchesFollowUp = followUpFilter === 'all' || followUpStatus === followUpFilter;
     
-    return matchesSearch && matchesCategory && matchesSymptom;
+    return matchesSearch && matchesCategory && matchesSymptom && matchesFollowUp;
   }).map(n => ({
     ...n,
     _name: n.residentName || n.name || '',
     _createdAt: n.createdAt || n.created_at || ''
-  })), [notes, searchTerm, categoryFilter, symptomFilter]);
+  })), [notes, searchTerm, categoryFilter, symptomFilter, followUpFilter]);
 
   const { sortKey, sortDirection, handleSort, sortedData: sortedNotes } = useSortableTable(filteredNotes, '_createdAt', 'desc');
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(sortedNotes.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedNotes = sortedNotes.slice(startIndex, startIndex + pageSize);
+  const rangeStart = sortedNotes.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + pageSize, sortedNotes.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, categoryFilter, symptomFilter, followUpFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString('en-US', {
@@ -229,6 +266,31 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Follow-up" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All follow-ups</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="escalated">Escalated</SelectItem>
+                <SelectItem value="none">No follow-up</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setCategoryFilter('all');
+                setSymptomFilter('all');
+                setFollowUpFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
           </div>
         </div>
       </div>
@@ -257,7 +319,7 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
                   </td>
                 </tr>
               ) : (
-                sortedNotes.map((note) => (
+                pagedNotes.map((note) => (
                   <tr key={note.id}>
                     <td className="text-sm whitespace-nowrap">{formatDate(note.createdAt || note.created_at || '')}</td>
                     <td className="font-medium">{note.residentName || note.name}</td>
@@ -298,6 +360,15 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={sortedNotes.length}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          itemLabel="notes"
+        />
       </SectionCard>
 
       {/* Note Modal */}

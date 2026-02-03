@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
 import { todayISO } from '@/lib/parsers';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import TablePagination from '@/components/ui/table-pagination';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
 type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol';
@@ -34,12 +36,19 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const [db, setDb] = useState(() => loadDB());
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<IPFilter>('active');
+  const [unitFilter, setUnitFilter] = useState('all');
+  const [protocolFilter, setProtocolFilter] = useState('all');
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingCase, setEditingCase] = useState<IPCase | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
   
   const records = db.records.ip_cases;
+  const units = useMemo(
+    () => [...new Set(records.map(r => r.unit).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [records],
+  );
 
   // Get active resident MRNs from census
   const activeCensusMrns = new Set(
@@ -53,11 +62,18 @@ const IPView = ({ onNavigate }: IPViewProps) => {
     let filtered = records.filter(r => {
       const name = r.residentName || r.name || '';
       const infectionType = r.infectionType || r.infection_type || '';
-      const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        infectionType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.protocol.toLowerCase().includes(searchTerm.toLowerCase());
+      const normalizedSearch = searchTerm.trim().toLowerCase();
+      const matchesSearch = normalizedSearch.length === 0
+        || name.toLowerCase().includes(normalizedSearch)
+        || infectionType.toLowerCase().includes(normalizedSearch)
+        || r.protocol.toLowerCase().includes(normalizedSearch)
+        || (r.unit || '').toLowerCase().includes(normalizedSearch)
+        || (r.room || '').toLowerCase().includes(normalizedSearch);
       
       if (!matchesSearch) return false;
+
+      if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
+      if (protocolFilter !== 'all' && (r.protocol || '').toLowerCase() !== protocolFilter) return false;
       
       // Normalize status for case-insensitive comparison
       const status = (r.status || '').toLowerCase();
@@ -119,7 +135,24 @@ const IPView = ({ onNavigate }: IPViewProps) => {
     });
     
     return filtered;
-  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir]);
+  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir, unitFilter, protocolFilter]);
+
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedRecords = filteredRecords.slice(startIndex, startIndex + pageSize);
+  const rangeStart = filteredRecords.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + pageSize, filteredRecords.length);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeFilter, unitFilter, protocolFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -371,7 +404,30 @@ const IPView = ({ onNavigate }: IPViewProps) => {
               />
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={unitFilter} onValueChange={setUnitFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All units</SelectItem>
+                {units.map(unit => (
+                  <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={protocolFilter} onValueChange={setProtocolFilter}>
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Protocol" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All protocols</SelectItem>
+                <SelectItem value="ebp">EBP</SelectItem>
+                <SelectItem value="isolation">Isolation</SelectItem>
+                <SelectItem value="standard precautions">Standard</SelectItem>
+              </SelectContent>
+            </Select>
             <Badge 
               variant={activeFilter === 'all' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
@@ -414,6 +470,18 @@ const IPView = ({ onNavigate }: IPViewProps) => {
             >
               Resolved ({resolvedCount})
             </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setActiveFilter('active');
+                setUnitFilter('all');
+                setProtocolFilter('all');
+              }}
+            >
+              Clear filters
+            </Button>
           </div>
         </div>
       </div>
@@ -452,7 +520,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
                 </tr>
               </thead>
               <tbody>
-                {filteredRecords.map((record) => {
+                {pagedRecords.map((record) => {
                   const reviewDate = record.nextReviewDate || record.next_review_date;
                   const isOverdue = reviewDate && new Date(reviewDate) < new Date();
                   
@@ -517,6 +585,15 @@ const IPView = ({ onNavigate }: IPViewProps) => {
             </table>
           )}
         </div>
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredRecords.length}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          itemLabel="cases"
+        />
       </SectionCard>
 
       <IPCaseModal 
