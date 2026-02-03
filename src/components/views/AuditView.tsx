@@ -7,6 +7,7 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import { loadDB, saveDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
+import { todayISO } from '@/lib/parsers';
 
 const AuditView = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,7 +69,7 @@ const AuditView = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `audit-log-${todayISO()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };

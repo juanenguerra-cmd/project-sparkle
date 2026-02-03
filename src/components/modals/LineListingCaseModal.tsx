@@ -16,6 +16,7 @@ import {
 } from '@/lib/lineListingTemplates';
 import { SYMPTOM_OPTIONS, type Outbreak, type Resident, type LineListingEntry, type SymptomCategory } from '@/lib/types';
 import { loadDB } from '@/lib/database';
+import { todayISO } from '@/lib/parsers';
 
 interface LineListingCaseModalProps {
   open: boolean;
@@ -86,7 +87,7 @@ const LineListingCaseModal = ({
   const [isStaffOrVisitor, setIsStaffOrVisitor] = useState(false);
   const [caseMrn, setCaseMrn] = useState('');
   const [staffVisitorName, setStaffVisitorName] = useState('');
-  const [caseOnsetDate, setCaseOnsetDate] = useState(new Date().toISOString().slice(0, 10));
+  const [caseOnsetDate, setCaseOnsetDate] = useState(todayISO());
   const [caseSymptoms, setCaseSymptoms] = useState<string[]>([]);
   const [caseLabResults, setCaseLabResults] = useState('');
   const [caseNotes, setCaseNotes] = useState('');
@@ -109,7 +110,7 @@ const LineListingCaseModal = ({
         setIsStaffOrVisitor(false);
         setCaseMrn('');
         setStaffVisitorName('');
-        setCaseOnsetDate(new Date().toISOString().slice(0, 10));
+        setCaseOnsetDate(todayISO());
         setCaseSymptoms([]);
         setCaseLabResults('');
         setCaseNotes('');

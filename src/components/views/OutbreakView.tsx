@@ -32,6 +32,7 @@ import {
   ViewType 
 } from '@/lib/types';
 import { generateLineListingPdf } from '@/lib/pdf/lineListingPdf';
+import { todayISO } from '@/lib/parsers';
 import { toast } from 'sonner';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
@@ -81,13 +82,13 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
   const [customOutbreakName, setCustomOutbreakName] = useState('');
   const [newOutbreakType, setNewOutbreakType] = useState<SymptomCategory>('respiratory');
   const [newOutbreakNotes, setNewOutbreakNotes] = useState('');
-  const [outbreakStartDate, setOutbreakStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [outbreakStartDate, setOutbreakStartDate] = useState(todayISO());
 
   // Add Case Form State
   const [isStaffOrVisitor, setIsStaffOrVisitor] = useState(false);
   const [caseMrn, setCaseMrn] = useState('');
   const [staffVisitorName, setStaffVisitorName] = useState('');
-  const [caseOnsetDate, setCaseOnsetDate] = useState(new Date().toISOString().slice(0, 10));
+  const [caseOnsetDate, setCaseOnsetDate] = useState(todayISO());
   const [caseSymptoms, setCaseSymptoms] = useState<string[]>([]);
   const [caseLabResults, setCaseLabResults] = useState('');
   const [caseNotes, setCaseNotes] = useState('');
@@ -98,7 +99,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
   const [contactName, setContactName] = useState('');
   const [contactRole, setContactRole] = useState('');
   const [contactUnit, setContactUnit] = useState('');
-  const [exposureDate, setExposureDate] = useState(new Date().toISOString().slice(0, 10));
+  const [exposureDate, setExposureDate] = useState(todayISO());
   const [exposureType, setExposureType] = useState('');
   const [contactNotes, setContactNotes] = useState('');
 
@@ -135,7 +136,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
     setOutbreakNameType('COVID-19 Outbreak');
     setCustomOutbreakName('');
     setNewOutbreakNotes('');
-    setOutbreakStartDate(new Date().toISOString().slice(0, 10));
+    setOutbreakStartDate(todayISO());
     setRefreshKey(k => k + 1);
   };
 
@@ -381,7 +382,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
       db.records.line_listings[idx] = {
         ...db.records.line_listings[idx],
         outcome: 'resolved',
-        resolutionDate: new Date().toISOString().slice(0, 10),
+        resolutionDate: todayISO(),
         updatedAt: new Date().toISOString()
       };
       addAudit(db, 'line_listing_resolved', `Resolved: ${entry.residentName}`, 'ip');
@@ -400,7 +401,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
       db.records.outbreaks[idx] = {
         ...db.records.outbreaks[idx],
         status: 'resolved',
-        endDate: new Date().toISOString().slice(0, 10),
+        endDate: todayISO(),
         updatedAt: new Date().toISOString()
       };
       addAudit(db, 'outbreak_resolved', `Resolved outbreak: ${outbreak.name}`, 'ip');
@@ -414,7 +415,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
     setCaseMrn('');
     setStaffVisitorName('');
     setIsStaffOrVisitor(false);
-    setCaseOnsetDate(new Date().toISOString().slice(0, 10));
+    setCaseOnsetDate(todayISO());
     setCaseSymptoms([]);
     setCaseLabResults('');
     setCaseNotes('');
@@ -426,7 +427,7 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
     setContactName('');
     setContactRole('');
     setContactUnit('');
-    setExposureDate(new Date().toISOString().slice(0, 10));
+    setExposureDate(todayISO());
     setExposureType('');
     setContactNotes('');
   };

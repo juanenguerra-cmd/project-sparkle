@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { IPCase } from '@/lib/types';
+import { todayISO, toLocalISODate } from '@/lib/parsers';
 
 interface IPImportModalProps {
   open: boolean;
@@ -22,7 +23,7 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
     infectionType: '',
     protocol: 'EBP' as 'EBP' | 'Isolation' | 'Standard Precautions',
     sourceOfInfection: '',
-    onsetDate: new Date().toISOString().slice(0, 10),
+    onsetDate: todayISO(),
     notes: ''
   });
 
@@ -75,7 +76,7 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
     
     const nextReview = new Date();
     nextReview.setDate(nextReview.getDate() + reviewDays);
-    newCase.nextReviewDate = nextReview.toISOString().slice(0, 10);
+    newCase.nextReviewDate = toLocalISODate(nextReview);
     newCase.next_review_date = newCase.nextReviewDate;
 
     db.records.ip_cases.push(newCase);
@@ -93,7 +94,7 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
       infectionType: '',
       protocol: 'EBP',
       sourceOfInfection: '',
-      onsetDate: new Date().toISOString().slice(0, 10),
+      onsetDate: todayISO(),
       notes: ''
     });
 

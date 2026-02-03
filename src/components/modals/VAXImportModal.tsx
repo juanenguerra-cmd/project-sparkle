@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
+import { todayISO } from '@/lib/parsers';
 
 interface VAXImportModalProps {
   open: boolean;
@@ -25,7 +26,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
     dose: '',
     status: 'due' as 'given' | 'due' | 'overdue' | 'declined',
     dateGiven: '',
-    dueDate: new Date().toISOString().slice(0, 10),
+    dueDate: todayISO(),
     notes: ''
   });
 
@@ -64,8 +65,8 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
       vaccine_type: formData.vaccine,
       dose: formData.dose,
       status: formData.status,
-      dateGiven: formData.status === 'given' ? formData.dateGiven || new Date().toISOString().slice(0, 10) : undefined,
-      date_given: formData.status === 'given' ? formData.dateGiven || new Date().toISOString().slice(0, 10) : undefined,
+      dateGiven: formData.status === 'given' ? formData.dateGiven || todayISO() : undefined,
+      date_given: formData.status === 'given' ? formData.dateGiven || todayISO() : undefined,
       dueDate: formData.dueDate,
       due_date: formData.dueDate,
       notes: formData.notes,
@@ -88,7 +89,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
       dose: '',
       status: 'due',
       dateGiven: '',
-      dueDate: new Date().toISOString().slice(0, 10),
+      dueDate: todayISO(),
       notes: ''
     });
 

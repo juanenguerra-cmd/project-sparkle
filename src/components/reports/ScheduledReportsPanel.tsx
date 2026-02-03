@@ -9,6 +9,7 @@ import { Calendar, Clock, Bell, Trash2, Plus, Users, Mail, AlertCircle } from 'l
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { addNotification } from '@/components/notifications/NotificationCenter';
+import { todayISO } from '@/lib/parsers';
 
 interface ScheduledReport {
   id: string;
@@ -94,7 +95,7 @@ const ScheduledReportsPanel = () => {
     const checkReminders = () => {
       const now = new Date();
       const currentTime = now.toTimeString().slice(0, 5);
-      const today = now.toISOString().slice(0, 10);
+      const today = todayISO();
       const dayOfWeek = now.getDay();
       const dayOfMonth = now.getDate();
 

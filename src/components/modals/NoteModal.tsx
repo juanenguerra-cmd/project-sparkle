@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident } from '@/lib/types';
 import { loadDB, saveDB, addAudit, classifySymptoms, getResidentLineListing } from '@/lib/database';
+import { toLocalISODate } from '@/lib/parsers';
 import { toast } from 'sonner';
 
 interface NoteModalProps {
@@ -96,7 +97,7 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
         // Default to tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        setFollowUpDate(tomorrow.toISOString().slice(0, 10));
+        setFollowUpDate(toLocalISODate(tomorrow));
       }
     }
   };
