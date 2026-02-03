@@ -51,8 +51,10 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
     const status = (record.status || '').toLowerCase();
     if (status === 'discontinued') return 'discontinued';
     const endDate = record.endDate || record.end_date;
-    if (endDate) return 'completed';
-    return 'active';
+    if (!endDate) return 'active';
+    const endIso = isoDateFromAny(endDate);
+    if (!endIso) return 'completed';
+    return endIso >= today ? 'active' : 'completed';
   };
 
   const handleDeleteRecord = (record: ABTRecord) => {

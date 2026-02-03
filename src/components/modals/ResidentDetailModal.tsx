@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pill, ShieldAlert, Syringe, FileText, User, Edit, Trash2, Calendar, MapPin, Phone, Clock, Plus, AlertTriangle } from 'lucide-react';
 import { Resident, ABTRecord, IPCase, VaxRecord, Note } from '@/lib/types';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
-import { todayISO } from '@/lib/parsers';
+import { isoDateFromAny, todayISO } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 
 interface ResidentDetailModalProps {
@@ -24,8 +24,10 @@ const deriveAbtStatus = (record: ABTRecord, today: string): 'active' | 'complete
   const status = (record.status || '').toLowerCase();
   if (status === 'discontinued') return 'discontinued';
   const endDate = record.endDate || record.end_date;
-  if (endDate) return 'completed';
-  return 'active';
+  if (!endDate) return 'active';
+  const endIso = isoDateFromAny(endDate);
+  if (!endIso) return 'completed';
+  return endIso >= today ? 'active' : 'completed';
 };
 
 const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalProps) => {
