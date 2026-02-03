@@ -21,7 +21,7 @@ import { todayISO } from '@/lib/parsers';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
-const ITEMS_PER_PAGE = 50;
+const ITEMS_PER_PAGE = 20;
 
 // Helper to escape CSV values
 const escapeCSV = (val: string | number | boolean | null | undefined): string => {
