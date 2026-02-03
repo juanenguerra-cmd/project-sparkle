@@ -57,21 +57,21 @@ const Index = () => {
       case 'dashboard':
         return <DashboardView onNavigate={setActiveView} />;
       case 'abt':
-        return <ABTView />;
+        return <ABTView onNavigate={setActiveView} />;
       case 'census':
-        return <CensusView />;
+        return <CensusView onNavigate={setActiveView} />;
       case 'resident_overview':
         return <ResidentOverviewView />;
       case 'ip':
-        return <IPView />;
+        return <IPView onNavigate={setActiveView} />;
       case 'vax':
         return <VAXView />;
       case 'notes':
-        return <NotesView />;
+        return <NotesView onNavigate={setActiveView} />;
       case 'outbreak':
-        return <OutbreakView />;
+        return <OutbreakView onNavigate={setActiveView} />;
       case 'reports':
-        return <ReportsView surveyorMode={surveyorMode} />;
+        return <ReportsView surveyorMode={surveyorMode} onNavigate={setActiveView} />;
       case 'audit':
         return <AuditView />;
       case 'settings':

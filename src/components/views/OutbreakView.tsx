@@ -28,7 +28,8 @@ import {
   ContactEntry, 
   SymptomCategory, 
   SYMPTOM_OPTIONS,
-  Resident 
+  Resident,
+  ViewType 
 } from '@/lib/types';
 import { generateLineListingPdf } from '@/lib/pdf/lineListingPdf';
 import { toast } from 'sonner';
@@ -41,7 +42,11 @@ const CATEGORY_COLORS: Record<SymptomCategory, string> = {
   other: 'bg-gray-100 text-gray-800 border-gray-300'
 };
 
-const OutbreakView = () => {
+interface OutbreakViewProps {
+  onNavigate?: (view: ViewType) => void;
+}
+
+const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showNewOutbreakModal, setShowNewOutbreakModal] = useState(false);
   const [showAddCaseModal, setShowAddCaseModal] = useState(false);
@@ -967,6 +972,22 @@ const OutbreakView = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('reports')}>
+              Generate Reports
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('notes')}>
+              Add Notes
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('ip')}>
+              Review IP Tracker
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import SectionCard from '@/components/dashboard/SectionCard';
 import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import { loadDB, getActiveIPCases, saveDB, addAudit } from '@/lib/database';
-import { IPCase } from '@/lib/types';
+import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,7 +24,11 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
   return str;
 };
 
-const IPView = () => {
+interface IPViewProps {
+  onNavigate?: (view: ViewType) => void;
+}
+
+const IPView = ({ onNavigate }: IPViewProps) => {
   const { toast } = useToast();
   const [db, setDb] = useState(() => loadDB());
   const [searchTerm, setSearchTerm] = useState('');
@@ -520,6 +524,22 @@ const IPView = () => {
         onSave={handleDataChange}
         editCase={editingCase}
       />
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('notes')}>
+              Add Notes
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('abt')}>
+              Review ABT
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('reports')}>
+              Generate Report
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };
