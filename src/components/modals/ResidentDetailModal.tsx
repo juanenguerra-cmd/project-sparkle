@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Pill, ShieldAlert, Syringe, FileText, User, Edit, Trash2, Calendar, MapPin, Phone, Clock, Plus, AlertTriangle } from 'lucide-react';
 import { Resident, ABTRecord, IPCase, VaxRecord, Note } from '@/lib/types';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
+import { isoDateFromAny } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 
 interface ResidentDetailModalProps {
@@ -19,6 +20,15 @@ interface ResidentDetailModalProps {
   resident: Resident | null;
 }
 
+const deriveAbtStatus = (record: ABTRecord, today: string): 'active' | 'completed' | 'discontinued' => {
+  const status = (record.status || '').toLowerCase();
+  if (status === 'discontinued') return 'discontinued';
+  const endDate = record.endDate || record.end_date;
+  const isoEndDate = endDate ? isoDateFromAny(endDate) : '';
+  if (isoEndDate && isoEndDate < today) return 'completed';
+  return 'active';
+};
+
 const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalProps) => {
   const { toast } = useToast();
   const [db, setDb] = useState(() => loadDB());
@@ -26,6 +36,8 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
   const [activeTab, setActiveTab] = useState('overview');
   
   if (!resident) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
 
   const refreshData = () => setDb(loadDB());
   
@@ -37,7 +49,7 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
     new Date(b.createdAt || b.created_at || '').getTime() - new Date(a.createdAt || a.created_at || '').getTime()
   );
 
-  const activeAbt = abtRecords.filter(r => r.status === 'active');
+  const activeAbt = abtRecords.filter(r => deriveAbtStatus(r, today) === 'active');
   const activeIp = ipCases.filter(r => r.status === 'Active');
   const dueVax = vaxRecords.filter(r => r.status === 'due' || r.status === 'overdue');
   const hasAlerts = activeAbt.length > 0 || activeIp.length > 0 || dueVax.some(v => v.status === 'overdue');
@@ -462,6 +474,8 @@ const AbtList = ({ records, onEdit, onDelete }: { records: ABTRecord[]; onEdit: 
     return <EmptyState message="No antibiotic records found for this resident." />;
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="space-y-3">
       {records.map((r) => (
@@ -476,8 +490,8 @@ const AbtList = ({ records, onEdit, onDelete }: { records: ABTRecord[]; onEdit: 
               </div>
             </div>
             <div className="flex items-center">
-              <Badge variant={r.status === 'active' ? 'destructive' : 'secondary'}>
-                {r.status}
+              <Badge variant={deriveAbtStatus(r, today) === 'active' ? 'destructive' : 'secondary'}>
+                {deriveAbtStatus(r, today)}
               </Badge>
               <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.medication || r.med_name || '')} />
             </div>
