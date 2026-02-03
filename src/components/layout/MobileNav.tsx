@@ -9,7 +9,9 @@ import {
   History, 
   Settings,
   Menu,
-  AlertTriangle
+  AlertTriangle,
+  UserCheck,
+  TrendingUp
 } from 'lucide-react';
 import { ViewType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -24,8 +26,9 @@ interface MobileNavProps {
 
 const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'abt', label: 'ABT Management', icon: <Pill className="w-5 h-5" /> },
   { id: 'census', label: 'Census', icon: <Users className="w-5 h-5" /> },
+  { id: 'abt', label: 'ABT Management', icon: <Pill className="w-5 h-5" /> },
+  { id: 'resident_overview', label: 'Resident Overview', icon: <UserCheck className="w-5 h-5" /> },
   { id: 'ip', label: 'IP Tracker', icon: <ShieldAlert className="w-5 h-5" /> },
   { id: 'vax', label: 'VAX Tracker', icon: <Syringe className="w-5 h-5" /> },
   { id: 'notes', label: 'Notes', icon: <FileText className="w-5 h-5" /> },
@@ -33,6 +36,28 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-5 h-5" /> },
   { id: 'audit', label: 'Audit Trail', icon: <History className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
+];
+
+const navSections = [
+  {
+    label: 'Overview',
+    items: ['dashboard', 'resident_overview'],
+  },
+  {
+    label: 'Daily Operations',
+    items: ['census', 'ip', 'abt', 'vax', 'notes', 'outbreak'],
+  },
+  {
+    label: 'Compliance & Reporting',
+    items: ['reports', 'audit', 'settings'],
+  },
+];
+
+const quickActions: { id: ViewType; label: string; icon: React.ReactNode }[] = [
+  { id: 'census', label: 'Review Census', icon: <Users className="w-4 h-4" /> },
+  { id: 'ip', label: 'Add IP Case', icon: <ShieldAlert className="w-4 h-4" /> },
+  { id: 'abt', label: 'Review ABT', icon: <Pill className="w-4 h-4" /> },
+  { id: 'reports', label: 'Run Report', icon: <TrendingUp className="w-4 h-4" /> },
 ];
 
 const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
@@ -70,23 +95,54 @@ const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-auto max-h-[70vh]">
-            <nav className="grid grid-cols-3 gap-2 pt-4">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={cn(
-                    'flex flex-col items-center gap-2 p-4 rounded-xl transition-colors',
-                    activeView === item.id
-                      ? 'bg-primary/10 text-primary'
-                      : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                  )}
-                >
-                  {item.icon}
-                  <span className="text-sm font-medium">{item.label}</span>
-                </button>
-              ))}
-            </nav>
+            <div className="space-y-6 pt-4">
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Quick Actions
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {quickActions.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id)}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+                    >
+                      {item.icon}
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <nav className="space-y-4">
+                {navSections.map((section) => (
+                  <div key={section.label} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {section.label}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {navItems
+                        .filter((item) => section.items.includes(item.id))
+                        .map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => handleNavClick(item.id)}
+                            className={cn(
+                              'flex flex-col items-center gap-2 p-4 rounded-xl transition-colors',
+                              activeView === item.id
+                                ? 'bg-primary/10 text-primary'
+                                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {item.icon}
+                            <span className="text-sm font-medium">{item.label}</span>
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </div>
           </SheetContent>
         </Sheet>
       </div>

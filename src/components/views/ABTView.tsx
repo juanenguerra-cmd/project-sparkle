@@ -8,7 +8,7 @@ import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import ABTImportModal from '@/components/modals/ABTImportModal';
 import ABTCaseModal from '@/components/modals/ABTCaseModal';
 import { loadDB, getActiveABT, saveDB, addAudit } from '@/lib/database';
-import { ABTRecord } from '@/lib/types';
+import { ABTRecord, ViewType } from '@/lib/types';
 import { isoDateFromAny, computeTxDays } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
@@ -23,7 +23,11 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
   return str;
 };
 
-const ABTView = () => {
+interface ABTViewProps {
+  onNavigate?: (view: ViewType) => void;
+}
+
+const ABTView = ({ onNavigate }: ABTViewProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('active');
@@ -413,6 +417,22 @@ const ABTView = () => {
         onSave={() => setDb(loadDB())}
         editRecord={editingRecord}
       />
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('ip')}>
+              Review IP Cases
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('notes')}>
+              Capture Notes
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('reports')}>
+              Generate Report
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };

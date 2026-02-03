@@ -12,7 +12,7 @@ import IPCaseModal from '@/components/modals/IPCaseModal';
 import ABTCaseModal from '@/components/modals/ABTCaseModal';
 import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
-import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident } from '@/lib/types';
+import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident, ViewType } from '@/lib/types';
 import { toast } from 'sonner';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
@@ -24,7 +24,11 @@ const CATEGORY_COLORS: Record<SymptomCategory, string> = {
   other: 'bg-gray-100 text-gray-800'
 };
 
-const NotesView = () => {
+interface NotesViewProps {
+  onNavigate?: (view: ViewType) => void;
+}
+
+const NotesView = ({ onNavigate }: NotesViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [symptomFilter, setSymptomFilter] = useState('all');
@@ -339,6 +343,22 @@ const NotesView = () => {
         onSave={() => setRefreshKey(k => k + 1)}
         editRecord={null}
       />
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('ip')}>
+              Review IP Cases
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('abt')}>
+              Review ABT
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('reports')}>
+              Run Reports
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };

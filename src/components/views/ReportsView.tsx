@@ -83,12 +83,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
+import { ViewType } from '@/lib/types';
 
 interface ReportsViewProps {
   surveyorMode?: boolean;
+  onNavigate?: (view: ViewType) => void;
 }
 
-const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
+const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => {
   const [executiveOpen, setExecutiveOpen] = useState(false);
   const [operationalOpen, setOperationalOpen] = useState(false);
   const [surveillanceOpen, setSurveillanceOpen] = useState(false);
@@ -1419,6 +1421,22 @@ const ReportsView = ({ surveyorMode = false }: ReportsViewProps) => {
           </Button>
         </div>
       </SectionCard>
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('audit')}>
+              Review Audit Trail
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('dashboard')}>
+              Return to Dashboard
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('outbreak')}>
+              Review Outbreaks
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };

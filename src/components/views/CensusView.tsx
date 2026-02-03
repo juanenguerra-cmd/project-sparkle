@@ -6,10 +6,14 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import CensusImportModal from '@/components/modals/CensusImportModal';
 import ResidentDetailModal from '@/components/modals/ResidentDetailModal';
 import { loadDB } from '@/lib/database';
-import { Resident } from '@/lib/types';
+import { Resident, ViewType } from '@/lib/types';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
-const CensusView = () => {
+interface CensusViewProps {
+  onNavigate?: (view: ViewType) => void;
+}
+
+const CensusView = ({ onNavigate }: CensusViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
@@ -158,6 +162,22 @@ const CensusView = () => {
         onClose={() => setSelectedResident(null)}
         resident={selectedResident}
       />
+
+      {onNavigate && (
+        <SectionCard title="Next Steps">
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => onNavigate('ip')}>
+              Review IP Cases
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('abt')}>
+              Review ABT Courses
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('notes')}>
+              Add Notes
+            </Button>
+          </div>
+        </SectionCard>
+      )}
     </div>
   );
 };

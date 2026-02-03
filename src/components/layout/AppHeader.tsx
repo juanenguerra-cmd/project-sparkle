@@ -1,6 +1,7 @@
-import { Download, Upload, Shield, Plus, Database } from 'lucide-react';
+import { Download, Upload, Shield, Plus, Database, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AppHeaderProps {
   surveyorMode: boolean;
@@ -35,19 +36,29 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
             <Database className="w-4 h-4 mr-2" />
             Data
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onToggleSurveyorMode}
-            className={`border-white/20 ${
-              surveyorMode
-                ? 'bg-amber-500/80 hover:bg-amber-500 text-white'
-                : 'bg-white/10 hover:bg-white/20 text-white'
-            }`}
-          >
-            <Shield className="w-4 h-4 mr-2" />
-            Surveyor: {surveyorMode ? 'On' : 'Off'}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleSurveyorMode}
+                  className={`border-white/20 ${
+                    surveyorMode
+                      ? 'bg-amber-500/80 hover:bg-amber-500 text-white'
+                      : 'bg-white/10 hover:bg-white/20 text-white'
+                  }`}
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Surveyor: {surveyorMode ? 'On' : 'Off'}
+                  <Info className="w-4 h-4 ml-2 opacity-80" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs">
+                Enable Surveyor Mode for a compliance-focused experience and streamlined surveyor-ready reporting.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             size="sm"
             onClick={onAddResident}

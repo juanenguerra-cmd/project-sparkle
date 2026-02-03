@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Pill, ShieldAlert, FileText, RefreshCw, TrendingUp, Database, UserCheck } from 'lucide-react';
+import { Users, Pill, ShieldAlert, FileText, RefreshCw, TrendingUp, Database, UserCheck, ClipboardCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatCard from '@/components/dashboard/StatCard';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -8,6 +8,7 @@ import WorklistSummary from '@/components/dashboard/WorklistSummary';
 import DataManagementModal from '@/components/modals/DataManagementModal';
 import { ViewType } from '@/lib/types';
 import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getRecentNotes } from '@/lib/database';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface DashboardViewProps {
   onNavigate: (view: ViewType) => void;
@@ -21,6 +22,8 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const activeABT = getActiveABT(db).length;
   const activeIP = getActiveIPCases(db).length;
   const pendingNotes = getRecentNotes(db, 3).length;
+  const hasResidentData = activeResidents > 0;
+  const hasClinicalData = activeABT > 0 || activeIP > 0 || pendingNotes > 0;
 
   const handleRefresh = () => {
     setDb(loadDB());
@@ -89,6 +92,81 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           onClick={() => onNavigate('notes')}
         />
       </div>
+
+      {!hasResidentData && (
+        <Alert className="bg-amber-50 border-amber-200 text-amber-900">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Data readiness check</AlertTitle>
+          <AlertDescription className="text-amber-900/90">
+            Import your census to unlock resident-based workflows. Once the census is loaded, IP, ABT, and Notes
+            will align to the active roster.
+          </AlertDescription>
+        </Alert>
+      )}
+      {hasResidentData && !hasClinicalData && (
+        <Alert className="bg-blue-50 border-blue-200 text-blue-900">
+          <AlertTriangle className="h-4 w-4 text-blue-600" />
+          <AlertTitle>Start-of-shift setup</AlertTitle>
+          <AlertDescription className="text-blue-900/90">
+            Census is ready. Add initial IP cases, ABT courses, and clinical notes to activate today’s worklists.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <SectionCard title="Start-of-Shift Workflow">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-border bg-background p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ClipboardCheck className="w-4 h-4 text-primary" />
+              1. Verify Census
+            </div>
+            <p className="text-xs text-muted-foreground">Confirm active residents and units are up to date.</p>
+            <Button size="sm" variant="outline" className="w-full" onClick={() => onNavigate('census')}>
+              Review Census
+            </Button>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ShieldAlert className="w-4 h-4 text-warning" />
+              2. Update IP Cases
+            </div>
+            <p className="text-xs text-muted-foreground">Log new isolation precautions and reviews.</p>
+            <Button size="sm" variant="outline" className="w-full" onClick={() => onNavigate('ip')}>
+              Go to IP Tracker
+            </Button>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Pill className="w-4 h-4 text-destructive" />
+              3. Review ABT
+            </div>
+            <p className="text-xs text-muted-foreground">Confirm antibiotic courses and stewardship notes.</p>
+            <Button size="sm" variant="outline" className="w-full" onClick={() => onNavigate('abt')}>
+              Review ABT
+            </Button>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <FileText className="w-4 h-4 text-info" />
+              4. Capture Notes
+            </div>
+            <p className="text-xs text-muted-foreground">Document symptoms, follow-ups, and action items.</p>
+            <Button size="sm" variant="outline" className="w-full" onClick={() => onNavigate('notes')}>
+              Add Notes
+            </Button>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button size="sm" onClick={() => onNavigate('reports')}>
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Generate Daily Report
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onNavigate('outbreak')}>
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            Review Outbreaks
+          </Button>
+        </div>
+      </SectionCard>
 
       {/* Worklist Summary */}
       <SectionCard title="Worklist Summary">
