@@ -39,6 +39,15 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   const records = db.records.abx;
   const today = new Date().toISOString().slice(0, 10);
 
+  const deriveStatus = (record: ABTRecord): 'active' | 'completed' | 'discontinued' => {
+    const status = (record.status || '').toLowerCase();
+    if (status === 'discontinued') return 'discontinued';
+    const endDate = record.endDate || record.end_date;
+    const isoEndDate = endDate ? isoDateFromAny(endDate) : '';
+    if (isoEndDate && isoEndDate < today) return 'completed';
+    return 'active';
+  };
+
   const handleDeleteRecord = (record: ABTRecord) => {
     if (!window.confirm(`Delete ABT record for ${record.residentName || record.name}?`)) return;
     
@@ -79,7 +88,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
 
   const filteredRecords = records.filter(r => {
     // Always exclude discontinued records from active view
-    if (r.status === 'discontinued') {
+    if (deriveStatus(r) === 'discontinued') {
       // Only show discontinued in 'completed' filter or 'all' filter
       if (statusFilter === 'active') return false;
     }
@@ -106,12 +115,10 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
     // Status filter
     if (statusFilter === 'all') return true;
     if (statusFilter === 'active') {
-      const endDate = r.endDate || r.end_date;
-      const isActive = r.status === 'active' || !endDate || isoDateFromAny(endDate) >= today;
-      return isActive;
+      return deriveStatus(r) === 'active';
     }
     if (statusFilter === 'completed') {
-      return r.status === 'completed' || r.status === 'discontinued';
+      return deriveStatus(r) !== 'active';
     }
     return true;
   });
@@ -129,22 +136,20 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   const { sortKey, sortDirection, handleSort, sortedData: sortedRecords } = useSortableTable(recordsWithSortableFields, '_startDate', 'desc');
 
   const activeCount = records.filter(r => {
-    if (r.status === 'discontinued') return false;
+    if (deriveStatus(r) === 'discontinued') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
-    const endDate = r.endDate || r.end_date;
-    return r.status === 'active' || !endDate || isoDateFromAny(endDate) >= today;
+    return deriveStatus(r) === 'active';
   }).length;
 
-  const completedCount = records.filter(r => r.status === 'completed' || r.status === 'discontinued').length;
+  const completedCount = records.filter(r => deriveStatus(r) !== 'active').length;
 
   const getStatusBadge = (record: typeof records[0]) => {
-    const endDate = record.endDate || record.end_date;
-    const isActive = record.status === 'active' || !endDate || isoDateFromAny(endDate) >= today;
-    
-    if (record.status === 'discontinued') {
+    const derivedStatus = deriveStatus(record);
+
+    if (derivedStatus === 'discontinued') {
       return <span className="badge-status badge-bad">Discontinued</span>;
     }
-    if (isActive) {
+    if (derivedStatus === 'active') {
       return <span className="badge-status badge-warn">Active</span>;
     }
     return <span className="badge-status badge-ok">Completed</span>;
@@ -385,7 +390,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        {(record.status === 'active' || (!record.endDate && !record.end_date) || (record.endDate && record.endDate >= today) || (record.end_date && record.end_date >= today)) && (
+                        {deriveStatus(record) === 'active' && (
                           <button 
                             type="button"
                             className="row-action-btn text-warning hover:text-warning" 
