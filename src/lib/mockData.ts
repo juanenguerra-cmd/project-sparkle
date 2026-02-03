@@ -7,18 +7,19 @@ import {
   AuditEntry,
   AppDatabase 
 } from './types';
+import { toLocalISODate } from './parsers';
 
 // Helper to generate dates
 const daysAgo = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 };
 
 const daysFromNow = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 };
 
 // Mock Residents

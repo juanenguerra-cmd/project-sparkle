@@ -5,6 +5,8 @@
  * Outputs 7/30/90-day predictions with confidence bands.
  */
 
+import { toLocalISODate } from '@/lib/parsers';
+
 export interface DataPoint {
   date: string; // ISO date yyyy-mm-dd
   value: number;
@@ -138,7 +140,7 @@ export const generateForecast = (
   for (let i = 1; i <= daysAhead; i++) {
     const futureDate = new Date(lastDate);
     futureDate.setDate(futureDate.getDate() + i);
-    const dateStr = futureDate.toISOString().slice(0, 10);
+    const dateStr = toLocalISODate(futureDate);
 
     // Trend projection + seasonal adjustment
     const trendValue = intercept + slope * (baseIndex + i);

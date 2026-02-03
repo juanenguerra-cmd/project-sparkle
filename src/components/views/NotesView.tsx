@@ -13,6 +13,7 @@ import ABTCaseModal from '@/components/modals/ABTCaseModal';
 import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { Note, SYMPTOM_OPTIONS, SymptomCategory, Resident, ViewType } from '@/lib/types';
+import { todayISO } from '@/lib/parsers';
 import { toast } from 'sonner';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 
@@ -133,7 +134,7 @@ const NotesView = ({ onNavigate }: NotesViewProps) => {
   const getFollowUpStatus = (note: Note) => {
     if (!note.requiresFollowUp) return null;
     
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const isOverdue = note.followUpDate && note.followUpDate < today && note.followUpStatus !== 'completed';
     const isCompleted = note.followUpStatus === 'completed';
     const isEscalated = note.followUpStatus === 'escalated';

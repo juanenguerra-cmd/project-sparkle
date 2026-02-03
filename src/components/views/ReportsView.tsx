@@ -35,6 +35,7 @@ import {
   generateOutbreakSummaryReport,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
+import { todayISO } from '@/lib/parsers';
 import {
   generateInfectionSurveillanceTrend,
   generateInfectionAcquired,
@@ -563,7 +564,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     }
     
     const sanitizedTitle = currentReport.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = todayISO();
     
     if (exportFormat === 'PDF') {
       const db = loadDB();

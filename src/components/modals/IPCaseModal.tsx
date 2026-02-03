@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { IPCase, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { todayISO, toLocalISODate } from '@/lib/parsers';
 
 interface IPCaseModalProps {
   open: boolean;
@@ -140,7 +141,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       censusStatus: '',
       precautionType: '',
       isolationType: '',
-      onsetDate: new Date().toISOString().slice(0, 10),
+      onsetDate: todayISO(),
       resolutionDate: '',
       status: 'Active',
       sourceCondition: '',
@@ -247,7 +248,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     
     const nextReview = new Date();
     nextReview.setDate(nextReview.getDate() + reviewDays);
-    caseData.nextReviewDate = nextReview.toISOString().slice(0, 10);
+    caseData.nextReviewDate = toLocalISODate(nextReview);
     caseData.next_review_date = caseData.nextReviewDate;
 
     if (editCase) {

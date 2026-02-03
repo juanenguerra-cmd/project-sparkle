@@ -20,7 +20,7 @@ import {
   SymptomCategory,
   SYMPTOM_OPTIONS
 } from './types';
-import { nowISO, canonicalMRN } from './parsers';
+import { nowISO, canonicalMRN, todayISO } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
 
 export interface ICNDatabase {
@@ -510,7 +510,7 @@ export const getRecentNotes = (db: ICNDatabase, days: number = 3): Note[] => {
 
 // Symptom follow-up helpers
 export const getNotesRequiringFollowUp = (db: ICNDatabase): Note[] => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   return db.records.notes.filter(n => 
     n.requiresFollowUp && 
     n.followUpStatus !== 'completed' &&

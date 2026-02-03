@@ -11,6 +11,7 @@ import { VaxRecord } from '@/lib/types';
 import { getEducationScript, generateEducationNote } from '@/lib/vaccineEducationScripts';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
+import { todayISO } from '@/lib/parsers';
 
 interface VaxEducationModalProps {
   open: boolean;
@@ -30,7 +31,7 @@ const VaxEducationModal = ({ open, onClose, record, onSave }: VaxEducationModalP
   const vaccineType = record.vaccine || record.vaccine_type || 'Other';
   const script = getEducationScript(vaccineType);
   const residentName = record.residentName || record.name || 'Unknown';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   const handleSave = () => {
     const db = loadDB();

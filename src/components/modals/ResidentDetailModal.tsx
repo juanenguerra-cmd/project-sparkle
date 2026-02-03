@@ -473,7 +473,7 @@ const AbtList = ({ records, onEdit, onDelete }: { records: ABTRecord[]; onEdit: 
     return <EmptyState message="No antibiotic records found for this resident." />;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   return (
     <div className="space-y-3">

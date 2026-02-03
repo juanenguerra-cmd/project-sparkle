@@ -25,6 +25,7 @@ import {
   type OutbreakRisk,
   type DataPoint,
 } from '@/lib/analytics/forecasting';
+import { todayISO, toLocalISODate } from '@/lib/parsers';
 
 type MetricType = 'infections' | 'abt' | 'outbreak';
 type HorizonType = '7' | '30' | '90';
@@ -33,7 +34,7 @@ const TrendPredictionPanel = () => {
   const [activeMetric, setActiveMetric] = useState<MetricType>('infections');
   const [horizon, setHorizon] = useState<HorizonType>('30');
   const db = useMemo(() => loadDB(), []);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   // Build historical data from records
   const { infectionHistory, abtHistory, outbreakRisk } = useMemo(() => {
@@ -45,7 +46,7 @@ const TrendPredictionPanel = () => {
 
     ipCases.forEach(c => {
       const onset = c.onset_date || c.onsetDate || c.createdAt?.slice(0, 10);
-      if (onset && onset >= last90.toISOString().slice(0, 10)) {
+      if (onset && onset >= toLocalISODate(last90)) {
         ipByDate[onset] = (ipByDate[onset] || 0) + 1;
       }
     });
@@ -53,7 +54,7 @@ const TrendPredictionPanel = () => {
     // Fill gaps for continuous time series
     const infectionHistory: DataPoint[] = [];
     for (let d = new Date(last90); d <= new Date(); d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = toLocalISODate(d);
       infectionHistory.push({ date: dateStr, value: ipByDate[dateStr] || 0 });
     }
 
@@ -62,14 +63,14 @@ const TrendPredictionPanel = () => {
     const abtByDate: Record<string, number> = {};
     abxRecords.forEach(r => {
       const start = r.startDate || r.start_date;
-      if (start && start >= last90.toISOString().slice(0, 10)) {
+      if (start && start >= toLocalISODate(last90)) {
         abtByDate[start] = (abtByDate[start] || 0) + 1;
       }
     });
 
     const abtHistory: DataPoint[] = [];
     for (let d = new Date(last90); d <= new Date(); d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = toLocalISODate(d);
       abtHistory.push({ date: dateStr, value: abtByDate[dateStr] || 0 });
     }
 
@@ -78,7 +79,7 @@ const TrendPredictionPanel = () => {
     last30.setDate(last30.getDate() - 30);
     const recentIP = ipCases.filter(c => {
       const onset = c.onset_date || c.onsetDate || c.createdAt?.slice(0, 10);
-      return onset && onset >= last30.toISOString().slice(0, 10);
+      return onset && onset >= toLocalISODate(last30);
     });
 
     const byType: Record<string, number> = {};

@@ -17,6 +17,7 @@ import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
+import { todayISO } from '@/lib/parsers';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -267,7 +268,7 @@ const VAXView = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vax_records_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `vax_records_${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -338,7 +339,7 @@ const VAXView = () => {
     const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
     if (idx !== -1) {
       updatedDb.records.vax[idx].status = 'due';
-      updatedDb.records.vax[idx].dueDate = new Date().toISOString().slice(0, 10);
+      updatedDb.records.vax[idx].dueDate = todayISO();
       addAudit(updatedDb, 'vax_reoffer_cleared', `Cleared re-offer for ${record.vaccine} - ${record.residentName || record.name}`, 'vax');
       saveDB(updatedDb);
       setDb(updatedDb);
@@ -351,7 +352,7 @@ const VAXView = () => {
     const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
     if (idx !== -1) {
       updatedDb.records.vax[idx].status = 'given';
-      updatedDb.records.vax[idx].dateGiven = new Date().toISOString().slice(0, 10);
+      updatedDb.records.vax[idx].dateGiven = todayISO();
       addAudit(updatedDb, 'vax_given', `Marked ${record.vaccine} as given for ${record.residentName || record.name}`, 'vax');
       saveDB(updatedDb);
       setDb(updatedDb);

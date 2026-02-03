@@ -214,7 +214,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `abt_records_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `abt_records_${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

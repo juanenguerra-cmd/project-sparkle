@@ -9,6 +9,7 @@ import { loadDB, getActiveIPCases, saveDB, addAudit } from '@/lib/database';
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
+import { todayISO } from '@/lib/parsers';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
 type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol';
@@ -203,7 +204,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const handleDischargeCase = (record: IPCase) => {
     if (!window.confirm(`Mark ${record.residentName || record.name} as discharged? This will close the IP case.`)) return;
     
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const currentDb = loadDB();
     const idx = currentDb.records.ip_cases.findIndex(c => c.id === record.id);
     if (idx >= 0) {
@@ -265,7 +266,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ip_cases_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `ip_cases_${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
