@@ -485,7 +485,12 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Status</Label>
-                <Select value={formData.status} onValueChange={(v: 'active' | 'completed' | 'discontinued') => setFormData(p => ({ ...p, status: v }))}>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v: 'active' | 'completed' | 'discontinued') =>
+                    setFormData(p => ({ ...p, status: deriveStatus(p.endDate, v) }))
+                  }
+                >
                   <SelectTrigger className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
