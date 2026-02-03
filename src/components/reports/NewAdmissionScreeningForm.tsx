@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO, differenceInDays, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +86,9 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
   const [dateOverrides, setDateOverrides] = useState<Record<string, string>>(() => getDateOverrides());
   const [editingDate, setEditingDate] = useState<{ mrn: string; date: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 20;
   
   const db = loadDB();
   const today = new Date();
@@ -219,6 +222,34 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
   const pendingCount = screeningList.filter(s => s.screeningStatus === 'pending').length;
   const overdueCount = screeningList.filter(s => s.screeningStatus === 'overdue').length;
   const completeCount = screeningList.filter(s => s.screeningStatus === 'complete').length;
+
+  const filteredScreeningList = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return screeningList;
+    return screeningList.filter(item => {
+      const searchable = [
+        item.name,
+        item.mrn,
+        item.room,
+        item.unit,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return searchable.includes(query);
+    });
+  }, [screeningList, searchQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, screeningList.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredScreeningList.length / pageSize));
+  const clampedPage = Math.min(currentPage, totalPages);
+  const startIndex = (clampedPage - 1) * pageSize;
+  const pagedScreeningList = filteredScreeningList.slice(startIndex, startIndex + pageSize);
+  const rangeStart = filteredScreeningList.length === 0 ? 0 : startIndex + 1;
+  const rangeEnd = Math.min(startIndex + pageSize, filteredScreeningList.length);
   
   const handleExclude = (mrn: string, name: string) => {
     const newExcluded = new Set(excludedMrns);
@@ -405,6 +436,20 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       
       {/* Screening List */}
       <div className="border rounded-lg overflow-hidden">
+        <div className="border-b bg-muted/30 px-3 py-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Showing {rangeStart}-{rangeEnd} of {filteredScreeningList.length} admissions
+            </div>
+            <div className="w-full md:w-64">
+              <Input
+                placeholder="Search by name, MRN, room, unit..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </div>
+          </div>
+        </div>
         <table className="data-table">
           <thead>
             <tr>
@@ -419,14 +464,14 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
             </tr>
           </thead>
           <tbody>
-            {screeningList.length === 0 ? (
+            {filteredScreeningList.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-muted-foreground">
-                  No new admissions in the last {daysBack} days
+                  No matching admissions found for the last {daysBack} days
                 </td>
               </tr>
             ) : (
-              screeningList.map((item) => (
+              pagedScreeningList.map((item) => (
                 <tr key={item.mrn} className={item.screeningStatus === 'overdue' ? 'bg-destructive/5' : ''}>
                   <td>{getStatusIcon(item.screeningStatus)}</td>
                   <td className="font-medium">{item.room}</td>
@@ -495,6 +540,31 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
             )}
           </tbody>
         </table>
+        {filteredScreeningList.length > pageSize && (
+          <div className="border-t bg-muted/20 px-3 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Page {clampedPage} of {totalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                disabled={clampedPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+                disabled={clampedPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Footer info */}

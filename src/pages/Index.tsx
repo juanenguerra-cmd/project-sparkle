@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { ViewType } from '@/lib/types';
 import AppHeader from '@/components/layout/AppHeader';
 import Sidebar from '@/components/layout/Sidebar';
@@ -17,6 +18,8 @@ import SettingsView from '@/components/views/SettingsView';
 import DataManagementModal from '@/components/modals/DataManagementModal';
 import BackupReminderBanner from '@/components/BackupReminderBanner';
 import LockScreen from '@/components/LockScreen';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/toaster';
 import { useDataLoader } from '@/hooks/useDataLoader';
 
@@ -25,13 +28,25 @@ const Index = () => {
   const [surveyorMode, setSurveyorMode] = useState(false);
   const [showDataModal, setShowDataModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showLoadError, setShowLoadError] = useState(false);
 
   const handleDataChange = useCallback(() => {
     setRefreshKey(prev => prev + 1);
   }, []);
 
   // Auto-load initial data if database is empty
-  const { loading: dataLoading } = useDataLoader(handleDataChange);
+  const { loading: dataLoading, error: dataLoadError } = useDataLoader(handleDataChange);
+
+  useEffect(() => {
+    if (dataLoadError) {
+      setShowLoadError(true);
+    }
+  }, [dataLoadError]);
+
+  const handleRetryDataLoad = () => {
+    localStorage.removeItem('icn_hub_initial_load_attempted');
+    window.location.reload();
+  };
 
   const handleAddResident = () => {
     setActiveView('census');
@@ -82,6 +97,27 @@ const Index = () => {
     <LockScreen>
       <div className="min-h-screen bg-background">
         <BackupReminderBanner onDataChange={handleDataChange} />
+        {dataLoadError && showLoadError && (
+          <div className="px-4 pt-4 md:px-6">
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Initial data load failed</AlertTitle>
+              <AlertDescription>
+                <p className="text-sm text-destructive-foreground/90">
+                  {dataLoadError}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={handleRetryDataLoad}>
+                    Retry load
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowLoadError(false)}>
+                    Dismiss
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
         <AppHeader 
           surveyorMode={surveyorMode}
           onToggleSurveyorMode={() => setSurveyorMode(!surveyorMode)}
