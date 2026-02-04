@@ -12,29 +12,31 @@ interface AppHeaderProps {
 
 const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDataModal }: AppHeaderProps) => {
   return (
-    <header className="app-header sticky top-0 z-50 px-4 py-4">
-      <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl" role="img" aria-label="Healthcare">🧑‍⚕️</span>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold">Infection Control Nurse Hub</h1>
-            <p className="text-sm opacity-90">Daily Support Platform for Prevention, Outbreaks, and Compliance</p>
+    <header className="app-header sticky top-0 z-50 px-4 py-3 md:py-4">
+      <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl leading-none" role="img" aria-label="Healthcare">🧑‍⚕️</span>
+          <div className="space-y-1">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold leading-tight">Infection Control Nurse Hub</h1>
+            <p className="text-xs sm:text-sm opacity-90 hidden sm:block">
+              Daily Support Platform for Prevention, Outbreaks, and Compliance
+            </p>
           </div>
-          <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-semibold hidden md:inline-block">
+          <span className="bg-white/20 px-2.5 py-1 rounded-full text-xs sm:text-sm font-semibold hidden sm:inline-flex">
             ICN Hub
           </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
           <NotificationCenter />
           <Button
             variant="ghost"
             size="sm"
             onClick={onOpenDataModal}
-            className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20 px-2.5"
           >
-            <Database className="w-4 h-4 mr-2" />
-            Data
+            <Database className="w-4 h-4 mr-1.5" />
+            <span className="text-xs sm:text-sm">Data</span>
           </Button>
           <TooltipProvider>
             <Tooltip>
@@ -43,15 +45,17 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
                   variant="ghost"
                   size="sm"
                   onClick={onToggleSurveyorMode}
-                  className={`border-white/20 ${
+                  className={`border-white/20 px-2.5 ${
                     surveyorMode
                       ? 'bg-amber-500/80 hover:bg-amber-500 text-white'
                       : 'bg-white/10 hover:bg-white/20 text-white'
                   }`}
                 >
-                  <Shield className="w-4 h-4 mr-2" />
-                  Surveyor: {surveyorMode ? 'On' : 'Off'}
-                  <Info className="w-4 h-4 ml-2 opacity-80" />
+                  <Shield className="w-4 h-4 mr-1.5" />
+                  <span className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Surveyor:</span> {surveyorMode ? 'On' : 'Off'}
+                  </span>
+                  <Info className="w-4 h-4 ml-1.5 opacity-80 hidden sm:inline" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-xs">
@@ -62,10 +66,10 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
           <Button
             size="sm"
             onClick={onAddResident}
-            className="bg-white text-primary hover:bg-white/90 font-semibold"
+            className="bg-white text-primary hover:bg-white/90 font-semibold px-2.5"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Resident
+            <Plus className="w-4 h-4 mr-1.5" />
+            <span className="text-xs sm:text-sm">Add Resident</span>
           </Button>
         </div>
       </div>
