@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Pill, ShieldAlert, Syringe, FileText, User, Edit, Trash2, Calendar, MapPin, Phone, Clock, Plus, AlertTriangle } from 'lucide-react';
+import { Pill, ShieldAlert, Syringe, FileText, User, Edit, Trash2, Calendar, MapPin, Clock, AlertTriangle } from 'lucide-react';
 import { Resident, ABTRecord, IPCase, VaxRecord, Note } from '@/lib/types';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { isoDateFromAny, todayISO } from '@/lib/parsers';
@@ -133,7 +133,7 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-primary/10">
@@ -180,8 +180,8 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
           </div>
         </div>
 
-        <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-5 w-full">
+        <Tabs defaultValue="overview" className="flex-1 min-h-0 overflow-hidden flex flex-col" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid grid-cols-5 w-full shrink-0">
             <TabsTrigger value="overview" className="gap-1">
               <User className="w-3.5 h-3.5" />
               Overview
@@ -204,9 +204,9 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 min-h-0 mt-4">
+          <ScrollArea className="flex-1 min-h-0 mt-4 pr-4">
             {/* Overview Tab */}
-            <TabsContent value="overview" className="mt-0 space-y-4">
+            <TabsContent value="overview" className="mt-0 space-y-4 pb-6">
               {/* Alerts Section */}
               {hasAlerts && (
                 <div className="space-y-2">
@@ -417,16 +417,16 @@ const ResidentDetailModal = ({ open, onClose, resident }: ResidentDetailModalPro
             </TabsContent>
 
             {/* Other Tabs */}
-            <TabsContent value="abt" className="mt-0">
+            <TabsContent value="abt" className="mt-0 pb-6">
               <AbtList records={abtRecords} onEdit={(r) => handleEdit('abt', r)} onDelete={(id, name) => handleDelete('abt', id, name)} />
             </TabsContent>
-            <TabsContent value="ip" className="mt-0">
+            <TabsContent value="ip" className="mt-0 pb-6">
               <IpList records={ipCases} onEdit={(r) => handleEdit('ip', r)} onDelete={(id, name) => handleDelete('ip', id, name)} />
             </TabsContent>
-            <TabsContent value="vax" className="mt-0">
+            <TabsContent value="vax" className="mt-0 pb-6">
               <VaxList records={vaxRecords} onEdit={(r) => handleEdit('vax', r)} onDelete={(id, name) => handleDelete('vax', id, name)} />
             </TabsContent>
-            <TabsContent value="notes" className="mt-0">
+            <TabsContent value="notes" className="mt-0 pb-6">
               <NotesList records={notes} onEdit={(r) => handleEdit('note', r)} onDelete={(id) => handleDelete('note', id, '')} />
             </TabsContent>
           </ScrollArea>
@@ -479,31 +479,46 @@ const AbtList = ({ records, onEdit, onDelete }: { records: ABTRecord[]; onEdit: 
 
   return (
     <div className="space-y-3">
-      {records.map((r) => (
-        <div key={r.id} className="p-3 border rounded-lg bg-card">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="font-semibold text-foreground">
-                {r.medication || r.med_name}
+      {records.map((r) => {
+        const status = deriveAbtStatus(r, today);
+        return (
+          <div key={r.id} className="p-4 border rounded-lg bg-card shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 space-y-1">
+                <div className="flex items-center gap-2">
+                  <Pill className="w-4 h-4 text-destructive" />
+                  <span className="font-semibold text-foreground">
+                    {r.medication || r.med_name}
+                  </span>
+                  <Badge variant={status === 'active' ? 'destructive' : 'secondary'} className="text-xs">
+                    {status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {r.dose || '—'} • {r.route || '—'} • {r.indication || 'No indication'}
+                </p>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {r.dose} • {r.route} • {r.indication || 'No indication'}
-              </div>
-            </div>
-            <div className="flex items-center">
-              <Badge variant={deriveAbtStatus(r, today) === 'active' ? 'destructive' : 'secondary'}>
-                {deriveAbtStatus(r, today)}
-              </Badge>
               <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.medication || r.med_name || '')} />
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-muted-foreground mt-3">
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                Start: {r.startDate || r.start_date || '—'}
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                End: {r.endDate || r.end_date || '—'}
+              </span>
+              {(r.infection_source || r.source_of_infection) && (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5" />
+                  Source: {r.infection_source || r.source_of_infection}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            <span>Start: {r.startDate || r.start_date || '—'}</span>
-            <span>End: {r.endDate || r.end_date || '—'}</span>
-            {r.infection_source && <span>Source: {r.infection_source}</span>}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -517,28 +532,38 @@ const IpList = ({ records, onEdit, onDelete }: { records: IPCase[]; onEdit: (r: 
   return (
     <div className="space-y-3">
       {records.map((r) => (
-        <div key={r.id} className="p-3 border rounded-lg bg-card">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="font-semibold text-foreground">
-                {r.infectionType || r.infection_type}
+        <div key={r.id} className="p-4 border rounded-lg bg-card shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-warning" />
+                <span className="font-semibold text-foreground">
+                  {r.infectionType || r.infection_type}
+                </span>
+                <Badge variant={r.status === 'Active' ? 'default' : 'secondary'} className="text-xs">
+                  {r.status}
+                </Badge>
               </div>
-              <div className="text-sm text-muted-foreground">
-                Protocol: {r.protocol}
-                {(r.sourceOfInfection || r.source_of_infection) && 
-                  ` • Source: ${r.sourceOfInfection || r.source_of_infection}`}
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Protocol: {r.protocol || '—'}
+              </p>
+              {(r.sourceOfInfection || r.source_of_infection) && (
+                <p className="text-sm text-muted-foreground">
+                  Source: {r.sourceOfInfection || r.source_of_infection}
+                </p>
+              )}
             </div>
-            <div className="flex items-center">
-              <Badge variant={r.status === 'Active' ? 'default' : 'secondary'}>
-                {r.status}
-              </Badge>
-              <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.infectionType || r.infection_type || '')} />
-            </div>
+            <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.infectionType || r.infection_type || '')} />
           </div>
-          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            <span>Onset: {r.onsetDate || r.onset_date || '—'}</span>
-            <span>Next Review: {r.nextReviewDate || r.next_review_date || '—'}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground mt-3">
+            <span className="inline-flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5" />
+              Onset: {r.onsetDate || r.onset_date || '—'}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              Next Review: {r.nextReviewDate || r.next_review_date || '—'}
+            </span>
           </div>
         </div>
       ))}
@@ -565,24 +590,39 @@ const VaxList = ({ records, onEdit, onDelete }: { records: VaxRecord[]; onEdit: 
   return (
     <div className="space-y-3">
       {records.map((r) => (
-        <div key={r.id} className="p-3 border rounded-lg bg-card">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="font-semibold text-foreground">
-                {r.vaccine || r.vaccine_type}
-                {r.dose && <span className="font-normal text-muted-foreground"> ({r.dose})</span>}
+        <div key={r.id} className="p-4 border rounded-lg bg-card shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <Syringe className="w-4 h-4 text-info" />
+                <span className="font-semibold text-foreground">
+                  {r.vaccine || r.vaccine_type}
+                </span>
+                {r.dose && (
+                  <span className="text-xs text-muted-foreground">
+                    ({r.dose})
+                  </span>
+                )}
+                <Badge variant={getStatusVariant(r.status)} className="text-xs">
+                  {r.status}
+                </Badge>
               </div>
             </div>
-            <div className="flex items-center">
-              <Badge variant={getStatusVariant(r.status)}>
-                {r.status}
-              </Badge>
-              <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.vaccine || r.vaccine_type || '')} />
-            </div>
+            <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id, r.vaccine || r.vaccine_type || '')} />
           </div>
-          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-            {(r.dateGiven || r.date_given) && <span>Given: {r.dateGiven || r.date_given}</span>}
-            {(r.dueDate || r.due_date) && <span>Due: {r.dueDate || r.due_date}</span>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground mt-3">
+            {(r.dateGiven || r.date_given) && (
+              <span className="inline-flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                Given: {r.dateGiven || r.date_given}
+              </span>
+            )}
+            {(r.dueDate || r.due_date) && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Due: {r.dueDate || r.due_date}
+              </span>
+            )}
           </div>
         </div>
       ))}
@@ -599,16 +639,19 @@ const NotesList = ({ records, onEdit, onDelete }: { records: Note[]; onEdit: (r:
   return (
     <div className="space-y-3">
       {records.map((r) => (
-        <div key={r.id} className="p-3 border rounded-lg bg-card">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <Badge variant="outline" className="mb-2">{r.category}</Badge>
-              <div className="text-sm text-foreground">{r.text}</div>
+        <div key={r.id} className="p-4 border rounded-lg bg-card shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-success" />
+                <Badge variant="outline" className="text-xs">{r.category}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(r.createdAt || r.created_at || '').toLocaleDateString()}
+                </span>
+              </div>
+              <div className="text-sm text-foreground whitespace-pre-wrap">{r.text}</div>
             </div>
             <RecordActions onEdit={() => onEdit(r)} onDelete={() => onDelete(r.id)} />
-          </div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            {new Date(r.createdAt || r.created_at || '').toLocaleDateString()}
           </div>
         </div>
       ))}
