@@ -274,6 +274,10 @@ export interface AppSettings {
     windowStartMmdd?: string;
     windowEndMmdd?: string;
   }>;
+  oneDriveBackup?: {
+    enabled: boolean;
+    folderPath: string;
+  };
   // Custom report descriptions
   customReportDescriptions?: Record<string, string>;
   // Line listing form field configurations
