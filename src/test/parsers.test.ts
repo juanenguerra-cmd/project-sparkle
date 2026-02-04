@@ -8,9 +8,10 @@ import {
 } from "@/lib/parsers";
 
 describe("canonicalMRN", () => {
-  it("extracts only digits from MRN", () => {
+  it("keeps alphanumeric MRNs and strips punctuation", () => {
     expect(canonicalMRN("123456")).toBe("123456");
-    expect(canonicalMRN("ABC123")).toBe("123");
+    expect(canonicalMRN("LON202238")).toBe("LON202238");
+    expect(canonicalMRN("abc123")).toBe("ABC123");
     expect(canonicalMRN("12-34-56")).toBe("123456");
   });
 
@@ -109,6 +110,15 @@ describe("parseCensusRaw", () => {
     expect(result[0].room).toBe("301-A");
     expect(result[0].unit).toBe("Unit 3");
     expect(result[0].dob_raw).toBe("01/15/1945");
+  });
+
+  it("keeps alphanumeric MRNs from parentheses", () => {
+    const input = "305 DOE, JANE (LON202238) 02/20/1950 Active";
+    const result = parseCensusRaw(input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].mrn).toBe("LON202238");
+    expect(result[0].name).toBe("DOE, JANE");
   });
 
   it("parses all rows but only assigns valid units (2, 3, 4)", () => {
