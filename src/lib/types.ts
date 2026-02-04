@@ -326,6 +326,7 @@ export type ViewType =
   | 'vax' 
   | 'notes' 
   | 'outbreak'
+  | 'reference_library'
   | 'reports' 
   | 'audit' 
   | 'settings';
