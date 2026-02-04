@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle, Filter, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -81,7 +81,6 @@ import { buildSurveyorPacketPdf, isSurveyorPacketReport } from '@/lib/pdf/survey
 import { generateBinderCoverPdf, generateBinderDividersPdf } from '@/lib/pdf/binderPdf';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
 import { ViewType } from '@/lib/types';
@@ -106,6 +105,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [trendReport, setTrendReport] = useState<InfectionTrendReport | null>(null);
   const [exportFormat, setExportFormat] = useState('PDF');
   const reportRef = useRef<HTMLDivElement>(null);
+  const [lastAction, setLastAction] = useState<string | null>(null);
+  const [lastActionAt, setLastActionAt] = useState<Date | null>(null);
   
   // New filter states for extended reports
   const [selectedVaccineType, setSelectedVaccineType] = useState('all');
@@ -172,6 +173,32 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       label: y.toString()
     }));
   }, []);
+
+  const recordAction = (action: string) => {
+    setLastAction(action);
+    setLastActionAt(new Date());
+  };
+
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return '—';
+    const parsed = new Date(timestamp);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return format(parsed, 'MMM d, yyyy h:mm a');
+  };
+
+  const hasGeneratedReport = Boolean(currentReport);
+  const hasFiltersApplied = Boolean(
+    fromDate ||
+    toDate ||
+    selectedUnit !== 'all' ||
+    selectedShift !== 'Day' ||
+    selectedVaccineType !== 'all' ||
+    selectedFollowUpStatus !== 'all' ||
+    selectedProtocol !== 'all'
+  );
+  const hasSharedReport = Boolean(lastAction && ['Copied report', 'Printed report'].includes(lastAction));
+  const hasExportedReport = Boolean(lastAction && lastAction.startsWith('Exported'));
+  const hasCompletedOutput = hasExportedReport || hasSharedReport;
   
   // Surveillance reports definition
   const surveillanceReports = [
@@ -272,6 +299,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         const trendData = generateInfectionTrends(db);
         setTrendReport(trendData);
         setCurrentReport(trendData);
+        recordAction('Generated report');
         toast.success(`Generated: ${trendData.title}`);
         return;
       case 'compliance':
@@ -423,6 +451,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         }
         
         setCurrentReport(survReport);
+        recordAction('Generated report');
         setTrendReport(null);
         toast.success(`Generated: ${survReport.title}`);
         return;
@@ -435,6 +464,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     if (report) {
       setCurrentReport(report);
       setTrendReport(null);
+      recordAction('Generated report');
       toast.success(`Generated: ${report.title}`);
     }
   };
@@ -468,6 +498,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
     if (report) {
       setCurrentReport(report);
+      recordAction('Generated report');
       toast.success(`Generated: ${report.title}`);
     }
   };
@@ -489,6 +520,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       if (!pdfWindow) {
         toast.error('Please allow popups to print');
       }
+      recordAction('Printed report');
       return;
     }
     
@@ -530,6 +562,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     
     printWindow.document.close();
     printWindow.print();
+    recordAction('Printed report');
   };
 
   const handleCopy = async () => {
@@ -552,6 +585,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     try {
       await navigator.clipboard.writeText(lines.join('\n'));
       toast.success('Report copied to clipboard');
+      recordAction('Copied report');
     } catch {
       toast.error('Failed to copy');
     }
@@ -575,6 +609,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         const doc = buildDailyPrecautionListPdf({ report: currentReport, facility });
         const filename = `${sanitizedTitle}_${dateStr}.pdf`;
         doc.save(filename);
+        recordAction(`Exported ${exportFormat}`);
         toast.success(`Exported as ${filename}`);
         return;
       }
@@ -584,6 +619,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         const doc = buildSurveyorPacketPdf({ report: currentReport, facility });
         const filename = `${sanitizedTitle}_${dateStr}.pdf`;
         doc.save(filename);
+        recordAction(`Exported ${exportFormat}`);
         toast.success(`Exported as ${filename}`);
         return;
       }
@@ -644,6 +680,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       
       const filename = `${sanitizedTitle}_${dateStr}.pdf`;
       doc.save(filename);
+      recordAction(`Exported ${exportFormat}`);
       toast.success(`Exported as ${filename}`);
       return;
     }
@@ -697,11 +734,13 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     a.click();
     URL.revokeObjectURL(url);
     
+    recordAction(`Exported ${exportFormat}`);
     toast.success(`Exported as ${filename}`);
   };
 
   const handleClear = () => {
     setCurrentReport(null);
+    recordAction('Cleared report');
   };
 
   return (
@@ -1209,6 +1248,102 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       {/* Scheduled Reports */}
       <SectionCard title="Scheduled Reports">
         <ScheduledReportsPanel />
+      </SectionCard>
+
+      <SectionCard title="Reporting Process & QA">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <FileText className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">1. Pick the right report</p>
+                <p className="text-xs text-muted-foreground">Choose Executive, Operational, or Surveillance based on the audience.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Filter className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">2. Apply filters intentionally</p>
+                <p className="text-xs text-muted-foreground">Use unit, date, and protocol filters to keep data precise.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <ClipboardCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">3. QA the preview</p>
+                <p className="text-xs text-muted-foreground">Verify counts, dates, and compliance notes before distribution.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Download className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">4. Export or share</p>
+                <p className="text-xs text-muted-foreground">Deliver PDF, CSV, or copy/paste for team follow-up.</p>
+              </div>
+            </div>
+            <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-4">
+              <p className="text-xs font-medium text-muted-foreground">Process checklist</p>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={hasGeneratedReport} />
+                Report generated
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={hasFiltersApplied} />
+                Filters applied
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={hasGeneratedReport} />
+                Preview reviewed
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={hasCompletedOutput} />
+                Exported/Shared
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Current report status</p>
+              <Badge variant={currentReport ? 'default' : 'secondary'}>
+                {currentReport ? 'Ready' : 'Not generated'}
+              </Badge>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Report</span>
+                <span className="text-right font-medium">{currentReport?.title || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Generated</span>
+                <span className="text-right">{formatTimestamp(currentReport?.generatedAt)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">Last action</span>
+                <span className="text-right">{lastAction ? `${lastAction}${lastActionAt ? ` • ${format(lastActionAt, 'MMM d, h:mm a')}` : ''}` : '—'}</span>
+              </div>
+            </div>
+            <div className="rounded-md border border-border bg-background p-3">
+              <p className="text-xs font-medium text-muted-foreground">Filters summary</p>
+              <p className="text-sm">
+                {currentReport
+                  ? Object.entries(currentReport.filters)
+                      .filter(([, value]) => value)
+                      .map(([key, value]) => `${key}: ${value}`)
+                      .join(' • ') || 'No filters applied'
+                  : 'Generate a report to see applied filters.'}
+              </p>
+            </div>
+          </div>
+        </div>
       </SectionCard>
 
       {/* Report Output */}
