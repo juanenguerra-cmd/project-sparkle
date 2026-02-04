@@ -95,7 +95,7 @@ const Index = () => {
 
   return (
     <LockScreen>
-      <div className="min-h-screen bg-background">
+      <div className="flex h-[100dvh] flex-col bg-background overflow-hidden">
         <BackupReminderBanner onDataChange={handleDataChange} />
         {dataLoadError && showLoadError && (
           <div className="px-4 pt-4 md:px-6">
@@ -125,13 +125,13 @@ const Index = () => {
           onOpenDataModal={() => setShowDataModal(true)}
         />
         
-        <div className="flex">
+        <div className="flex flex-1 overflow-hidden">
           <Sidebar 
             activeView={activeView} 
             onViewChange={setActiveView} 
           />
           
-          <main className="flex-1 p-4 md:p-6 pb-20 lg:pb-6 overflow-auto min-h-[calc(100vh-80px)]">
+          <main className="flex-1 p-4 md:p-6 pb-20 lg:pb-6 overflow-auto">
             <div key={refreshKey} className="max-w-7xl mx-auto">
               {renderView()}
             </div>
