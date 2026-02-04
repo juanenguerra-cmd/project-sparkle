@@ -69,38 +69,38 @@ const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
   };
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 pb-[env(safe-area-inset-bottom)]">
       {/* Bottom Tab Bar */}
-      <div className="flex justify-around items-center py-2 px-1">
+      <div className="flex justify-around items-center py-1.5 px-1">
         {navItems.slice(0, 4).map((item) => (
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
             className={cn(
-              'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors',
+              'flex min-w-0 flex-col items-center gap-1 px-2.5 py-2 rounded-lg transition-colors',
               activeView === item.id
                 ? 'text-primary bg-primary/10'
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {item.icon}
-            <span className="text-xs">{item.label.split(' ')[0]}</span>
+            <span className="text-[11px] leading-tight">{item.label.split(' ')[0]}</span>
           </button>
         ))}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="flex flex-col items-center gap-1 h-auto py-2">
+            <Button variant="ghost" size="sm" className="flex flex-col items-center gap-1 h-auto py-2 px-2.5">
               <Menu className="w-5 h-5" />
-              <span className="text-xs">More</span>
+              <span className="text-[11px] leading-tight">More</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="h-auto max-h-[70vh]">
-            <div className="space-y-6 pt-4">
+          <SheetContent side="bottom" className="h-auto max-h-[80vh]">
+            <div className="space-y-6 pt-4 pb-6 overflow-y-auto">
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quick Actions
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {quickActions.map((item) => (
                     <button
                       key={item.id}
@@ -120,7 +120,7 @@ const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {section.label}
                     </p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {navItems
                         .filter((item) => section.items.includes(item.id))
                         .map((item) => (
@@ -128,14 +128,14 @@ const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
                             key={item.id}
                             onClick={() => handleNavClick(item.id)}
                             className={cn(
-                              'flex flex-col items-center gap-2 p-4 rounded-xl transition-colors',
+                              'flex flex-col items-center gap-2 p-3 rounded-xl transition-colors',
                               activeView === item.id
                                 ? 'bg-primary/10 text-primary'
                                 : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                             )}
                           >
                             {item.icon}
-                            <span className="text-sm font-medium">{item.label}</span>
+                            <span className="text-xs font-medium text-center leading-snug">{item.label}</span>
                           </button>
                         ))}
                     </div>
