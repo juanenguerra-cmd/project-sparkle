@@ -7,7 +7,16 @@ import RecentActivity from '@/components/dashboard/RecentActivity';
 import WorklistSummary from '@/components/dashboard/WorklistSummary';
 import DataManagementModal from '@/components/modals/DataManagementModal';
 import { ViewType } from '@/lib/types';
-import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getRecentNotes } from '@/lib/database';
+import { 
+  loadDB, 
+  saveDB, 
+  getActiveResidents, 
+  getActiveABT, 
+  getActiveIPCases, 
+  getRecentNotes, 
+  getLineListingRecommendations, 
+  dismissLineListingRecommendation 
+} from '@/lib/database';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface DashboardViewProps {
@@ -22,6 +31,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const activeABT = getActiveABT(db).length;
   const activeIP = getActiveIPCases(db).length;
   const pendingNotes = getRecentNotes(db, 3).length;
+  const lineListingRecommendations = getLineListingRecommendations(db);
   const hasResidentData = activeResidents > 0;
   const hasClinicalData = activeABT > 0 || activeIP > 0 || pendingNotes > 0;
 
@@ -30,6 +40,13 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   };
 
   const handleDataChange = () => {
+    setDb(loadDB());
+  };
+
+  const handleDismissRecommendation = (recommendationId: string) => {
+    const nextDb = loadDB();
+    dismissLineListingRecommendation(nextDb, recommendationId);
+    saveDB(nextDb);
     setDb(loadDB());
   };
 
@@ -171,6 +188,45 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
       {/* Worklist Summary */}
       <SectionCard title="Worklist Summary">
         <WorklistSummary onNavigateVax={() => onNavigate('vax')} />
+      </SectionCard>
+
+      <SectionCard
+        title={`Line Listing Recommendations${lineListingRecommendations.length ? ` (${lineListingRecommendations.length})` : ''}`}
+        actions={
+          lineListingRecommendations.length > 0 ? (
+            <Button size="sm" variant="outline" onClick={() => onNavigate('outbreak')}>
+              Review Line Listings
+            </Button>
+          ) : undefined
+        }
+      >
+        {lineListingRecommendations.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No ABT-based line listing recommendations.</p>
+        ) : (
+          <div className="space-y-3">
+            {lineListingRecommendations.slice(0, 5).map(rec => (
+              <div key={rec.id} className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">{rec.residentName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {rec.unit} • {rec.room} • {rec.infectionSource}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => onNavigate('outbreak')}>
+                    Add to Line Listing
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDismissRecommendation(rec.id)}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {lineListingRecommendations.length > 5 && (
+              <p className="text-xs text-muted-foreground">Showing first 5 recommendations.</p>
+            )}
+          </div>
+        )}
       </SectionCard>
 
       {/* Two Column Layout */}

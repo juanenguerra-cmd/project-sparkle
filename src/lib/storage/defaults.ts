@@ -47,6 +47,7 @@ export const defaultSettings: AppSettings = {
     enabled: false,
     folderPath: '',
   },
+  lineListingRecommendationDismissals: [],
 };
 
 export const defaultDatabase = (): ICNDatabaseShape => ({

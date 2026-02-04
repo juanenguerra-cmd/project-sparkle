@@ -220,6 +220,19 @@ export interface LineListingEntry {
   templateData?: Record<string, string | number | boolean | undefined>;
 }
 
+export interface LineListingRecommendation {
+  id: string;
+  abtRecordId: string;
+  mrn: string;
+  residentName: string;
+  unit: string;
+  room: string;
+  infectionSource: string;
+  category: SymptomCategory;
+  startDate?: string;
+  createdAt: string;
+}
+
 // Contact tracing
 export interface ContactEntry {
   id: string;
@@ -278,6 +291,7 @@ export interface AppSettings {
     enabled: boolean;
     folderPath: string;
   };
+  lineListingRecommendationDismissals?: string[];
   // Custom report descriptions
   customReportDescriptions?: Record<string, string>;
   // Line listing form field configurations
