@@ -1,5 +1,5 @@
 // Report Generation Functions for ICN Hub
-import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents, getNotesRequiringFollowUp, getActiveOutbreaks } from './database';
+import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents, getNotesRequiringFollowUp, getActiveOutbreaks, normalizeIPStatus } from './database';
 import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from './types';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
 
@@ -1004,7 +1004,7 @@ export const generateSurveyorPacket = (
   const activeABT = db.records.abx.filter(r => r.status === 'active');
   // FIX: Include BOTH EBP and Isolation cases - check status === 'Active' 
   // (both protocols should have Active status when currently on precautions)
-  const activeIP = db.records.ip_cases.filter(c => c.status === 'Active');
+  const activeIP = db.records.ip_cases.filter(c => normalizeIPStatus(c.status || c.case_status) === 'active');
   
   // Build lookup maps
   const abtByMrn: Record<string, typeof activeABT> = {};
@@ -1924,7 +1924,7 @@ export const generateNewAdmissionScreeningReport = (
     
     // Check for any IP cases
     const ipCases = db.records.ip_cases.filter(c => c.mrn === resident.mrn);
-    const hasActiveIP = ipCases.some(c => c.status === 'Active');
+    const hasActiveIP = ipCases.some(c => normalizeIPStatus(c.status || c.case_status) === 'active');
     const hasAnyIP = ipCases.length > 0;
     
     // Screening status based on IP data
@@ -1933,7 +1933,7 @@ export const generateNewAdmissionScreeningReport = (
     
     if (hasActiveIP) {
       screeningStatus = 'ACTIVE PRECAUTION';
-      screeningNotes = ipCases.find(c => c.status === 'Active')?.protocol || 'On precautions';
+      screeningNotes = ipCases.find(c => normalizeIPStatus(c.status || c.case_status) === 'active')?.protocol || 'On precautions';
     } else if (hasAnyIP) {
       screeningStatus = 'REVIEWED';
       screeningNotes = 'History noted';

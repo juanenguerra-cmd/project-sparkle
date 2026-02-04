@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import SectionCard from '@/components/dashboard/SectionCard';
 import TrackerSummary from '@/components/dashboard/TrackerSummary';
-import { loadDB, getActiveIPCases, saveDB, addAudit } from '@/lib/database';
+import { loadDB, getActiveIPCases, saveDB, addAudit, normalizeIPStatus } from '@/lib/database';
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +44,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const normalizeStatus = (record: IPCase) => (record.status || record.case_status || '').trim().toLowerCase();
+  const normalizeStatus = (record: IPCase) => normalizeIPStatus(record.status || record.case_status);
   
   const records = db.records.ip_cases;
   const units = useMemo(
@@ -319,7 +319,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   };
 
   const getStatusBadge = (status: string) => {
-    const normalizedStatus = status.trim().toLowerCase();
+    const normalizedStatus = normalizeIPStatus(status);
     switch (normalizedStatus) {
       case 'active':
         return <span className="badge-status badge-warn">Active</span>;
