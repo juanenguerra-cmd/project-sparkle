@@ -1,7 +1,13 @@
 // Report Generation Functions for ICN Hub
-import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents } from './database';
-import { IPCase, ABTRecord, VaxRecord, Resident, Note } from './types';
-import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays } from 'date-fns';
+import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents, getNotesRequiringFollowUp, getActiveOutbreaks } from './database';
+import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from './types';
+import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
+
+export interface ReportSection {
+  title: string;
+  headers: string[];
+  rows: string[][];
+}
 
 export interface ReportData {
   title: string;
@@ -10,6 +16,8 @@ export interface ReportData {
   filters: Record<string, string>;
   headers: string[];
   rows: string[][];
+  sections?: ReportSection[];
+  reportType?: string;
   footer?: {
     preparedBy?: string;
     signature?: string;
@@ -62,6 +70,39 @@ const formatResidentNameForReport = (name: string, mrn: string, status: string =
   
   // Template format: "LASTNAME, FIRSTNAME Active (MRN)"
   return `${formattedName} ${status} (${mrn})`;
+};
+
+const formatDateValue = (value?: string): string => {
+  if (!value) return '';
+  const parsed = parseISO(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return format(parsed, 'MM/dd/yyyy');
+  }
+  const fallback = new Date(value);
+  if (!Number.isNaN(fallback.getTime())) {
+    return format(fallback, 'MM/dd/yyyy');
+  }
+  return value;
+};
+
+const parseDateValue = (value?: string): Date | null => {
+  if (!value) return null;
+  const parsed = parseISO(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  const fallback = new Date(value);
+  if (!Number.isNaN(fallback.getTime())) {
+    return fallback;
+  }
+  return null;
+};
+
+const getSymptomNames = (symptoms?: string[]): string => {
+  if (!symptoms || symptoms.length === 0) return '';
+  return symptoms
+    .map(symptomId => SYMPTOM_OPTIONS.find(option => option.id === symptomId)?.name || symptomId)
+    .join(', ');
 };
 
 // Daily Precaution List Report
@@ -2065,4 +2106,151 @@ export const generateOutbreakSummaryReport = (
       disclaimer: `Total cases in period: ${recentCases.length} | Active alerts: ${outbreakAlerts.length}. Outbreak threshold: ≥3 cases of same infection type OR ≥5 cases on same unit within ${daysBack} days. Per CDC guidelines, clusters should be investigated within 24 hours of identification.`
     }
   };
+};
+
+export const generateIPDailyMorningReport = (db: ICNDatabase): ReportData => {
+  const activeCases = getActiveIPCases(db);
+  const activeABT = getActiveABT(db);
+  const vaxDue = getVaxDue(db);
+  const today = new Date();
+  const todayLabel = format(today, 'MM/dd/yyyy');
+  const activeOutbreakIds = new Set(getActiveOutbreaks(db).map(outbreak => outbreak.id));
+
+  const isolationCases = activeCases.filter(caseItem => (caseItem.protocol || '').toLowerCase() === 'isolation');
+  const ebpCases = activeCases.filter(caseItem => {
+    const protocol = (caseItem.protocol || '').toLowerCase();
+    return protocol === 'ebp' || protocol === 'edp';
+  });
+
+  const buildIpRows = (cases: IPCase[]) => {
+    return cases.map(caseItem => {
+      const resident = db.census.residentsByMrn[caseItem.mrn];
+      const unit = caseItem.unit || resident?.unit || '';
+      const room = caseItem.room || resident?.room || '';
+      const residentName = caseItem.residentName || caseItem.name || resident?.name || 'Unknown';
+      const precaution = getPrecautionDisplay(caseItem);
+      const source = caseItem.sourceOfInfection || caseItem.source_of_infection || '';
+      return [unit, room, residentName, precaution, source];
+    });
+  };
+
+  const lineListingRows = db.records.line_listings
+    .filter(entry => entry.outcome === 'active' && activeOutbreakIds.has(entry.outbreakId))
+    .map(entry => {
+      const residentName = entry.residentName || 'Unknown';
+      const outbreakName = db.records.outbreaks.find(outbreak => outbreak.id === entry.outbreakId)?.name;
+      const symptoms = getSymptomNames(entry.symptoms);
+      const descriptionParts = [
+        outbreakName ? `Outbreak: ${outbreakName}` : '',
+        symptoms ? `Symptoms: ${symptoms}` : '',
+        entry.notes ? `Notes: ${entry.notes}` : ''
+      ].filter(Boolean);
+      return [entry.unit, entry.room, residentName, descriptionParts.join(' | ')];
+    });
+
+  const abtRows = activeABT.map(record => {
+    const resident = db.census.residentsByMrn[record.mrn];
+    const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+    const unit = record.unit || resident?.unit || '';
+    const room = record.room || resident?.room || '';
+    const medication = record.medication || record.med_name || '';
+    const route = record.route || '';
+    const startDate = formatDateValue(record.startDate || record.start_date || '');
+    const endDate = formatDateValue(record.endDate || record.end_date || '');
+    const indication = record.indication || '';
+    return [unit, room, residentName, medication, route, startDate, endDate, indication];
+  });
+
+  const vaxDueTodayRows = vaxDue
+    .filter(record => {
+      const dueDateValue = record.dueDate || record.due_date || '';
+      const parsed = parseDateValue(dueDateValue);
+      return parsed ? isSameDay(parsed, today) : false;
+    })
+    .map(record => {
+      const resident = db.census.residentsByMrn[record.mrn];
+      const residentName = record.residentName || record.name || resident?.name || 'Unknown';
+      const unit = record.unit || resident?.unit || '';
+      const room = record.room || resident?.room || '';
+      const vaccine = record.vaccine || record.vaccine_type || '';
+      const dateValue = record.dateGiven || record.date_given || record.dueDate || record.due_date || '';
+      const dateLabel = formatDateValue(dateValue);
+      let consentStatus = 'Consented';
+      if (record.educationOutcome === 'declined') {
+        consentStatus = 'Declined';
+      } else if (record.educationOutcome === 'deferred') {
+        consentStatus = 'Refused';
+      } else if (record.educationOutcome === 'accepted') {
+        consentStatus = 'Consented';
+      } else if (record.status === 'given') {
+        consentStatus = 'Vaccinated';
+      } else if (record.status === 'declined') {
+        consentStatus = 'Declined';
+      } else if (record.status === 'overdue') {
+        consentStatus = 'Refused';
+      }
+      return [unit, room, residentName, vaccine, dateLabel, consentStatus];
+    });
+
+  const followUpNotes = getNotesRequiringFollowUp(db);
+  const followUpRows = followUpNotes.map(note => {
+    const resident = db.census.residentsByMrn[note.mrn];
+    const residentName = note.residentName || note.name || resident?.name || 'Unknown';
+    const unit = note.unit || resident?.unit || '';
+    const room = note.room || resident?.room || '';
+    const followUpDate = formatDateValue(note.followUpDate || '');
+    const descriptionParts = [
+      note.text,
+      note.followUpNotes ? `Follow-up: ${note.followUpNotes}` : '',
+      followUpDate ? `Due: ${followUpDate}` : ''
+    ].filter(Boolean);
+    return [unit, room, residentName, descriptionParts.join(' | ')];
+  });
+
+  return {
+    title: 'IP Daily Morning Report',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      date: todayLabel
+    },
+    headers: [],
+    rows: [],
+    reportType: 'ip_daily_morning',
+    sections: [
+      {
+        title: 'Active IP Precaution List - Isolation',
+        headers: ['Unit', 'Room', "Resident's Name", 'Type of Precaution', 'Source of Infection'],
+        rows: buildIpRows(isolationCases)
+      },
+      {
+        title: 'Active IP Precaution List - EBP (EDP)',
+        headers: ['Unit', 'Room', "Resident's Name", 'Type of Precaution', 'Source of Infection'],
+        rows: buildIpRows(ebpCases)
+      },
+      {
+        title: 'Active Symptoms / Line Listing Follow-ups',
+        headers: ['Unit', 'Room', "Resident's Name", 'Symptoms / Line Listing'],
+        rows: lineListingRows
+      },
+      {
+        title: 'Active Antibiotics (ABT)',
+        headers: ['Unit', 'Room', "Resident's Name", 'Medication', 'Route', 'Start Date', 'End Date', 'Indication'],
+        rows: abtRows
+      },
+      {
+        title: 'Vaccinations Due Today',
+        headers: ['Unit', 'Room', "Resident's Name", 'Vaccine', 'Date Due/Admin', 'Consent Status'],
+        rows: vaxDueTodayRows
+      },
+      {
+        title: 'Follow-up Notes',
+        headers: ['Unit', 'Room', "Resident's Name", 'Description'],
+        rows: followUpRows
+      }
+    ]
+  };
+};
+
+export const isIPDailyMorningReport = (report: ReportData): boolean => {
+  return report.reportType === 'ip_daily_morning';
 };
