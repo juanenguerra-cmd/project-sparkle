@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import TablePagination from '@/components/ui/table-pagination';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
-type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol';
+type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol' | 'status';
 type SortDir = 'asc' | 'desc';
 
 // Helper to escape CSV values
@@ -43,6 +43,8 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+
+  const normalizeStatus = (record: IPCase) => (record.status || record.case_status || '').trim().toLowerCase();
   
   const records = db.records.ip_cases;
   const units = useMemo(
@@ -76,7 +78,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
       if (protocolFilter !== 'all' && (r.protocol || '').toLowerCase() !== protocolFilter) return false;
       
       // Normalize status for case-insensitive comparison
-      const status = (r.status || '').toLowerCase();
+      const status = normalizeStatus(r);
       
       // For active views, exclude discharged residents from census
       if (activeFilter === 'active' || activeFilter === 'ebp' || activeFilter === 'isolation' || activeFilter === 'standard') {
@@ -128,6 +130,18 @@ const IPView = ({ onNavigate }: IPViewProps) => {
           valA = a.protocol;
           valB = b.protocol;
           break;
+        case 'status': {
+          const statusOrder: Record<string, number> = { active: 0, resolved: 1, discharged: 2 };
+          const statusA = normalizeStatus(a);
+          const statusB = normalizeStatus(b);
+          const orderA = statusOrder[statusA] ?? 99;
+          const orderB = statusOrder[statusB] ?? 99;
+          const diff = orderA - orderB;
+          if (diff !== 0) return sortDir === 'asc' ? diff : -diff;
+          valA = statusA;
+          valB = statusB;
+          break;
+        }
       }
       
       const cmp = valA.localeCompare(valB, undefined, { numeric: true });
@@ -172,14 +186,14 @@ const IPView = ({ onNavigate }: IPViewProps) => {
 
   // Accurate active count - exclude discharged census residents (case-insensitive)
   const activeCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     if (status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const overdueCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     if (status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     const reviewDate = r.nextReviewDate || r.next_review_date;
@@ -187,28 +201,28 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   }).length;
   
   const ebpCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     if (r.protocol !== 'EBP' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const isolationCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     if (r.protocol !== 'Isolation' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const standardCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     if (r.protocol !== 'Standard Precautions' || status !== 'active') return false;
     if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
     return true;
   }).length;
   
   const resolvedCount = records.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = normalizeStatus(r);
     return status === 'resolved' || status === 'discharged';
   }).length;
 
@@ -305,7 +319,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   };
 
   const getStatusBadge = (status: string) => {
-    const normalizedStatus = (status || '').toLowerCase();
+    const normalizedStatus = status.trim().toLowerCase();
     switch (normalizedStatus) {
       case 'active':
         return <span className="badge-status badge-warn">Active</span>;
@@ -515,7 +529,9 @@ const IPView = ({ onNavigate }: IPViewProps) => {
                   <th className="cursor-pointer select-none" onClick={() => handleSort('review')}>
                     <span className="flex items-center">Next Review <SortIcon field="review" /></span>
                   </th>
-                  <th>Status</th>
+                  <th className="cursor-pointer select-none" onClick={() => handleSort('status')}>
+                    <span className="flex items-center">Status <SortIcon field="status" /></span>
+                  </th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -539,7 +555,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
                           reviewDate || '—'
                         )}
                       </td>
-                      <td>{getStatusBadge(record.status)}</td>
+                      <td>{getStatusBadge(record.status || record.case_status || '—')}</td>
                       <td>
                         <div className="flex items-center gap-1">
                           <button 
@@ -566,7 +582,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                          {(record.status || '').toLowerCase() === 'active' && (
+                          {normalizeStatus(record) === 'active' && (
                             <button 
                               type="button"
                               className="row-action-btn text-warning hover:text-warning" 
