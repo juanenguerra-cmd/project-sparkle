@@ -538,7 +538,7 @@ export const dismissLineListingRecommendation = (db: ICNDatabase, recommendation
 export const getActiveIPCases = (db: ICNDatabase): IPCase[] => {
   const activeMrns = getActiveCensusMrns(db);
   return db.records.ip_cases.filter(r => {
-    const status = (r.status || '').toLowerCase();
+    const status = (r.status || r.case_status || '').trim().toLowerCase();
     if (status !== 'active') return false;
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
     return true;
