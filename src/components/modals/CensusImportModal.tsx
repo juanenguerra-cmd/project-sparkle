@@ -141,6 +141,7 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
     
     // Build set of canonical MRNs that are in the new census
     const seenCanonicalMRNs = new Set<string>();
+    const locationUpdates: Array<{ mrn: string; unit: string; room: string; name?: string }> = [];
     
     rowsToImport.forEach(r => {
       const mrn = canonicalMRN(r.mrn);
@@ -149,12 +150,24 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
       seenCanonicalMRNs.add(mrn);
       
       const prev = db.census.residentsByMrn[mrn];
+      const updatedUnit = r.unit || prev?.unit || '';
+      const updatedRoom = r.room || prev?.room || '';
+      if (prev) {
+        const prevUnit = prev.unit?.trim() || '';
+        const prevRoom = prev.room?.trim() || '';
+        const nextUnit = updatedUnit.trim();
+        const nextRoom = updatedRoom.trim();
+        if (prevUnit !== nextUnit || prevRoom !== nextRoom) {
+          locationUpdates.push({ mrn, unit: updatedUnit, room: updatedRoom, name: prev.name });
+        }
+      }
+
       db.census.residentsByMrn[mrn] = {
         id: prev?.id || `res_${mrn}`,
         mrn,
         name: r.name || prev?.name || '',
-        unit: r.unit || prev?.unit || '',
-        room: r.room || prev?.room || '',
+        unit: updatedUnit,
+        room: updatedRoom,
         dob_raw: r.dob_raw || prev?.dob_raw || '',
         status: r.status || prev?.status || '',
         payor: r.payor || prev?.payor || '',
@@ -163,6 +176,24 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
         last_missing_census_at: prev?.last_missing_census_at || null
       };
     });
+
+    if (locationUpdates.length > 0) {
+      locationUpdates.forEach(update => {
+        db.records.abx.forEach(record => {
+          if (record.mrn === update.mrn && record.status === 'active') {
+            record.unit = update.unit;
+            record.room = update.room;
+            record.updated_at = now;
+          }
+        });
+        db.records.ip_cases.forEach(record => {
+          if (record.mrn === update.mrn && record.status === 'Active') {
+            record.unit = update.unit;
+            record.room = update.room;
+          }
+        });
+      });
+    }
     
     // Collect MRNs of residents being dropped from census
     const droppedMRNs: string[] = [];
@@ -192,6 +223,9 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
     
     // Build detailed toast message
     let description = `Imported ${rowsToImport.length} residents`;
+    if (locationUpdates.length > 0) {
+      description += `, ${locationUpdates.length} location update${locationUpdates.length === 1 ? '' : 's'}`;
+    }
     if (dropped > 0) {
       description += `, ${dropped} discharged`;
       const closedItems = [];
