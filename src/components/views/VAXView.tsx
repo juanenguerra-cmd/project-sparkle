@@ -783,81 +783,8 @@ const VAXView = () => {
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
-          )}
-        </div>
-        
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between p-4 border-t">
-            <span className="text-sm text-muted-foreground">
-              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage(p => p - 1)}
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Previous
-              </Button>
-              <span className="text-sm px-2">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage(p => p + 1)}
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const printContent = `
-                    <html>
-                      <head>
-                        <title>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter}</title>
-                        <style>
-                          body { font-family: Arial, sans-serif; margin: 20px; }
-                          h1 { font-size: 16px; margin-bottom: 5px; }
-                          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                          th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
-                          th { background: #f5f5f5; }
-                        </style>
-                      </head>
-                      <body>
-                        <h1>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter} (${activeFilter})</h1>
-                        <p style="font-size:11px;color:#666;">Page ${currentPage} of ${totalPages} • ${new Date().toLocaleString()}</p>
-                        <table>
-                          <thead><tr><th>Resident</th><th>Unit/Room</th><th>Vaccine</th><th>Status</th><th>Date</th></tr></thead>
-                          <tbody>
-                            ${paginatedRecords.map(r => `<tr>
-                              <td>${r.residentName || r.name || '—'}</td>
-                              <td>${r.unit} / ${r.room}</td>
-                              <td>${r.vaccine || r.vaccine_type || '—'}</td>
-                              <td>${r.status}</td>
-                              <td>${r.dateGiven || r.date_given || r.dueDate || r.due_date || '—'}</td>
-                            </tr>`).join('')}
-                          </tbody>
-                        </table>
-                      </body>
-                    </html>
-                  `;
-                  const w = window.open('', '_blank');
-                  if (w) { w.document.write(printContent); w.document.close(); w.print(); }
-                }}
-              >
-                <Printer className="w-4 h-4 mr-1" />
-                Print View
-              </Button>
-            </div>
-          </div>
-        )}
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -884,6 +811,79 @@ const VAXView = () => {
           )}
         </div>
       </SectionCard>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between p-4 border border-border border-t-0 rounded-b-lg bg-background">
+          <span className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredRecords.length)} of {filteredRecords.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
+            </Button>
+            <span className="text-sm px-2">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(p => p + 1)}
+            >
+              Next
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const printContent = `
+                  <html>
+                    <head>
+                      <title>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter}</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1 { font-size: 16px; margin-bottom: 5px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+                        th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+                        th { background: #f5f5f5; }
+                      </style>
+                    </head>
+                    <body>
+                      <h1>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter} (${activeFilter})</h1>
+                      <p style="font-size:11px;color:#666;">Page ${currentPage} of ${totalPages} • ${new Date().toLocaleString()}</p>
+                      <table>
+                        <thead><tr><th>Resident</th><th>Unit/Room</th><th>Vaccine</th><th>Status</th><th>Date</th></tr></thead>
+                        <tbody>
+                          ${paginatedRecords.map(r => `<tr>
+                            <td>${r.residentName || r.name || '—'}</td>
+                            <td>${r.unit} / ${r.room}</td>
+                            <td>${r.vaccine || r.vaccine_type || '—'}</td>
+                            <td>${r.status}</td>
+                            <td>${r.dateGiven || r.date_given || r.dueDate || r.due_date || '—'}</td>
+                          </tr>`).join('')}
+                        </tbody>
+                      </table>
+                    </body>
+                  </html>
+                `;
+                const w = window.open('', '_blank');
+                if (w) { w.document.write(printContent); w.document.close(); w.print(); }
+              }}
+            >
+              <Printer className="w-4 h-4 mr-1" />
+              Print View
+            </Button>
+          </div>
+        </div>
+      )}
 
       <VAXImportModal 
         open={showImportModal}
