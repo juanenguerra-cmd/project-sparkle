@@ -549,7 +549,8 @@ export const getActiveIPCases = (db: ICNDatabase): IPCase[] => {
   return db.records.ip_cases.filter(r => {
     const status = normalizeIPStatus(r.status || r.case_status);
     if (status !== 'active') return false;
-    if (r.mrn && !activeMrns.has(r.mrn)) return false;
+    const mrn = canonicalMRN(r.mrn || '');
+    if (mrn && !activeMrns.has(mrn)) return false;
     return true;
   });
 };
