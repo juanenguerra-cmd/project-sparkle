@@ -17,9 +17,13 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
   const isPrecautionList = isPrecautionListReport(report.title);
   
   return (
-    <div className="report-preview bg-white text-black p-6 min-h-[400px] print:p-0" id="report-content" style={{ fontFamily: 'Arial, sans-serif' }}>
+    <div
+      className="report-preview bg-white text-black p-6 min-h-[400px] print:p-0"
+      id="report-content"
+      style={{ fontFamily: 'Arial, sans-serif' }}
+    >
       {/* Header - Exact template layout */}
-      <div className="text-center mb-4">
+      <div className="text-center mb-4" style={{ textAlign: 'center', marginBottom: '16px' }}>
         {/* Facility name - bold, larger */}
         <h1 className="font-bold mb-1" style={{ fontSize: '14px' }}>{facility}</h1>
         
@@ -27,7 +31,16 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
         <h2 className="font-bold mb-3" style={{ fontSize: '12px' }}>{report.title}</h2>
         
         {/* Filter row: UNIT / DATE / SHIFT on same line */}
-        <div className="flex justify-center gap-8 text-xs">
+        <div
+          className="flex justify-center gap-8 text-xs"
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '32px',
+            fontSize: '12px',
+            flexWrap: 'wrap'
+          }}
+        >
           <span>
             <strong>UNIT:</strong>{' '}
             <span className="border-b border-black px-2 inline-block" style={{ minWidth: '60px' }}>
@@ -50,15 +63,30 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
       </div>
       
       {/* Table - Exact template columns */}
-      <div className="border border-black">
-        <table className="w-full border-collapse" style={{ fontSize: '10px' }}>
+      <div className="border border-black" style={{ border: '1px solid #000' }}>
+        <table
+          className="w-full border-collapse"
+          style={{
+            fontSize: '10px',
+            width: '100%',
+            borderCollapse: 'collapse',
+            tableLayout: 'fixed'
+          }}
+        >
           <thead>
             <tr style={{ backgroundColor: '#FBBF24' }} className="border-b border-black">
               {report.headers.map((header, idx) => (
-                <th 
-                  key={idx} 
+                <th
+                  key={idx}
                   className="font-bold border-r border-black last:border-r-0 py-1 px-2 text-left align-middle"
-                  style={{ 
+                  style={{
+                    fontWeight: 700,
+                    borderRight: idx === report.headers.length - 1 ? 'none' : '1px solid #000',
+                    padding: '4px 8px',
+                    textAlign: 'left',
+                    verticalAlign: 'middle',
+                    wordBreak: 'break-word',
+                    overflowWrap: 'anywhere',
                     width: isPrecautionList 
                       ? ['50px', '200px', '150px', '120px', '110px'][idx] 
                       : 'auto',
@@ -86,10 +114,15 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
               report.rows.map((row, rowIdx) => (
                 <tr key={rowIdx} className="border-b border-black last:border-b-0 bg-white">
                   {row.map((cell, cellIdx) => (
-                    <td 
-                      key={cellIdx} 
+                    <td
+                      key={cellIdx}
                       className="border-r border-black last:border-r-0 py-1 px-2 align-top"
                       style={{
+                        borderRight: cellIdx === row.length - 1 ? 'none' : '1px solid #000',
+                        padding: '4px 8px',
+                        verticalAlign: 'top',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'anywhere',
                         textAlign: isPrecautionList && cellIdx === 3 ? 'center' : 'left'
                       }}
                     >
