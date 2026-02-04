@@ -41,12 +41,13 @@ const calculateDuration = (startDate: string | undefined): string => {
 // Get precaution/isolation type display - matches template format
 const getPrecautionDisplay = (ipCase: IPCase): string => {
   const protocol = ipCase.protocol || 'Standard Precautions';
-  const infectionType = ipCase.infectionType || ipCase.infection_type || '';
-  
+  const isolationTypeValue = ipCase.isolationType || ipCase.isolation_type || '';
+  const isolationType = isolationTypeValue.replace('+', ' + ');
+
   if (protocol === 'EBP') return 'EBP';
   if (protocol === 'Isolation') {
-    // Format: "ISOLATION / [infection type]" e.g., "ISOLATION / Flu", "ISOLATION / COVID"
-    return infectionType ? `ISOLATION / ${infectionType}` : 'ISOLATION';
+    if (isolationType.toLowerCase() === 'ebp') return 'EBP';
+    return isolationType || 'Isolation';
   }
   return protocol;
 };
