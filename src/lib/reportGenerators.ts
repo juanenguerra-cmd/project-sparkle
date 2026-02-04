@@ -1091,6 +1091,14 @@ export const generateStandardOfCareReport = (
   toDate: string
 ): ReportData => {
   const rows: string[][] = [];
+
+  const pushSectionHeader = (title: string) => {
+    rows.push([title, '', '', '', '', '', '', '']);
+  };
+
+  const pushSectionColumns = (columns: string[]) => {
+    rows.push([...columns, ...Array(Math.max(0, 8 - columns.length)).fill('')]);
+  };
   
   // Section 1: ABT regimens started within date range
   const abtStarted = db.records.abx.filter(r => {
@@ -1099,28 +1107,36 @@ export const generateStandardOfCareReport = (
     return start >= fromDate && start <= toDate;
   });
   
-  rows.push(['=== ANTIBIOTIC REGIMENS STARTED ===', '', '', '', '', '']);
+  pushSectionHeader('ABT ACTIVE (STARTED IN RANGE)');
+  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Medication', 'Route', 'Start Date & End Date', 'Indication', 'Source of Infection']);
   if (abtStarted.length === 0) {
-    rows.push(['No new antibiotic regimens in this period', '', '', '', '', '']);
+    rows.push(['No new antibiotic regimens in this period', '', '', '', '', '', '', '']);
   } else {
     abtStarted.forEach(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const medication = record.medication || record.med_name || '';
-      const startDate = record.startDate || record.start_date || '';
+      const startDate = formatDateValue(record.startDate || record.start_date || '');
+      const endDate = formatDateValue(record.endDate || record.end_date || '');
+      const route = record.route || '';
+      const indication = record.indication || '';
+      const source = record.infection_source || record.sourceOfInfection || record.source_of_infection || '';
+      const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
       
       rows.push([
-        'ABT',
+        record.unit,
+        record.room,
         residentName,
-        `${record.unit} / ${record.room}`,
         medication,
-        startDate ? format(new Date(startDate), 'MM/dd/yyyy') : '',
-        record.indication || ''
+        route,
+        dateRange,
+        indication,
+        source
       ]);
     });
   }
   
-  rows.push(['', '', '', '', '', '']);
+  rows.push(['', '', '', '', '', '', '', '']);
   
   // Section 2: IP cases started within date range
   const ipStarted = db.records.ip_cases.filter(c => {
@@ -1129,67 +1145,74 @@ export const generateStandardOfCareReport = (
     return onset >= fromDate && onset <= toDate;
   });
   
-  rows.push(['=== ISOLATION/PRECAUTION CASES STARTED ===', '', '', '', '', '']);
+  pushSectionHeader('IP ACTIVE (STARTED IN RANGE)');
+  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Isolation Type', 'Precaution Type', 'Source of Infection']);
   if (ipStarted.length === 0) {
-    rows.push(['No new IP cases in this period', '', '', '', '', '']);
+    rows.push(['No new IP cases in this period', '', '', '', '', '', '', '']);
   } else {
     ipStarted.forEach(ipCase => {
       const resident = db.census.residentsByMrn[ipCase.mrn];
       const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
-      const onsetDate = ipCase.onsetDate || ipCase.onset_date || '';
+      const isolationType = ipCase.isolationType || ipCase.isolation_type || '';
+      const precautionType = ipCase.protocol || '';
+      const source = ipCase.sourceOfInfection || ipCase.source_of_infection || '';
       
       rows.push([
-        'IP',
+        ipCase.unit,
+        ipCase.room,
         residentName,
-        `${ipCase.unit} / ${ipCase.room}`,
-        ipCase.protocol,
-        onsetDate ? format(new Date(onsetDate), 'MM/dd/yyyy') : '',
-        ipCase.infectionType || ipCase.infection_type || ''
+        isolationType,
+        precautionType,
+        source,
+        '',
+        ''
       ]);
     });
   }
   
-  rows.push(['', '', '', '', '', '']);
+  rows.push(['', '', '', '', '', '', '', '']);
   
-  // Section 3: VAX declinations within date range
-  const vaxDeclined = db.records.vax.filter(v => {
-    if (v.status !== 'declined') return false;
+  // Section 3: VAX records within date range
+  const vaxInRange = db.records.vax.filter(v => {
     const date = v.dateGiven || v.date_given || v.dueDate || v.due_date || '';
     if (!date) return false;
     return date >= fromDate && date <= toDate;
   });
   
-  rows.push(['=== VACCINATION DECLINATIONS ===', '', '', '', '', '']);
-  if (vaxDeclined.length === 0) {
-    rows.push(['No vaccination declinations in this period', '', '', '', '', '']);
+  pushSectionHeader('VAX (STARTED IN RANGE)');
+  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Vaccine Type', 'Date', 'Status']);
+  if (vaxInRange.length === 0) {
+    rows.push(['No vaccination activity in this period', '', '', '', '', '', '', '']);
   } else {
-    vaxDeclined.forEach(record => {
+    vaxInRange.forEach(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const vaccine = record.vaccine || record.vaccine_type || '';
-      const date = record.dueDate || record.due_date || record.dateGiven || record.date_given || '';
+      const date = formatDateValue(record.dateGiven || record.date_given || record.dueDate || record.due_date || '');
       
       rows.push([
-        'VAX',
+        record.unit,
+        record.room,
         residentName,
-        `${record.unit} / ${record.room}`,
         vaccine,
-        date ? format(new Date(date), 'MM/dd/yyyy') : '',
-        'DECLINED'
+        date,
+        (record.status || '').toUpperCase(),
+        '',
+        ''
       ]);
     });
   }
   
   return {
     title: 'STANDARD OF CARE WEEKLY REPORT',
-    subtitle: 'ABT Started, IP Cases, and VAX Declinations',
+    subtitle: 'Those started on the date range selected',
     generatedAt: new Date().toISOString(),
     filters: {
       fromDate: format(new Date(fromDate), 'MM/dd/yyyy'),
       toDate: format(new Date(toDate), 'MM/dd/yyyy'),
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Type', 'Resident', 'Unit/Room', 'Item', 'Date', 'Details'],
+    headers: ['Unit', 'Room', 'Resident Name', 'Medication / Type', 'Route / Precaution', 'Date', 'Indication', 'Source of Infection'],
     rows,
     footer: {
       disclaimer: 'Weekly standard of care documentation for quality assurance and regulatory compliance.'
