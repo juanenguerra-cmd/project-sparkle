@@ -201,7 +201,7 @@ const FloorLayoutHeatmap = ({ className }: FloorLayoutHeatmapProps) => {
             </div>
             <div class="footer">
               <div class="footer-line"><strong>Isolation Precaution:</strong> —</div>
-              <div class="footer-line"><strong>Enhance Barrier Precaution:</strong> —</div>
+              <div class="footer-line"><strong>Enhanced Barrier Precautions:</strong> —</div>
             </div>
           </div>
         </body>

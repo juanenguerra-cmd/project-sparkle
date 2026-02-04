@@ -27,7 +27,7 @@ const PRECAUTION_RULES: { match: PrecautionMatch; keywords: string[] }[] = [
       title: 'Enhanced Barrier Precautions (EBP)',
       protocol: 'EBP',
       description:
-        'Recommended for residents with wounds needing dressings, indwelling devices, or known MDRO colonization/infection when full Contact Precautions are not required.',
+        'Recommended for residents with wounds needing dressings, indwelling devices, or known MDRO colonization/infection when full Contact Precautions are not required. Apply gown and gloves for high-contact resident care activities.',
       examples: [
         'Any wound with routine dressing care',
         'Indwelling urinary catheter (Foley/suprapubic)',
@@ -36,6 +36,7 @@ const PRECAUTION_RULES: { match: PrecautionMatch; keywords: string[] }[] = [
         'Tracheostomy or ventilator-dependent',
         'Central line (PICC/tunneled/port access)',
         'Known MDRO (MRSA/VRE/ESBL/CRE)',
+        'High-contact care: dressing, bathing, transferring, toileting, device care',
       ],
     },
     keywords: [
@@ -84,6 +85,16 @@ const PRECAUTION_RULES: { match: PrecautionMatch; keywords: string[] }[] = [
       'abscess',
       'dressing change',
       'dressing changes',
+      'bathing',
+      'bed bath',
+      'dressing resident',
+      'transfer',
+      'transferring',
+      'toileting',
+      'device care',
+      'linen change',
+      'high-contact',
+      'high contact',
       'mdro',
       'mrsa',
       'vre',
