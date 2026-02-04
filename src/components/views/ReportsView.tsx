@@ -107,6 +107,9 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [currentReport, setCurrentReport] = useState<ReportData | null>(null);
   const [trendReport, setTrendReport] = useState<InfectionTrendReport | null>(null);
   const [exportFormat, setExportFormat] = useState('PDF');
+  const [printFontSize, setPrintFontSize] = useState<'normal' | 'compact'>('normal');
+  const [printColumnWidth, setPrintColumnWidth] = useState<'wide' | 'narrow'>('wide');
+  const [showPageBreaks, setShowPageBreaks] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [lastActionAt, setLastActionAt] = useState<Date | null>(null);
@@ -189,6 +192,37 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     return format(parsed, 'MMM d, yyyy h:mm a');
   };
 
+  const getReportRowCount = (report: ReportData) => {
+    if (report.sections && report.sections.length > 0) {
+      return report.sections.reduce((total, section) => total + section.rows.length, 0);
+    }
+    return report.rows.length;
+  };
+
+  const isPrintSafeRecommended = (report: ReportData) => {
+    const totalRows = getReportRowCount(report);
+    const title = report.title.toLowerCase();
+    return (
+      totalRows > 25 ||
+      report.headers.length >= 8 ||
+      title.includes('line list') ||
+      title.includes('line listing') ||
+      title.includes('outbreak') ||
+      title.includes('exposure') ||
+      title.includes('follow-up') ||
+      title.includes('survey') ||
+      title.includes('standard of care') ||
+      title.includes('hand hygiene') ||
+      title.includes('ppe')
+    );
+  };
+
+  const applyExportDefaults = (report: ReportData) => {
+    if (isPrintSafeRecommended(report)) {
+      setExportFormat('PDF');
+    }
+  };
+
   const hasGeneratedReport = Boolean(currentReport);
   const hasFiltersApplied = Boolean(
     fromDate ||
@@ -202,6 +236,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const hasSharedReport = Boolean(lastAction && ['Copied report', 'Printed report'].includes(lastAction));
   const hasExportedReport = Boolean(lastAction && lastAction.startsWith('Exported'));
   const hasCompletedOutput = hasExportedReport || hasSharedReport;
+  const printSafeRecommended = currentReport ? isPrintSafeRecommended(currentReport) : false;
   
   // Surveillance reports definition
   const surveillanceReports = [
@@ -306,6 +341,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         const trendData = generateInfectionTrends(db);
         setTrendReport(trendData);
         setCurrentReport(trendData);
+        applyExportDefaults(trendData);
         recordAction('Generated report');
         toast.success(`Generated: ${trendData.title}`);
         return;
@@ -458,6 +494,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         }
         
         setCurrentReport(survReport);
+        applyExportDefaults(survReport);
         recordAction('Generated report');
         setTrendReport(null);
         toast.success(`Generated: ${survReport.title}`);
@@ -470,6 +507,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
     if (report) {
       setCurrentReport(report);
+      applyExportDefaults(report);
       setTrendReport(null);
       recordAction('Generated report');
       toast.success(`Generated: ${report.title}`);
@@ -505,6 +543,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
     if (report) {
       setCurrentReport(report);
+      applyExportDefaults(report);
       recordAction('Generated report');
       toast.success(`Generated: ${report.title}`);
     }
@@ -611,6 +650,187 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     }
   };
 
+  const exportReportAsPdf = (report: ReportData, actionLabel = 'PDF') => {
+    const sanitizedTitle = report.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const dateStr = todayISO();
+    const db = loadDB();
+    const facility = db.settings.facilityName || 'Healthcare Facility';
+
+    // Daily Precaution List: strict template PDF (matches on-screen preview)
+    if (isDailyPrecautionListReport(report)) {
+      const doc = buildDailyPrecautionListPdf({ report, facility });
+      const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+      doc.save(filename);
+      recordAction(`Exported ${actionLabel}`);
+      toast.success(`Exported as ${filename}`);
+      return;
+    }
+
+    // Surveyor Packet: no footer, repeating headers
+    if (isSurveyorPacketReport(report)) {
+      const doc = buildSurveyorPacketPdf({ report, facility });
+      const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+      doc.save(filename);
+      recordAction(`Exported ${actionLabel}`);
+      toast.success(`Exported as ${filename}`);
+      return;
+    }
+
+    if (isIPDailyMorningReport(report)) {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const headerBottomY = 40;
+
+      const drawHeader = () => {
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(facility, pageWidth / 2, 15, { align: 'center' });
+
+        doc.setFontSize(12);
+        doc.text(report.title, pageWidth / 2, 22, { align: 'center' });
+
+        if (report.subtitle) {
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          doc.text(report.subtitle, pageWidth / 2, 28, { align: 'center' });
+        }
+
+        doc.setFontSize(9);
+        const filterParts = [];
+        if (report.filters.unit) filterParts.push(`Unit: ${report.filters.unit}`);
+        if (report.filters.date) filterParts.push(`Date: ${report.filters.date}`);
+        if (report.filters.shift) filterParts.push(`Shift: ${report.filters.shift}`);
+        if (filterParts.length > 0) {
+          doc.text(filterParts.join('  |  '), pageWidth / 2, 34, { align: 'center' });
+        }
+      };
+
+      const ensureSpace = (currentY: number, neededSpace = 14) => {
+        if (currentY + neededSpace > pageHeight - 20) {
+          doc.addPage();
+          drawHeader();
+          return headerBottomY;
+        }
+        return currentY;
+      };
+
+      drawHeader();
+
+      let startY = headerBottomY;
+      report.sections?.forEach(section => {
+        startY = ensureSpace(startY, 18);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(section.title, 14, startY);
+        startY += 4;
+        autoTable(doc, {
+          head: [section.headers],
+          body: section.rows,
+          startY,
+          margin: { top: headerBottomY },
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          tableLineColor: [0, 0, 0],
+          tableLineWidth: 0.1,
+          didDrawPage: () => {
+            drawHeader();
+          }
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
+        startY += 8;
+      });
+
+      const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+      doc.save(filename);
+      recordAction(`Exported ${actionLabel}`);
+      toast.success(`Exported as ${filename}`);
+      return;
+    }
+
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(facility, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(report.title, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+
+    if (report.subtitle) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(report.subtitle, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
+    }
+
+    // Filters line
+    doc.setFontSize(9);
+    const filterParts = [];
+    if (report.filters.unit) filterParts.push(`Unit: ${report.filters.unit}`);
+    if (report.filters.date) filterParts.push(`Date: ${report.filters.date}`);
+    if (report.filters.shift) filterParts.push(`Shift: ${report.filters.shift}`);
+    if (filterParts.length > 0) {
+      doc.text(filterParts.join('  |  '), doc.internal.pageSize.getWidth() / 2, 34, { align: 'center' });
+    }
+
+    if (report.sections && report.sections.length > 0) {
+      let startY = 40;
+      report.sections.forEach(section => {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text(section.title, 14, startY);
+        startY += 4;
+        autoTable(doc, {
+          head: [section.headers],
+          body: section.rows,
+          startY,
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          tableLineColor: [0, 0, 0],
+          tableLineWidth: 0.1,
+        });
+        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
+        startY += 8;
+      });
+    } else {
+      // Table
+      autoTable(doc, {
+        head: [report.headers],
+        body: report.rows,
+        startY: 40,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        tableLineColor: [0, 0, 0],
+        tableLineWidth: 0.1,
+      });
+
+      // Footer
+      const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 40;
+      if (report.footer) {
+        doc.setFontSize(9);
+        doc.text(`Prepared by: ________________________`, 14, finalY + 15);
+        doc.text(`Signature: ________________________`, 14, finalY + 22);
+        doc.text(`Title: ________________________`, 110, finalY + 15);
+        doc.text(`Date/Time: ${report.footer.dateTime || new Date().toLocaleString()}`, 110, finalY + 22);
+
+        if (report.footer.disclaimer) {
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'italic');
+          doc.text(`* ${report.footer.disclaimer}`, 14, finalY + 35, { maxWidth: 180 });
+        }
+      }
+    }
+
+    const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+    doc.save(filename);
+    recordAction(`Exported ${actionLabel}`);
+    toast.success(`Exported as ${filename}`);
+  };
+
   const handleExport = () => {
     if (!currentReport) {
       toast.error('Generate a report first');
@@ -621,182 +841,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     const dateStr = todayISO();
     
     if (exportFormat === 'PDF') {
-      const db = loadDB();
-      const facility = db.settings.facilityName || 'Healthcare Facility';
-
-      // Daily Precaution List: strict template PDF (matches on-screen preview)
-      if (isDailyPrecautionListReport(currentReport)) {
-        const doc = buildDailyPrecautionListPdf({ report: currentReport, facility });
-        const filename = `${sanitizedTitle}_${dateStr}.pdf`;
-        doc.save(filename);
-        recordAction(`Exported ${exportFormat}`);
-        toast.success(`Exported as ${filename}`);
-        return;
-      }
-
-      // Surveyor Packet: no footer, repeating headers
-      if (isSurveyorPacketReport(currentReport)) {
-        const doc = buildSurveyorPacketPdf({ report: currentReport, facility });
-        const filename = `${sanitizedTitle}_${dateStr}.pdf`;
-        doc.save(filename);
-        recordAction(`Exported ${exportFormat}`);
-        toast.success(`Exported as ${filename}`);
-        return;
-      }
-      
-      if (isIPDailyMorningReport(currentReport)) {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const headerBottomY = 40;
-
-        const drawHeader = () => {
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'bold');
-          doc.text(facility, pageWidth / 2, 15, { align: 'center' });
-
-          doc.setFontSize(12);
-          doc.text(currentReport.title, pageWidth / 2, 22, { align: 'center' });
-
-          if (currentReport.subtitle) {
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text(currentReport.subtitle, pageWidth / 2, 28, { align: 'center' });
-          }
-
-          doc.setFontSize(9);
-          const filterParts = [];
-          if (currentReport.filters.unit) filterParts.push(`Unit: ${currentReport.filters.unit}`);
-          if (currentReport.filters.date) filterParts.push(`Date: ${currentReport.filters.date}`);
-          if (currentReport.filters.shift) filterParts.push(`Shift: ${currentReport.filters.shift}`);
-          if (filterParts.length > 0) {
-            doc.text(filterParts.join('  |  '), pageWidth / 2, 34, { align: 'center' });
-          }
-        };
-
-        const ensureSpace = (currentY: number, neededSpace = 14) => {
-          if (currentY + neededSpace > pageHeight - 20) {
-            doc.addPage();
-            drawHeader();
-            return headerBottomY;
-          }
-          return currentY;
-        };
-
-        drawHeader();
-
-        let startY = headerBottomY;
-        currentReport.sections?.forEach(section => {
-          startY = ensureSpace(startY, 18);
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text(section.title, 14, startY);
-          startY += 4;
-          autoTable(doc, {
-            head: [section.headers],
-            body: section.rows,
-            startY,
-            margin: { top: headerBottomY },
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [250, 250, 250] },
-            tableLineColor: [0, 0, 0],
-            tableLineWidth: 0.1,
-            didDrawPage: () => {
-              drawHeader();
-            }
-          });
-          startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
-          startY += 8;
-        });
-
-        const filename = `${sanitizedTitle}_${dateStr}.pdf`;
-        doc.save(filename);
-        recordAction(`Exported ${exportFormat}`);
-        toast.success(`Exported as ${filename}`);
-        return;
-      }
-
-      const doc = new jsPDF();
-      
-      // Header
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(facility, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
-      
-      doc.setFontSize(12);
-      doc.text(currentReport.title, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
-      
-      if (currentReport.subtitle) {
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text(currentReport.subtitle, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
-      }
-      
-      // Filters line
-      doc.setFontSize(9);
-      const filterParts = [];
-      if (currentReport.filters.unit) filterParts.push(`Unit: ${currentReport.filters.unit}`);
-      if (currentReport.filters.date) filterParts.push(`Date: ${currentReport.filters.date}`);
-      if (currentReport.filters.shift) filterParts.push(`Shift: ${currentReport.filters.shift}`);
-      if (filterParts.length > 0) {
-        doc.text(filterParts.join('  |  '), doc.internal.pageSize.getWidth() / 2, 34, { align: 'center' });
-      }
-
-      if (currentReport.sections && currentReport.sections.length > 0) {
-        let startY = 40;
-        currentReport.sections.forEach(section => {
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text(section.title, 14, startY);
-          startY += 4;
-          autoTable(doc, {
-            head: [section.headers],
-            body: section.rows,
-            startY,
-            styles: { fontSize: 8, cellPadding: 3 },
-            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [250, 250, 250] },
-            tableLineColor: [0, 0, 0],
-            tableLineWidth: 0.1,
-          });
-          startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
-          startY += 8;
-        });
-      } else {
-        // Table
-        autoTable(doc, {
-          head: [currentReport.headers],
-          body: currentReport.rows,
-          startY: 40,
-          styles: { fontSize: 9, cellPadding: 3 },
-          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [250, 250, 250] },
-          tableLineColor: [0, 0, 0],
-          tableLineWidth: 0.1,
-        });
-        
-        // Footer
-        const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 40;
-        if (currentReport.footer) {
-          doc.setFontSize(9);
-          doc.text(`Prepared by: ________________________`, 14, finalY + 15);
-          doc.text(`Signature: ________________________`, 14, finalY + 22);
-          doc.text(`Title: ________________________`, 110, finalY + 15);
-          doc.text(`Date/Time: ${currentReport.footer.dateTime || new Date().toLocaleString()}`, 110, finalY + 22);
-          
-          if (currentReport.footer.disclaimer) {
-            doc.setFontSize(8);
-            doc.setFont('helvetica', 'italic');
-            doc.text(`* ${currentReport.footer.disclaimer}`, 14, finalY + 35, { maxWidth: 180 });
-          }
-        }
-      }
-      
-      const filename = `${sanitizedTitle}_${dateStr}.pdf`;
-      doc.save(filename);
-      recordAction(`Exported ${exportFormat}`);
-      toast.success(`Exported as ${filename}`);
+      exportReportAsPdf(currentReport, exportFormat);
       return;
     }
     
@@ -860,6 +905,14 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     
     recordAction(`Exported ${exportFormat}`);
     toast.success(`Exported as ${filename}`);
+  };
+
+  const handlePrintSafeExport = () => {
+    if (!currentReport) {
+      toast.error('Generate a report first');
+      return;
+    }
+    exportReportAsPdf(currentReport, 'PDF (print-safe)');
   };
 
   const handleClear = () => {
@@ -1495,6 +1548,56 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
               </div>
             </div>
 
+            {/* Print Fit */}
+            <div className="min-w-[220px]">
+              <label className="text-sm font-medium mb-2 block">Print Fit</label>
+              <div className="flex flex-wrap items-center gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Font size</p>
+                  <ToggleGroup
+                    type="single"
+                    value={printFontSize}
+                    onValueChange={(value) => {
+                      if (value) setPrintFontSize(value as 'normal' | 'compact');
+                    }}
+                    className="inline-flex rounded-md border border-input overflow-hidden"
+                  >
+                    <ToggleGroupItem value="normal" className="text-xs px-2 py-1">Normal</ToggleGroupItem>
+                    <ToggleGroupItem value="compact" className="text-xs px-2 py-1">Small</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Columns</p>
+                  <ToggleGroup
+                    type="single"
+                    value={printColumnWidth}
+                    onValueChange={(value) => {
+                      if (value) setPrintColumnWidth(value as 'wide' | 'narrow');
+                    }}
+                    className="inline-flex rounded-md border border-input overflow-hidden"
+                  >
+                    <ToggleGroupItem value="wide" className="text-xs px-2 py-1">Wide</ToggleGroupItem>
+                    <ToggleGroupItem value="narrow" className="text-xs px-2 py-1">Narrow</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+              </div>
+            </div>
+
+            {/* Page-break Preview */}
+            <div className="min-w-[180px]">
+              <label className="text-sm font-medium mb-2 block">Preview Aids</label>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="page-break-preview"
+                  checked={showPageBreaks}
+                  onCheckedChange={(value) => setShowPageBreaks(value === true)}
+                />
+                <label htmlFor="page-break-preview" className="text-sm text-muted-foreground">
+                  Page-break preview
+                </label>
+              </div>
+            </div>
+
             {/* Unit */}
             <div className="min-w-[140px]">
               <label className="text-sm font-medium mb-2 block">Unit</label>
@@ -1647,16 +1750,35 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           </div>
         </div>
 
-        <div ref={reportRef} className="border border-border rounded-lg overflow-hidden">
+        <div ref={reportRef} className="border border-border rounded-lg overflow-hidden relative">
+          {currentReport && showPageBreaks && (
+            <div
+              className="pointer-events-none absolute inset-0 z-10"
+              style={{
+                backgroundImage:
+                  'linear-gradient(to bottom, rgba(59, 130, 246, 0.45) 0, rgba(59, 130, 246, 0.45) 1px, transparent 1px, transparent 11in)',
+                backgroundSize: '100% 11in',
+                backgroundRepeat: 'repeat'
+              }}
+            />
+          )}
           {currentReport ? (
             <>
               {trendReport && trendReport.chartData && (
                 <InfectionTrendChart data={trendReport.chartData} />
               )}
               {isIPDailyMorningReport(currentReport) ? (
-                <IPDailyMorningReportPreview report={currentReport} />
+                <IPDailyMorningReportPreview
+                  report={currentReport}
+                  printFontSize={printFontSize}
+                  columnWidth={printColumnWidth}
+                />
               ) : (
-                <ReportPreview report={currentReport} />
+                <ReportPreview
+                  report={currentReport}
+                  printFontSize={printFontSize}
+                  columnWidth={printColumnWidth}
+                />
               )}
             </>
           ) : (
@@ -1675,6 +1797,12 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
             <Copy className="w-4 h-4 mr-2" />
             Copy
           </Button>
+          {printSafeRecommended && (
+            <Button variant="outline" size="sm" onClick={handlePrintSafeExport} disabled={!currentReport}>
+              <FileDown className="w-4 h-4 mr-2" />
+              Export PDF (print-safe)
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExport} disabled={!currentReport}>
             <Download className="w-4 h-4 mr-2" />
             Export
