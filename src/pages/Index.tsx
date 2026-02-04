@@ -15,6 +15,7 @@ import OutbreakView from '@/components/views/OutbreakView';
 import ReportsView from '@/components/views/ReportsView';
 import AuditView from '@/components/views/AuditView';
 import SettingsView from '@/components/views/SettingsView';
+import ReferenceLibraryView from '@/components/views/ReferenceLibraryView';
 import DataManagementModal from '@/components/modals/DataManagementModal';
 import BackupReminderBanner from '@/components/BackupReminderBanner';
 import LockScreen from '@/components/LockScreen';
@@ -72,6 +73,8 @@ const Index = () => {
         return <OutbreakView onNavigate={setActiveView} />;
       case 'reports':
         return <ReportsView surveyorMode={surveyorMode} onNavigate={setActiveView} />;
+      case 'reference_library':
+        return <ReferenceLibraryView />;
       case 'audit':
         return <AuditView />;
       case 'settings':

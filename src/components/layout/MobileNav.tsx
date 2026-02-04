@@ -11,7 +11,8 @@ import {
   Menu,
   AlertTriangle,
   UserCheck,
-  TrendingUp
+  TrendingUp,
+  BookOpen
 } from 'lucide-react';
 import { ViewType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ const navItems: { id: ViewType; label: string; icon: React.ReactNode }[] = [
   { id: 'vax', label: 'VAX Tracker', icon: <Syringe className="w-5 h-5" /> },
   { id: 'notes', label: 'Notes', icon: <FileText className="w-5 h-5" /> },
   { id: 'outbreak', label: 'Outbreak/Line List', icon: <AlertTriangle className="w-5 h-5" /> },
+  { id: 'reference_library', label: 'Reference Library', icon: <BookOpen className="w-5 h-5" /> },
   { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-5 h-5" /> },
   { id: 'audit', label: 'Audit Trail', icon: <History className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
@@ -49,7 +51,7 @@ const navSections = [
   },
   {
     label: 'Compliance & Reporting',
-    items: ['reports', 'audit', 'settings'],
+    items: ['reference_library', 'reports', 'audit', 'settings'],
   },
 ];
 

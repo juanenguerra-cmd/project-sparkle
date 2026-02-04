@@ -9,7 +9,8 @@ import {
   BarChart3, 
   History, 
   Settings,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen
 } from 'lucide-react';
 import { ViewType } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ const navSections: {
   {
     label: 'Compliance & Reporting',
     items: [
+      { id: 'reference_library', label: 'Reference Library', icon: <BookOpen className="w-5 h-5" /> },
       { id: 'reports', label: 'Reports', icon: <BarChart3 className="w-5 h-5" /> },
       { id: 'audit', label: 'Audit Trail', icon: <History className="w-5 h-5" /> },
       { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
