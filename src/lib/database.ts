@@ -534,11 +534,20 @@ export const dismissLineListingRecommendation = (db: ICNDatabase, recommendation
 };
 
 // IP helpers - excludes discharged residents
-// Status check is case-insensitive to handle both 'Active' and 'ACTIVE'
+// Status check is case-insensitive and handles common variants (e.g., "Active Case")
+export const normalizeIPStatus = (status?: string): string => {
+  const normalized = (status || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (normalized.includes('discharge')) return 'discharged';
+  if (normalized.includes('resolve')) return 'resolved';
+  if (normalized.includes('active') || normalized.includes('open')) return 'active';
+  return normalized;
+};
+
 export const getActiveIPCases = (db: ICNDatabase): IPCase[] => {
   const activeMrns = getActiveCensusMrns(db);
   return db.records.ip_cases.filter(r => {
-    const status = (r.status || r.case_status || '').trim().toLowerCase();
+    const status = normalizeIPStatus(r.status || r.case_status);
     if (status !== 'active') return false;
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
     return true;
