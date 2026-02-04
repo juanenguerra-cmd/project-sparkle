@@ -547,14 +547,15 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           <title>${currentReport.title}</title>
           <style>
             body { font-family: Arial, sans-serif; margin: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid black; padding: 8px; text-align: left; }
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+            th, td { border: 1px solid black; padding: 8px; text-align: left; word-break: break-word; overflow-wrap: anywhere; }
             th { background-color: #f0f0f0; font-weight: bold; }
             h1, h2 { text-align: center; margin: 0; }
             .header { text-align: center; margin-bottom: 20px; }
-            .filters { display: flex; justify-content: center; gap: 30px; margin: 10px 0; }
+            .filters { display: flex; justify-content: center; gap: 30px; margin: 10px 0; flex-wrap: wrap; }
             .footer { margin-top: 30px; }
             .disclaimer { font-size: 11px; font-style: italic; margin-top: 20px; }
+            tr { page-break-inside: avoid; }
             @media print { 
               body { margin: 0; }
               @page { margin: 0.5in; }

@@ -358,6 +358,31 @@
     @apply bg-white border border-border rounded-lg p-5 max-h-96 overflow-y-auto font-mono text-sm;
   }
 
+  @media print {
+    .report-preview {
+      max-height: none;
+      overflow: visible;
+      border: none;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      font-size: 10px;
+    }
+
+    .report-preview table {
+      table-layout: fixed;
+    }
+
+    .report-preview th,
+    .report-preview td {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+
+    .report-preview tr {
+      page-break-inside: avoid;
+    }
+  }
+
   /* Mini Indicators */
   .mini-indicator {
     @apply inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold;
