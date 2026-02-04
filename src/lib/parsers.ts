@@ -2,7 +2,10 @@
 // Matches the original ICN Hub parsing logic
 
 export const canonicalMRN = (raw: string): string => {
-  return String(raw || "").replace(/\D/g, "").slice(0, 20);
+  return String(raw || "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 20);
 };
 
 export const pad2 = (n: number): string => String(n).padStart(2, '0');
