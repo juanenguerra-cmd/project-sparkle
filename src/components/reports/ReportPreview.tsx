@@ -4,6 +4,8 @@ import { loadDB } from '@/lib/database';
 interface ReportPreviewProps {
   report: ReportData;
   facilityName?: string;
+  printFontSize?: 'normal' | 'compact';
+  columnWidth?: 'wide' | 'narrow';
 }
 
 // Check if this is a precaution list report
@@ -11,24 +13,34 @@ const isPrecautionListReport = (title: string) => {
   return title.toUpperCase().includes('PRECAUTION') || title.toUpperCase().includes('ISOLATION');
 };
 
-const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
+const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnWidth = 'wide' }: ReportPreviewProps) => {
   const db = loadDB();
   const facility = facilityName || db.settings.facilityName || 'Long Beach Nursing & Rehabilitation Center';
   const isPrecautionList = isPrecautionListReport(report.title);
+  const isCompact = printFontSize === 'compact';
+  const tableLayout = columnWidth === 'narrow' ? 'fixed' : 'auto';
+  const wordBreak = columnWidth === 'narrow' ? 'break-word' : 'normal';
+  const overflowWrap = columnWidth === 'narrow' ? 'anywhere' : 'normal';
+  const cellPadding = isCompact ? '2px 4px' : '4px 8px';
+  const tableFontSize = isCompact ? '8px' : '10px';
+  const headerFontSize = isCompact ? '12px' : '14px';
+  const subtitleFontSize = isCompact ? '11px' : '12px';
+  const filterFontSize = isCompact ? '10px' : '12px';
+  const footerFontSize = isCompact ? '9px' : '10px';
   
   return (
     <div
-      className="report-preview bg-white text-black p-6 min-h-[400px] print:p-0"
+      className="report-preview bg-white text-black min-h-[400px] print:p-0"
       id="report-content"
-      style={{ fontFamily: 'Arial, sans-serif' }}
+      style={{ fontFamily: 'Arial, sans-serif', padding: isCompact ? '12px' : '24px' }}
     >
       {/* Header - Exact template layout */}
       <div className="text-center mb-4" style={{ textAlign: 'center', marginBottom: '16px' }}>
         {/* Facility name - bold, larger */}
-        <h1 className="font-bold mb-1" style={{ fontSize: '14px' }}>{facility}</h1>
+        <h1 className="font-bold mb-1" style={{ fontSize: headerFontSize }}>{facility}</h1>
         
         {/* Report title - bold, slightly smaller */}
-        <h2 className="font-bold mb-3" style={{ fontSize: '12px' }}>{report.title}</h2>
+        <h2 className="font-bold mb-3" style={{ fontSize: subtitleFontSize }}>{report.title}</h2>
         
         {/* Filter row: UNIT / DATE / SHIFT on same line */}
         <div
@@ -37,7 +49,7 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
             display: 'flex',
             justifyContent: 'center',
             gap: '32px',
-            fontSize: '12px',
+            fontSize: filterFontSize,
             flexWrap: 'wrap'
           }}
         >
@@ -67,10 +79,10 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
         <table
           className="w-full border-collapse"
           style={{
-            fontSize: '10px',
+            fontSize: tableFontSize,
             width: '100%',
             borderCollapse: 'collapse',
-            tableLayout: 'fixed'
+            tableLayout
           }}
         >
           <thead>
@@ -82,13 +94,13 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
                   style={{
                     fontWeight: 700,
                     borderRight: idx === report.headers.length - 1 ? 'none' : '1px solid #000',
-                    padding: '4px 8px',
+                    padding: cellPadding,
                     textAlign: 'left',
                     verticalAlign: 'middle',
-                    wordBreak: 'break-word',
-                    overflowWrap: 'anywhere',
-                    width: isPrecautionList 
-                      ? ['50px', '200px', '150px', '120px', '110px'][idx] 
+                    wordBreak,
+                    overflowWrap,
+                    width: isPrecautionList && columnWidth === 'narrow'
+                      ? ['50px', '200px', '150px', '120px', '110px'][idx]
                       : 'auto',
                     textAlign: isPrecautionList && idx === 3 ? 'center' : 'left'
                   }}
@@ -119,10 +131,10 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
                       className="border-r border-black last:border-r-0 py-1 px-2 align-top"
                       style={{
                         borderRight: cellIdx === row.length - 1 ? 'none' : '1px solid #000',
-                        padding: '4px 8px',
+                        padding: cellPadding,
                         verticalAlign: 'top',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'anywhere',
+                        wordBreak,
+                        overflowWrap,
                         textAlign: isPrecautionList && cellIdx === 3 ? 'center' : 'left'
                       }}
                     >
@@ -138,7 +150,7 @@ const ReportPreview = ({ report, facilityName }: ReportPreviewProps) => {
       
       {/* Footer - Exact template layout */}
       {report.footer && (
-        <div className="mt-6" style={{ fontSize: '10px' }}>
+        <div className="mt-6" style={{ fontSize: footerFontSize }}>
           {/* Row 1: Prepared by and Title on same line */}
           <div className="flex gap-12 mb-2">
             <div className="flex items-end">
