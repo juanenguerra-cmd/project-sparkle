@@ -643,6 +643,79 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         return;
       }
       
+      if (isIPDailyMorningReport(currentReport)) {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const headerBottomY = 40;
+
+        const drawHeader = () => {
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'bold');
+          doc.text(facility, pageWidth / 2, 15, { align: 'center' });
+
+          doc.setFontSize(12);
+          doc.text(currentReport.title, pageWidth / 2, 22, { align: 'center' });
+
+          if (currentReport.subtitle) {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(currentReport.subtitle, pageWidth / 2, 28, { align: 'center' });
+          }
+
+          doc.setFontSize(9);
+          const filterParts = [];
+          if (currentReport.filters.unit) filterParts.push(`Unit: ${currentReport.filters.unit}`);
+          if (currentReport.filters.date) filterParts.push(`Date: ${currentReport.filters.date}`);
+          if (currentReport.filters.shift) filterParts.push(`Shift: ${currentReport.filters.shift}`);
+          if (filterParts.length > 0) {
+            doc.text(filterParts.join('  |  '), pageWidth / 2, 34, { align: 'center' });
+          }
+        };
+
+        const ensureSpace = (currentY: number, neededSpace = 14) => {
+          if (currentY + neededSpace > pageHeight - 20) {
+            doc.addPage();
+            drawHeader();
+            return headerBottomY;
+          }
+          return currentY;
+        };
+
+        drawHeader();
+
+        let startY = headerBottomY;
+        currentReport.sections?.forEach(section => {
+          startY = ensureSpace(startY, 18);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(section.title, 14, startY);
+          startY += 4;
+          autoTable(doc, {
+            head: [section.headers],
+            body: section.rows,
+            startY,
+            margin: { top: headerBottomY },
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            tableLineColor: [0, 0, 0],
+            tableLineWidth: 0.1,
+            didDrawPage: () => {
+              drawHeader();
+            }
+          });
+          startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
+          startY += 8;
+        });
+
+        const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+        doc.save(filename);
+        recordAction(`Exported ${exportFormat}`);
+        toast.success(`Exported as ${filename}`);
+        return;
+      }
+
       const doc = new jsPDF();
       
       // Header
