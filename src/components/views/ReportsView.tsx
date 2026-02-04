@@ -33,6 +33,8 @@ import {
   generateAntibioticDurationReport,
   generateNewAdmissionScreeningReport,
   generateOutbreakSummaryReport,
+  generateIPDailyMorningReport,
+  isIPDailyMorningReport,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
 import { todayISO } from '@/lib/parsers';
@@ -66,6 +68,7 @@ import { getReportDescription } from '@/lib/reportDescriptions';
 import { generateLineListingPdf, generateBlankLineListingPdf } from '@/lib/pdf/lineListingPdf';
 import { ALL_TEMPLATES } from '@/lib/lineListingTemplates';
 import ReportPreview from '@/components/reports/ReportPreview';
+import IPDailyMorningReportPreview from '@/components/reports/IPDailyMorningReportPreview';
 import ReportListItem from '@/components/reports/ReportListItem';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
@@ -248,6 +251,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   ];
 
   const operationalReports = [
+    { id: 'ip_daily_morning', name: 'IP Daily Morning Report', description: 'Combined morning IP report with IP precautions, ABT, VAX due today, line listings, and follow-up notes' },
     { id: 'daily_ip', name: 'Daily IP Worklist', description: 'Active isolation precautions and EBP cases' },
     { id: 'abt_review', name: 'ABT Review Worklist', description: 'Antibiotic courses requiring review' },
     { id: 'abt_duration', name: 'Antibiotic Duration Analysis', description: 'Prolonged ABT courses (≥7 days) requiring stewardship review' },
@@ -271,6 +275,9 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     let report: ReportData | null = null;
 
     switch (reportId) {
+      case 'ip_daily_morning':
+        report = generateIPDailyMorningReport(db);
+        break;
       case 'precautions_list':
         report = generateDailyPrecautionList(db, selectedUnit, selectedShift);
         break;
@@ -571,16 +578,28 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       return;
     }
     
-    // Create a text version of the report
+    const filterLine = Object.entries(currentReport.filters).map(([k, v]) => `${k}: ${v}`).join(' | ');
     const lines = [
       currentReport.title,
       currentReport.subtitle || '',
       '',
-      Object.entries(currentReport.filters).map(([k, v]) => `${k}: ${v}`).join(' | '),
-      '',
-      currentReport.headers.join('\t'),
-      ...currentReport.rows.map(row => row.join('\t'))
+      filterLine,
+      ''
     ];
+
+    if (currentReport.sections && currentReport.sections.length > 0) {
+      currentReport.sections.forEach(section => {
+        lines.push(section.title);
+        lines.push(section.headers.join('\t'));
+        section.rows.forEach(row => {
+          lines.push(row.join('\t'));
+        });
+        lines.push('');
+      });
+    } else {
+      lines.push(currentReport.headers.join('\t'));
+      lines.push(...currentReport.rows.map(row => row.join('\t')));
+    }
     
     try {
       await navigator.clipboard.writeText(lines.join('\n'));
@@ -649,32 +668,54 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       if (filterParts.length > 0) {
         doc.text(filterParts.join('  |  '), doc.internal.pageSize.getWidth() / 2, 34, { align: 'center' });
       }
-      
-      // Table
-      autoTable(doc, {
-        head: [currentReport.headers],
-        body: currentReport.rows,
-        startY: 40,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        tableLineColor: [0, 0, 0],
-        tableLineWidth: 0.1,
-      });
-      
-      // Footer
-      const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 40;
-      if (currentReport.footer) {
-        doc.setFontSize(9);
-        doc.text(`Prepared by: ________________________`, 14, finalY + 15);
-        doc.text(`Signature: ________________________`, 14, finalY + 22);
-        doc.text(`Title: ________________________`, 110, finalY + 15);
-        doc.text(`Date/Time: ${currentReport.footer.dateTime || new Date().toLocaleString()}`, 110, finalY + 22);
+
+      if (currentReport.sections && currentReport.sections.length > 0) {
+        let startY = 40;
+        currentReport.sections.forEach(section => {
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(section.title, 14, startY);
+          startY += 4;
+          autoTable(doc, {
+            head: [section.headers],
+            body: section.rows,
+            startY,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            tableLineColor: [0, 0, 0],
+            tableLineWidth: 0.1,
+          });
+          startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
+          startY += 8;
+        });
+      } else {
+        // Table
+        autoTable(doc, {
+          head: [currentReport.headers],
+          body: currentReport.rows,
+          startY: 40,
+          styles: { fontSize: 9, cellPadding: 3 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [250, 250, 250] },
+          tableLineColor: [0, 0, 0],
+          tableLineWidth: 0.1,
+        });
         
-        if (currentReport.footer.disclaimer) {
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'italic');
-          doc.text(`* ${currentReport.footer.disclaimer}`, 14, finalY + 35, { maxWidth: 180 });
+        // Footer
+        const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 40;
+        if (currentReport.footer) {
+          doc.setFontSize(9);
+          doc.text(`Prepared by: ________________________`, 14, finalY + 15);
+          doc.text(`Signature: ________________________`, 14, finalY + 22);
+          doc.text(`Title: ________________________`, 110, finalY + 15);
+          doc.text(`Date/Time: ${currentReport.footer.dateTime || new Date().toLocaleString()}`, 110, finalY + 22);
+          
+          if (currentReport.footer.disclaimer) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'italic');
+            doc.text(`* ${currentReport.footer.disclaimer}`, 14, finalY + 35, { maxWidth: 180 });
+          }
         }
       }
       
@@ -691,10 +732,19 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     
     switch (exportFormat) {
       case 'CSV':
-        content = [
-          currentReport.headers.join(','),
-          ...currentReport.rows.map(row => row.map(cell => `"${cell}"`).join(','))
-        ].join('\n');
+        if (currentReport.sections && currentReport.sections.length > 0) {
+          content = currentReport.sections
+            .map(section => {
+              const rows = section.rows.map(row => row.map(cell => `"${cell}"`).join(','));
+              return [`"${section.title}"`, section.headers.join(','), ...rows, ''].join('\n');
+            })
+            .join('\n');
+        } else {
+          content = [
+            currentReport.headers.join(','),
+            ...currentReport.rows.map(row => row.map(cell => `"${cell}"`).join(','))
+          ].join('\n');
+        }
         filename = `${sanitizedTitle}_${dateStr}.csv`;
         mimeType = 'text/csv';
         break;
@@ -1529,7 +1579,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
               {trendReport && trendReport.chartData && (
                 <InfectionTrendChart data={trendReport.chartData} />
               )}
-              <ReportPreview report={currentReport} />
+              {isIPDailyMorningReport(currentReport) ? (
+                <IPDailyMorningReportPreview report={currentReport} />
+              ) : (
+                <ReportPreview report={currentReport} />
+              )}
             </>
           ) : (
             <div className="bg-muted/30 min-h-[200px] flex items-center justify-center">
