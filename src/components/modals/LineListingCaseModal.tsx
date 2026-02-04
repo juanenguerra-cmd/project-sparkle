@@ -37,6 +37,12 @@ interface LineListingCaseModalProps {
   }) => void;
   editingEntry?: LineListingEntry | null;
   mode?: 'add' | 'edit';
+  prefill?: {
+    mrn?: string;
+    onsetDate?: string;
+    symptoms?: string[];
+    notes?: string;
+  } | null;
 }
 
 const CATEGORY_ORDER = ['demographics', 'vaccines', 'predisposing', 'symptoms', 'outcomes', 'other'];
@@ -57,6 +63,7 @@ const LineListingCaseModal = ({
   onSubmit,
   editingEntry,
   mode = 'add',
+  prefill = null,
 }: LineListingCaseModalProps) => {
   // Get saved field configuration from settings
   const db = loadDB();
@@ -118,6 +125,23 @@ const LineListingCaseModal = ({
       }
     }
   }, [open, editingEntry, mode]);
+
+  useEffect(() => {
+    if (!open || mode !== 'add' || editingEntry) return;
+    if (prefill?.mrn) {
+      setIsStaffOrVisitor(false);
+      setCaseMrn(prefill.mrn);
+    }
+    if (prefill?.onsetDate) {
+      setCaseOnsetDate(prefill.onsetDate);
+    }
+    if (prefill?.symptoms) {
+      setCaseSymptoms(prefill.symptoms);
+    }
+    if (prefill?.notes) {
+      setCaseNotes(prefill.notes);
+    }
+  }, [open, mode, editingEntry, prefill]);
 
   const getSymptomOptions = (category: SymptomCategory) => 
     SYMPTOM_OPTIONS.filter(s => s.category === category);

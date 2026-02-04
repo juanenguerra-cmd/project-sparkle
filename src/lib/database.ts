@@ -15,6 +15,7 @@ import {
   AuditEntry,
   AppSettings,
   LineListingEntry,
+  LineListingRecommendation,
   Outbreak,
   ContactEntry,
   SymptomCategory,
@@ -475,6 +476,61 @@ export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
     if (status === 'active') return isWithinCourse;
     return isWithinCourse;
   });
+};
+
+const normalizeInfectionSource = (source?: string): string => (source || '').toLowerCase().trim();
+
+const getLineListingRecommendationKey = (record: ABTRecord): string => {
+  return record.id || record.record_id || `${record.mrn}_${record.medication || record.med_name || ''}_${record.startDate || record.start_date || ''}`;
+};
+
+const mapInfectionSourceToCategory = (source?: string): SymptomCategory | null => {
+  const normalized = normalizeInfectionSource(source);
+  if (normalized === 'respiratory') return 'respiratory';
+  if (normalized === 'gi') return 'gi';
+  return null;
+};
+
+export const getLineListingRecommendations = (db: ICNDatabase): LineListingRecommendation[] => {
+  const dismissals = new Set(db.settings.lineListingRecommendationDismissals || []);
+  const activeLineListingMrns = new Set(
+    db.records.line_listings
+      .filter(entry => entry.outcome === 'active')
+      .map(entry => entry.mrn)
+  );
+  const activeABT = getActiveABT(db);
+
+  return activeABT
+    .map(record => {
+      const category = mapInfectionSourceToCategory(record.infection_source);
+      if (!category) return null;
+      const key = getLineListingRecommendationKey(record);
+      if (!record.mrn || dismissals.has(key) || activeLineListingMrns.has(record.mrn)) return null;
+      const resident = db.census.residentsByMrn[record.mrn];
+      return {
+        id: key,
+        abtRecordId: key,
+        mrn: record.mrn,
+        residentName: record.residentName || record.name || resident?.name || 'Unknown',
+        unit: record.unit || resident?.unit || '',
+        room: record.room || resident?.room || '',
+        infectionSource: record.infection_source || 'Other',
+        category,
+        startDate: record.startDate || record.start_date || '',
+        createdAt: record.createdAt || nowISO()
+      } satisfies LineListingRecommendation;
+    })
+    .filter((rec): rec is LineListingRecommendation => Boolean(rec));
+};
+
+export const dismissLineListingRecommendation = (db: ICNDatabase, recommendationId: string): void => {
+  if (!db.settings.lineListingRecommendationDismissals) {
+    db.settings.lineListingRecommendationDismissals = [];
+  }
+  if (!db.settings.lineListingRecommendationDismissals.includes(recommendationId)) {
+    db.settings.lineListingRecommendationDismissals.push(recommendationId);
+    addAudit(db, 'line_listing_recommendation_dismissed', `Dismissed recommendation ${recommendationId}`, 'settings');
+  }
 };
 
 // IP helpers - excludes discharged residents

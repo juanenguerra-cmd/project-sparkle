@@ -17,8 +17,10 @@ import {
   addAudit, 
   getActiveOutbreaks, 
   getLineListingsByOutbreak, 
+  getLineListingRecommendations,
   createOutbreak, 
   addToLineListing,
+  dismissLineListingRecommendation,
   addContact,
   getContactsByLineListing
 } from '@/lib/database';
@@ -32,7 +34,7 @@ import {
   ViewType 
 } from '@/lib/types';
 import { generateLineListingPdf } from '@/lib/pdf/lineListingPdf';
-import { todayISO } from '@/lib/parsers';
+import { isoDateFromAny, todayISO } from '@/lib/parsers';
 import { toast } from 'sonner';
 
 const CATEGORY_COLORS: Record<SymptomCategory, string> = {
@@ -57,10 +59,18 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
   const [selectedLineListing, setSelectedLineListing] = useState<LineListingEntry | null>(null);
   const [editingLineListing, setEditingLineListing] = useState<LineListingEntry | null>(null);
   const [expandedOutbreaks, setExpandedOutbreaks] = useState<Set<string>>(new Set());
+  const [selectedRecommendationOutbreaks, setSelectedRecommendationOutbreaks] = useState<Record<string, string>>({});
+  const [recommendationPrefill, setRecommendationPrefill] = useState<{
+    mrn?: string;
+    onsetDate?: string;
+    symptoms?: string[];
+    notes?: string;
+  } | null>(null);
 
   const db = loadDB();
   const activeOutbreaks = getActiveOutbreaks(db);
   const resolvedOutbreaks = db.records.outbreaks.filter(o => o.status === 'resolved');
+  const recommendations = getLineListingRecommendations(db);
   const residents = Object.values(db.census.residentsByMrn)
     .filter(r => r.active_on_census)
     .sort((a, b) => a.name.localeCompare(b.name)); // Alphabetical sorting
@@ -218,6 +228,37 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
       setEditingLineListing(null);
       setRefreshKey(k => k + 1);
     }
+  };
+
+  const handleDismissRecommendation = (recommendationId: string) => {
+    const db = loadDB();
+    dismissLineListingRecommendation(db, recommendationId);
+    saveDB(db);
+    toast.success('Recommendation cleared');
+    setRefreshKey(k => k + 1);
+  };
+
+  const handleAddRecommendation = (recommendationId: string) => {
+    const recommendation = recommendations.find(rec => rec.id === recommendationId);
+    if (!recommendation) return;
+
+    const matchingOutbreaks = activeOutbreaks.filter(outbreak => outbreak.type === recommendation.category);
+    if (matchingOutbreaks.length === 0) {
+      setNewOutbreakType(recommendation.category);
+      setShowNewOutbreakModal(true);
+      toast.info('Create an outbreak to add this case to the line listing.');
+      return;
+    }
+
+    const selectedOutbreakId = selectedRecommendationOutbreaks[recommendationId] || matchingOutbreaks[0].id;
+    const outbreak = matchingOutbreaks.find(item => item.id === selectedOutbreakId) || matchingOutbreaks[0];
+    setSelectedOutbreak(outbreak);
+    setRecommendationPrefill({
+      mrn: recommendation.mrn,
+      onsetDate: isoDateFromAny(recommendation.startDate || '') || todayISO(),
+      notes: `Recommended from ABT (source: ${recommendation.infectionSource}).`
+    });
+    setShowAddCaseModal(true);
   };
 
   const handlePrintLineListing = (outbreak: Outbreak) => {
@@ -628,6 +669,77 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
         </div>
       </div>
 
+      <SectionCard title="Line Listing Review">
+        {recommendations.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
+            <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p>No ABT-based line listing recommendations.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recommendations.map(rec => {
+              const matchingOutbreaks = activeOutbreaks.filter(outbreak => outbreak.type === rec.category);
+              const selectedOutbreakId = selectedRecommendationOutbreaks[rec.id] || matchingOutbreaks[0]?.id || '';
+              return (
+                <div key={rec.id} className="flex flex-col gap-3 rounded-lg border border-border bg-background p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={CATEGORY_COLORS[rec.category]}>{rec.category.toUpperCase()}</Badge>
+                      <span className="text-sm font-semibold">{rec.residentName}</span>
+                      <span className="text-xs text-muted-foreground">{rec.unit} • {rec.room}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Source: {rec.infectionSource}
+                      {rec.startDate ? ` • ABT Start: ${new Date(rec.startDate).toLocaleDateString()}` : ''}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    {matchingOutbreaks.length > 1 && (
+                      <Select
+                        value={selectedOutbreakId}
+                        onValueChange={(value) => setSelectedRecommendationOutbreaks(prev => ({ ...prev, [rec.id]: value }))}
+                      >
+                        <SelectTrigger className="w-48">
+                          <SelectValue placeholder="Select outbreak" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {matchingOutbreaks.map(outbreak => (
+                            <SelectItem key={outbreak.id} value={outbreak.id}>
+                              {outbreak.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {matchingOutbreaks.length === 1 && (
+                      <span className="text-xs text-muted-foreground">Outbreak: {matchingOutbreaks[0].name}</span>
+                    )}
+                    {matchingOutbreaks.length === 0 && (
+                      <span className="text-xs text-muted-foreground">No active {rec.category} outbreak</span>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddRecommendation(rec.id)}
+                      >
+                        Add to Line Listing
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDismissRecommendation(rec.id)}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionCard>
+
       {/* Active Outbreaks */}
       {activeOutbreaks.length === 0 ? (
         <SectionCard title="Active Outbreaks">
@@ -818,11 +930,18 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
       {/* Add Case Modal - Using new template-based modal */}
       <LineListingCaseModal
         open={showAddCaseModal}
-        onOpenChange={setShowAddCaseModal}
+        onOpenChange={(open) => {
+          setShowAddCaseModal(open);
+          if (!open) {
+            setSelectedOutbreak(null);
+            setRecommendationPrefill(null);
+          }
+        }}
         outbreak={selectedOutbreak}
         residents={residents}
         onSubmit={handleAddCaseFromModal}
         mode="add"
+        prefill={recommendationPrefill}
       />
 
       {/* Edit Case Modal - Using new template-based modal */}
