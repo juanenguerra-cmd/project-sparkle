@@ -43,6 +43,10 @@ export const defaultSettings: AppSettings = {
     COVID: { intervalDays: 180 },
     PNA: { intervalDays: 365 * 5 },
   },
+  oneDriveBackup: {
+    enabled: false,
+    folderPath: '',
+  },
 };
 
 export const defaultDatabase = (): ICNDatabaseShape => ({

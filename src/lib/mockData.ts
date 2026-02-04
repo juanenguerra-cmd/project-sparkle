@@ -213,6 +213,10 @@ export const mockDatabase: AppDatabase = {
       COVID: { intervalDays: 180 },
       PNA: { intervalDays: 365 * 5 },
     },
+    oneDriveBackup: {
+      enabled: false,
+      folderPath: '',
+    },
   },
 };
 

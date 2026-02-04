@@ -25,6 +25,8 @@ const SettingsView = () => {
   const [autoCloseGraceDays, setAutoCloseGraceDays] = useState(db.settings.autoCloseGraceDays);
   const [ebpReviewDays, setEbpReviewDays] = useState(db.settings.ipRules.ebpReviewDays);
   const [isolationReviewDays, setIsolationReviewDays] = useState(db.settings.ipRules.isolationReviewDays);
+  const [oneDriveEnabled, setOneDriveEnabled] = useState(db.settings.oneDriveBackup?.enabled ?? false);
+  const [oneDriveFolderPath, setOneDriveFolderPath] = useState(db.settings.oneDriveBackup?.folderPath ?? '');
   const [lineListingConfigs, setLineListingConfigs] = useState<Record<string, CustomLineListingConfig>>(
     (db.settings.lineListingConfigs as Record<string, CustomLineListingConfig>) || {}
   );
@@ -42,6 +44,10 @@ const SettingsView = () => {
         ...db.settings.ipRules,
         ebpReviewDays,
         isolationReviewDays,
+      },
+      oneDriveBackup: {
+        enabled: oneDriveEnabled,
+        folderPath: oneDriveFolderPath.trim(),
       },
       lineListingConfigs,
     };
@@ -182,6 +188,27 @@ const SettingsView = () => {
             <Button variant="destructive" className="w-full justify-start">
               Clear All Data
             </Button>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="OneDrive Backup Sync">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label>Enable OneDrive Backup Location</Label>
+              <Switch checked={oneDriveEnabled} onCheckedChange={setOneDriveEnabled} />
+            </div>
+            <div className="space-y-2">
+              <Label>OneDrive Folder Path</Label>
+              <Input
+                value={oneDriveFolderPath}
+                onChange={(e) => setOneDriveFolderPath(e.target.value)}
+                placeholder="e.g. C:\\Users\\Name\\OneDrive\\ICN Hub Backups"
+                disabled={!oneDriveEnabled}
+              />
+              <p className="text-sm text-muted-foreground">
+                Use a locally synced OneDrive folder to save exports and select imports. Keep the path consistent across devices.
+              </p>
+            </div>
           </div>
         </SectionCard>
 

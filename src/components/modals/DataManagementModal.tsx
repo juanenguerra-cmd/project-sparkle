@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { exportDBToJSON, importDBFromJSON, clearDB } from '@/lib/database';
+import { exportDBToJSON, importDBFromJSON, clearDB, loadDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { Download, Upload, Trash2 } from 'lucide-react';
 import { todayISO } from '@/lib/parsers';
@@ -14,6 +14,8 @@ interface DataManagementModalProps {
 }
 
 const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModalProps) => {
+  const db = loadDB();
+  const oneDriveBackup = db.settings.oneDriveBackup;
   const [importing, setImporting] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -205,6 +207,16 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
                 {importing ? 'Importing...' : 'Import Data Backup'}
               </Button>
             </div>
+
+            {oneDriveBackup?.enabled && (
+              <div className="rounded-lg border border-muted bg-muted/30 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">OneDrive Backup Location</p>
+                <p className="break-all">{oneDriveBackup.folderPath || 'No folder path saved yet.'}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Exports should be saved to this synced folder, and imports can be selected from it.
+                </p>
+              </div>
+            )}
             
             <div className="border-t pt-4 mt-4">
               <Button 
