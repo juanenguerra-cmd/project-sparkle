@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { ABTRecord, Resident } from '@/lib/types';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { computeTxDays, nowISO, todayISO } from '@/lib/parsers';
 
 interface ABTCaseModalProps {
@@ -274,13 +273,13 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-hidden flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
-          <DialogTitle>{editRecord ? 'Edit ABT Record' : 'Add ABT Record'}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] p-0 overflow-y-auto">
+        <div className="flex min-h-0 flex-col">
+          <DialogHeader className="sticky top-0 z-10 bg-background px-6 pt-6 pb-2 border-b">
+            <DialogTitle>{editRecord ? 'Edit ABT Record' : 'Add ABT Record'}</DialogTitle>
+          </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6">
-          <div className="space-y-4 pb-4">
+          <div className="space-y-4 px-6 py-4 pb-24">
             {/* Resident Selection */}
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-primary">Resident Name *</Label>
@@ -576,20 +575,20 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
               </div>
             </div>
           </div>
-        </ScrollArea>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center px-6 py-4 border-t">
-          <div>
-            {editRecord && (
-              <Button type="button" variant="destructive" onClick={handleDelete}>
-                Delete Record
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="button" onClick={handleSubmit}>Save</Button>
+          {/* Footer */}
+          <div className="sticky bottom-0 flex justify-between items-center px-6 py-4 border-t bg-background">
+            <div>
+              {editRecord && (
+                <Button type="button" variant="destructive" onClick={handleDelete}>
+                  Delete Record
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="button" onClick={handleSubmit}>Save</Button>
+            </div>
           </div>
         </div>
       </DialogContent>
