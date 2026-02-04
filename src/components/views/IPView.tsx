@@ -9,7 +9,7 @@ import { loadDB, getActiveIPCases, saveDB, addAudit, normalizeIPStatus } from '@
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
-import { todayISO } from '@/lib/parsers';
+import { canonicalMRN, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 
@@ -56,8 +56,15 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const activeCensusMrns = new Set(
     Object.values(db.census.residentsByMrn)
       .filter(r => r.active_on_census)
-      .map(r => r.mrn)
+      .map(r => canonicalMRN(r.mrn))
+      .filter(Boolean)
   );
+
+  const isActiveCensusMrn = (mrn?: string) => {
+    const canonical = canonicalMRN(mrn || '');
+    if (!canonical) return true;
+    return activeCensusMrns.has(canonical);
+  };
 
   // Filter and sort records
   const filteredRecords = useMemo(() => {
@@ -85,7 +92,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
         // Exclude Discharged/Resolved status (case-insensitive)
         if (status === 'discharged' || status === 'resolved') return false;
         // Exclude residents no longer on census
-        if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+        if (!isActiveCensusMrn(r.mrn)) return false;
       }
       
       switch (activeFilter) {
@@ -188,14 +195,14 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const activeCount = records.filter(r => {
     const status = normalizeStatus(r);
     if (status !== 'active') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
   const overdueCount = records.filter(r => {
     const status = normalizeStatus(r);
     if (status !== 'active') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (!isActiveCensusMrn(r.mrn)) return false;
     const reviewDate = r.nextReviewDate || r.next_review_date;
     return reviewDate && new Date(reviewDate) < new Date();
   }).length;
@@ -203,21 +210,21 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const ebpCount = records.filter(r => {
     const status = normalizeStatus(r);
     if (r.protocol !== 'EBP' || status !== 'active') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
   const isolationCount = records.filter(r => {
     const status = normalizeStatus(r);
     if (r.protocol !== 'Isolation' || status !== 'active') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
   const standardCount = records.filter(r => {
     const status = normalizeStatus(r);
     if (r.protocol !== 'Standard Precautions' || status !== 'active') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
