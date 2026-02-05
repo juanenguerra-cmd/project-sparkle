@@ -1090,15 +1090,7 @@ export const generateStandardOfCareReport = (
   fromDate: string,
   toDate: string
 ): ReportData => {
-  const rows: string[][] = [];
-
-  const pushSectionHeader = (title: string) => {
-    rows.push([title, '', '', '', '', '', '', '']);
-  };
-
-  const pushSectionColumns = (columns: string[]) => {
-    rows.push([...columns, ...Array(Math.max(0, 8 - columns.length)).fill('')]);
-  };
+  const sections: ReportSection[] = [];
   
   // Section 1: ABT regimens started within date range
   const abtStarted = db.records.abx.filter(r => {
@@ -1107,36 +1099,34 @@ export const generateStandardOfCareReport = (
     return start >= fromDate && start <= toDate;
   });
   
-  pushSectionHeader('ABT ACTIVE (STARTED IN RANGE)');
-  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Medication', 'Route', 'Start Date & End Date', 'Indication', 'Source of Infection']);
-  if (abtStarted.length === 0) {
-    rows.push(['No new antibiotic regimens in this period', '', '', '', '', '', '', '']);
-  } else {
-    abtStarted.forEach(record => {
+  const abtRows = abtStarted.length === 0
+    ? [['No new antibiotic regimens in this period', '', '', '', '', '', '']]
+    : abtStarted.map(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const medication = record.medication || record.med_name || '';
       const startDate = formatDateValue(record.startDate || record.start_date || '');
       const endDate = formatDateValue(record.endDate || record.end_date || '');
-      const route = record.route || '';
       const indication = record.indication || '';
       const source = record.infection_source || record.sourceOfInfection || record.source_of_infection || '';
-      const dateRange = [startDate, endDate].filter(Boolean).join(' - ');
+      const dateRange = [startDate, endDate].filter(Boolean).join(' to ');
       
-      rows.push([
+      return [
         record.unit,
         record.room,
         residentName,
         medication,
-        route,
-        dateRange,
         indication,
-        source
-      ]);
+        source,
+        dateRange
+      ];
     });
-  }
   
-  rows.push(['', '', '', '', '', '', '', '']);
+  sections.push({
+    title: 'ABT Report — Antibiotic Initiation Report',
+    headers: ['Unit', 'Room', 'Name', 'Medication', 'Indication', 'Source of Infection', 'Start Date to End Date'],
+    rows: abtRows
+  });
   
   // Section 2: IP cases started within date range
   const ipStarted = db.records.ip_cases.filter(c => {
@@ -1145,32 +1135,55 @@ export const generateStandardOfCareReport = (
     return onset >= fromDate && onset <= toDate;
   });
   
-  pushSectionHeader('IP ACTIVE (STARTED IN RANGE)');
-  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Isolation Type', 'Precaution Type', 'Source of Infection']);
+  const isolationRows: string[][] = [];
+  const ebpRows: string[][] = [];
+  ipStarted.forEach(ipCase => {
+    const resident = db.census.residentsByMrn[ipCase.mrn];
+    const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
+    const precautionType = getPrecautionDisplay(ipCase);
+    const source = ipCase.sourceOfInfection || ipCase.source_of_infection || '';
+    const startDate = formatDateValue(ipCase.onsetDate || ipCase.onset_date || '');
+    const protocol = (ipCase.protocol || '').toLowerCase();
+    const isEBP = protocol.includes('ebp') || protocol.includes('enhanced');
+    
+    const row = [
+      ipCase.unit,
+      ipCase.room,
+      residentName,
+      precautionType,
+      source,
+      startDate
+    ];
+    
+    if (isEBP) {
+      ebpRows.push(row);
+    } else {
+      isolationRows.push(row);
+    }
+  });
+  
+  const ipRows: string[][] = [];
   if (ipStarted.length === 0) {
-    rows.push(['No new IP cases in this period', '', '', '', '', '', '', '']);
+    ipRows.push(['No new precaution starts in this period', '', '', '', '', '']);
   } else {
-    ipStarted.forEach(ipCase => {
-      const resident = db.census.residentsByMrn[ipCase.mrn];
-      const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
-      const isolationType = ipCase.isolationType || ipCase.isolation_type || '';
-      const precautionType = ipCase.protocol || '';
-      const source = ipCase.sourceOfInfection || ipCase.source_of_infection || '';
-      
-      rows.push([
-        ipCase.unit,
-        ipCase.room,
-        residentName,
-        isolationType,
-        precautionType,
-        source,
-        '',
-        ''
-      ]);
-    });
+    if (isolationRows.length > 0) {
+      ipRows.push(['Isolation Precaution List', '', '', '', '', '']);
+      ipRows.push(...isolationRows);
+    }
+    if (ebpRows.length > 0) {
+      if (isolationRows.length > 0) {
+        ipRows.push(['', '', '', '', '', '']);
+      }
+      ipRows.push(['Enhanced Barrier Precaution List', '', '', '', '', '']);
+      ipRows.push(...ebpRows);
+    }
   }
   
-  rows.push(['', '', '', '', '', '', '', '']);
+  sections.push({
+    title: 'IP Report — Precaution List Initiation',
+    headers: ['Unit', 'Room', 'Name', 'Precaution Type', 'Source of Infection', 'Start Date'],
+    rows: ipRows
+  });
   
   // Section 3: VAX records within date range
   const vaxInRange = db.records.vax.filter(v => {
@@ -1179,29 +1192,37 @@ export const generateStandardOfCareReport = (
     return date >= fromDate && date <= toDate;
   });
   
-  pushSectionHeader('VAX (STARTED IN RANGE)');
-  pushSectionColumns(['Unit', 'Room', 'Resident Name', 'Vaccine Type', 'Date', 'Status']);
-  if (vaxInRange.length === 0) {
-    rows.push(['No vaccination activity in this period', '', '', '', '', '', '', '']);
-  } else {
-    vaxInRange.forEach(record => {
+  const vaxRows = vaxInRange.length === 0
+    ? [['No vaccination activity in this period', '', '', '', '', '']]
+    : vaxInRange.map(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const vaccine = record.vaccine || record.vaccine_type || '';
-      const date = formatDateValue(record.dateGiven || record.date_given || record.dueDate || record.due_date || '');
+      const date = formatDateValue(
+        record.dateGiven
+          || record.date_given
+          || record.offerDate
+          || record.educationDate
+          || record.dueDate
+          || record.due_date
+          || ''
+      );
       
-      rows.push([
+      return [
         record.unit,
         record.room,
         residentName,
         vaccine,
         date,
-        (record.status || '').toUpperCase(),
-        '',
-        ''
-      ]);
+        (record.status || '').toUpperCase()
+      ];
     });
-  }
+  
+  sections.push({
+    title: 'Vax Report — Vaccination Offered Report',
+    headers: ['Unit', 'Room', 'Name', 'Vaccine Type', 'Date Given or Date Declined', 'Status'],
+    rows: vaxRows
+  });
   
   return {
     title: 'STANDARD OF CARE WEEKLY REPORT',
@@ -1212,8 +1233,10 @@ export const generateStandardOfCareReport = (
       toDate: format(new Date(toDate), 'MM/dd/yyyy'),
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Unit', 'Room', 'Resident Name', 'Medication / Type', 'Route / Precaution', 'Date', 'Indication', 'Source of Infection'],
-    rows,
+    headers: [],
+    rows: [],
+    sections,
+    reportType: 'standard_of_care',
     footer: {
       disclaimer: 'Weekly standard of care documentation for quality assurance and regulatory compliance.'
     }

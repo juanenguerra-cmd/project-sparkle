@@ -28,12 +28,91 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
   const filterFontSize = isCompact ? '10px' : '12px';
   const footerFontSize = isCompact ? '9px' : '10px';
   
+  const renderTable = (headers: string[], rows: string[][]) => (
+    <div className="border border-black" style={{ border: '1px solid #000' }}>
+      <table
+        className="w-full border-collapse"
+        style={{
+          fontSize: tableFontSize,
+          width: '100%',
+          borderCollapse: 'collapse',
+          tableLayout
+        }}
+      >
+        <thead>
+          <tr style={{ backgroundColor: '#FBBF24' }} className="border-b border-black">
+            {headers.map((header, idx) => (
+              <th
+                key={idx}
+                className="font-bold border-r border-black last:border-r-0 py-1 px-2 text-left align-middle"
+                style={{
+                  fontWeight: 700,
+                  borderRight: idx === headers.length - 1 ? 'none' : '1px solid #000',
+                  padding: cellPadding,
+                  textAlign: 'left',
+                  verticalAlign: 'middle',
+                  wordBreak,
+                  overflowWrap,
+                  width: isPrecautionList && columnWidth === 'narrow'
+                    ? ['50px', '200px', '150px', '120px', '110px'][idx]
+                    : 'auto',
+                  textAlign: isPrecautionList && idx === 3 ? 'center' : 'left'
+                }}
+              >
+                {isPrecautionList && idx === 3 ? (
+                  <span className="text-center block whitespace-nowrap">
+                    INFECTED<br/>SOURCE
+                  </span>
+                ) : header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={headers.length} className="text-center py-4 text-gray-500">
+                No records found for the selected filters
+              </td>
+            </tr>
+          ) : (
+            rows.map((row, rowIdx) => (
+              <tr key={rowIdx} className="border-b border-black last:border-b-0 bg-white">
+                {row.map((cell, cellIdx) => (
+                  <td
+                    key={cellIdx}
+                    className="border-r border-black last:border-r-0 py-1 px-2 align-top"
+                    style={{
+                      borderRight: cellIdx === row.length - 1 ? 'none' : '1px solid #000',
+                      padding: cellPadding,
+                      verticalAlign: 'top',
+                      wordBreak,
+                      overflowWrap,
+                      textAlign: isPrecautionList && cellIdx === 3 ? 'center' : 'left'
+                    }}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+  
   return (
     <div
       className="report-preview bg-white text-black min-h-[400px] print:p-0"
       id="report-content"
       style={{ fontFamily: 'Arial, sans-serif', padding: isCompact ? '12px' : '24px' }}
     >
+      {report.reportType === 'standard_of_care' && (
+        <style>
+          {`@media print { @page { size: landscape; } }`}
+        </style>
+      )}
       {/* Header - Exact template layout */}
       <div className="text-center mb-4" style={{ textAlign: 'center', marginBottom: '16px' }}>
         {/* Facility name - bold, larger */}
@@ -75,78 +154,18 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
       </div>
       
       {/* Table - Exact template columns */}
-      <div className="border border-black" style={{ border: '1px solid #000' }}>
-        <table
-          className="w-full border-collapse"
-          style={{
-            fontSize: tableFontSize,
-            width: '100%',
-            borderCollapse: 'collapse',
-            tableLayout
-          }}
-        >
-          <thead>
-            <tr style={{ backgroundColor: '#FBBF24' }} className="border-b border-black">
-              {report.headers.map((header, idx) => (
-                <th
-                  key={idx}
-                  className="font-bold border-r border-black last:border-r-0 py-1 px-2 text-left align-middle"
-                  style={{
-                    fontWeight: 700,
-                    borderRight: idx === report.headers.length - 1 ? 'none' : '1px solid #000',
-                    padding: cellPadding,
-                    textAlign: 'left',
-                    verticalAlign: 'middle',
-                    wordBreak,
-                    overflowWrap,
-                    width: isPrecautionList && columnWidth === 'narrow'
-                      ? ['50px', '200px', '150px', '120px', '110px'][idx]
-                      : 'auto',
-                    textAlign: isPrecautionList && idx === 3 ? 'center' : 'left'
-                  }}
-                >
-                  {/* Template header names exactly */}
-                  {isPrecautionList && idx === 3 ? (
-                    <span className="text-center block whitespace-nowrap">
-                      INFECTED<br/>SOURCE
-                    </span>
-                  ) : header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {report.rows.length === 0 ? (
-              <tr>
-                <td colSpan={report.headers.length} className="text-center py-4 text-gray-500">
-                  No records found for the selected filters
-                </td>
-              </tr>
-            ) : (
-              report.rows.map((row, rowIdx) => (
-                <tr key={rowIdx} className="border-b border-black last:border-b-0 bg-white">
-                  {row.map((cell, cellIdx) => (
-                    <td
-                      key={cellIdx}
-                      className="border-r border-black last:border-r-0 py-1 px-2 align-top"
-                      style={{
-                        borderRight: cellIdx === row.length - 1 ? 'none' : '1px solid #000',
-                        padding: cellPadding,
-                        verticalAlign: 'top',
-                        wordBreak,
-                        overflowWrap,
-                        textAlign: isPrecautionList && cellIdx === 3 ? 'center' : 'left'
-                      }}
-                    >
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {report.sections && report.sections.length > 0 ? (
+        <div className="flex flex-col gap-6">
+          {report.sections.map((section, sectionIdx) => (
+            <div key={sectionIdx} className="flex flex-col gap-2">
+              <h3 className="font-bold text-sm">{section.title}</h3>
+              {renderTable(section.headers, section.rows)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        renderTable(report.headers, report.rows)
+      )}
       
       {/* Footer - Exact template layout */}
       {report.footer && (
