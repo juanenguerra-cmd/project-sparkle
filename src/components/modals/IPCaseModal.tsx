@@ -302,8 +302,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
           <DialogTitle>{editCase ? 'Edit Case' : 'Add Case'}</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6 overflow-y-auto">
-          <div className="space-y-6 pb-4">
+        <ScrollArea className="flex-1 min-h-0 px-6 pb-6">
+          <div className="space-y-6">
             {/* Row 1: Resident Name, MRN, DOB, Room */}
             <div className="grid grid-cols-4 gap-4">
               <div className="space-y-1">
