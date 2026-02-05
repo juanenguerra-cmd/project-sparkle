@@ -9,7 +9,7 @@ import { loadDB, getActiveIPCases, saveDB, addAudit, normalizeIPStatus } from '@
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
-import { canonicalMRN, todayISO } from '@/lib/parsers';
+import { mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 
@@ -61,17 +61,17 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   );
 
   // Get active resident MRNs from census
-  const activeCensusMrns = new Set(
-    Object.values(db.census.residentsByMrn)
-      .filter(r => r.active_on_census)
-      .map(r => canonicalMRN(r.mrn))
-      .filter(Boolean)
-  );
+  const activeCensusMrns = new Set<string>();
+  Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .forEach(r => {
+      mrnMatchKeys(r.mrn).forEach(key => activeCensusMrns.add(key));
+    });
 
   const isActiveCensusMrn = (mrn?: string) => {
-    const canonical = canonicalMRN(mrn || '');
-    if (!canonical) return true;
-    return activeCensusMrns.has(canonical);
+    const matchKeys = mrnMatchKeys(mrn || '');
+    if (matchKeys.length === 0) return true;
+    return matchKeys.some(key => activeCensusMrns.has(key));
   };
 
   // Filter and sort records

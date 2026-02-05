@@ -9,7 +9,7 @@ import ABTImportModal from '@/components/modals/ABTImportModal';
 import ABTCaseModal from '@/components/modals/ABTCaseModal';
 import { loadDB, getActiveABT, saveDB, addAudit } from '@/lib/database';
 import { ABTRecord, ViewType } from '@/lib/types';
-import { isoDateFromAny, computeTxDays, todayISO } from '@/lib/parsers';
+import { isoDateFromAny, computeTxDays, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -89,11 +89,18 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   };
 
   // Get active resident MRNs from census
-  const activeCensusMrns = new Set(
-    Object.values(db.census.residentsByMrn)
-      .filter(r => r.active_on_census)
-      .map(r => r.mrn)
-  );
+  const activeCensusMrns = new Set<string>();
+  Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .forEach(r => {
+      mrnMatchKeys(r.mrn).forEach(key => activeCensusMrns.add(key));
+    });
+
+  const isActiveCensusMrn = (mrn?: string) => {
+    const matchKeys = mrnMatchKeys(mrn || '');
+    if (matchKeys.length === 0) return true;
+    return matchKeys.some(key => activeCensusMrns.has(key));
+  };
 
   const filteredRecords = records.filter(r => {
     // Always exclude discontinued records from active view
@@ -104,7 +111,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
     
     // Check if resident is still in census (unless viewing completed/all)
     if (statusFilter === 'active') {
-      if (r.mrn && !activeCensusMrns.has(r.mrn)) {
+      if (r.mrn && !isActiveCensusMrn(r.mrn)) {
         return false; // Resident discharged from census
       }
     }
@@ -167,7 +174,7 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
 
   const activeCount = records.filter(r => {
     if (deriveStatus(r) === 'discontinued') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
     return deriveStatus(r) === 'active';
   }).length;
 

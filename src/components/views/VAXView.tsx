@@ -17,7 +17,7 @@ import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
-import { todayISO } from '@/lib/parsers';
+import { mrnMatchKeys, todayISO } from '@/lib/parsers';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -51,11 +51,18 @@ const VAXView = () => {
   const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
 
   // Get active resident MRNs from census
-  const activeCensusMrns = new Set(
-    Object.values(db.census.residentsByMrn)
-      .filter(r => r.active_on_census)
-      .map(r => r.mrn)
-  );
+  const activeCensusMrns = new Set<string>();
+  Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .forEach(r => {
+      mrnMatchKeys(r.mrn).forEach(key => activeCensusMrns.add(key));
+    });
+
+  const isActiveCensusMrn = (mrn?: string) => {
+    const matchKeys = mrnMatchKeys(mrn || '');
+    if (matchKeys.length === 0) return true;
+    return matchKeys.some(key => activeCensusMrns.has(key));
+  };
 
   const dueRecords = getVaxDue(db);
   
@@ -105,7 +112,7 @@ const VAXView = () => {
       result = result.filter(r => {
         // For due/overdue views, exclude discharged residents from census
         if (activeFilter === 'due' || activeFilter === 'overdue') {
-          if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+          if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
         }
         
         switch (activeFilter) {
@@ -197,13 +204,13 @@ const VAXView = () => {
   const givenCount = records.filter(r => r.status === 'given').length;
   const dueCount = records.filter(r => {
     if (r.status !== 'due') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   const declinedCount = records.filter(r => r.status === 'declined').length;
   const overdueCount = records.filter(r => {
     if (r.status !== 'overdue') return false;
-    if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+    if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   const reofferCount = reofferCandidates.length;
