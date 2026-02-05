@@ -1,0 +1,16 @@
+name = "project-sparkle-db"
+main = "workers/d1/worker.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+# Optional: if you want to consume a different API base in local dev
+# API_BASE_URL = "http://127.0.0.1:8787"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "project-sparkle-db"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+[dev]
+ip = "127.0.0.1"
+port = 8787
