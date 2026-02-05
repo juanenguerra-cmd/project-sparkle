@@ -99,11 +99,12 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     if (editCase) {
       const resident = db.census.residentsByMrn[editCase.mrn];
       if (resident) setSelectedResident(resident);
+      setSearchTerm(editCase.residentName || editCase.name || resident?.name || '');
       
       setFormData({
         residentName: editCase.residentName || editCase.name || '',
         mrn: editCase.mrn,
-        dob: resident?.dob || '',
+        dob: resident?.dob || editCase.dob || '',
         room: editCase.room,
         unit: editCase.unit,
         censusStatus: resident?.status || 'Active',
@@ -116,7 +117,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
         pathogenResistance: editCase.infectionType || editCase.infection_type || '',
         nhsnPathogenCode: '',
         vaccineStatus: '',
-        requiredPPE: '',
+        requiredPPE: editCase.requiredPPE || '',
         staffAssignments: '',
         closeContacts: '',
         commonAreasVisited: [],
@@ -232,12 +233,14 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       isolation_type: formData.isolationType,
       sourceOfInfection: formData.sourceCondition,
       source_of_infection: formData.sourceCondition,
+      dob: formData.dob,
       onsetDate: formData.onsetDate,
       onset_date: formData.onsetDate,
       resolutionDate: formData.resolutionDate,
       resolution_date: formData.resolutionDate,
       status: formData.status,
       notes: formData.notes,
+      requiredPPE: formData.requiredPPE,
       createdAt: editCase?.createdAt || new Date().toISOString(),
     };
 

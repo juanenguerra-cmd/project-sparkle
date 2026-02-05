@@ -99,6 +99,7 @@ export interface IPCase {
   exposureLinked?: boolean;
   outbreakId?: string;
   requiredPPE?: string;
+  dob?: string;
 }
 
 export interface VaxRecord {
