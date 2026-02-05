@@ -2,7 +2,10 @@
 // Matches the original ICN Hub parsing logic
 
 export const canonicalMRN = (raw: string): string => {
-  return String(raw || "")
+  const rawValue = String(raw || "");
+  const parenMatch = rawValue.match(/\(([^)]+)\)/);
+  const candidate = parenMatch ? parenMatch[1] : rawValue;
+  return candidate
     .replace(/[^A-Za-z0-9]/g, "")
     .toUpperCase()
     .slice(0, 20);
