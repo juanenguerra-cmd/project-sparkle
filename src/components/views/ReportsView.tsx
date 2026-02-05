@@ -530,12 +530,36 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       case 'residents':
         // Generate a census summary
         const residents = getActiveResidents(db);
+        const unitCounts = residents.reduce((acc, resident) => {
+          const unitName = resident.unit?.trim() || 'Unassigned';
+          acc.set(unitName, (acc.get(unitName) || 0) + 1);
+          return acc;
+        }, new Map<string, number>());
+        const unitRows = Array.from(unitCounts.entries())
+          .sort(([unitA], [unitB]) => unitA.localeCompare(unitB))
+          .map(([unit, count]) => [unit, count.toString()]);
+        if (unitRows.length === 0) {
+          unitRows.push(['No active residents', '0']);
+        }
+        const residentRows = residents.map(r => [r.room, r.name, r.mrn, r.unit, r.physician || '', r.status || 'Active']);
         report = {
           title: 'ACTIVE RESIDENTS SUMMARY',
           generatedAt: new Date().toISOString(),
           filters: { date: new Date().toLocaleDateString() },
           headers: ['Room', 'Name', 'MRN', 'Unit', 'Physician', 'Status'],
-          rows: residents.map(r => [r.room, r.name, r.mrn, r.unit, r.physician || '', r.status || 'Active'])
+          rows: residentRows,
+          sections: [
+            {
+              title: 'Active Census by Unit',
+              headers: ['Unit', 'Active Residents'],
+              rows: unitRows
+            },
+            {
+              title: 'Active Resident Detail',
+              headers: ['Room', 'Name', 'MRN', 'Unit', 'Physician', 'Status'],
+              rows: residentRows
+            }
+          ]
         };
         break;
       case 'abt':
