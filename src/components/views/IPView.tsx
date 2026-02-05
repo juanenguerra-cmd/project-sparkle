@@ -45,6 +45,14 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const normalizeStatus = (record: IPCase) => normalizeIPStatus(record.status || record.case_status);
+  const normalizeProtocol = (protocol?: string) => {
+    const normalized = (protocol || '').trim().toLowerCase();
+    if (!normalized) return '';
+    if (normalized.includes('ebp') || normalized.includes('edp') || normalized.includes('enhanced barrier')) return 'ebp';
+    if (normalized.includes('standard')) return 'standard';
+    if (normalized.includes('isolation')) return 'isolation';
+    return normalized;
+  };
   
   const records = db.records.ip_cases;
   const units = useMemo(
@@ -82,7 +90,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
       if (!matchesSearch) return false;
 
       if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
-      if (protocolFilter !== 'all' && (r.protocol || '').toLowerCase() !== protocolFilter) return false;
+      if (protocolFilter !== 'all' && normalizeProtocol(r.protocol) !== protocolFilter) return false;
       
       // Normalize status for case-insensitive comparison
       const status = normalizeStatus(r);
@@ -99,11 +107,11 @@ const IPView = ({ onNavigate }: IPViewProps) => {
         case 'active':
           return status === 'active';
         case 'ebp':
-          return r.protocol === 'EBP' && status === 'active';
+          return normalizeProtocol(r.protocol) === 'ebp' && status === 'active';
         case 'isolation':
-          return r.protocol === 'Isolation' && status === 'active';
+          return normalizeProtocol(r.protocol) === 'isolation' && status === 'active';
         case 'standard':
-          return r.protocol === 'Standard Precautions' && status === 'active';
+          return normalizeProtocol(r.protocol) === 'standard' && status === 'active';
         case 'resolved':
           return status === 'resolved' || status === 'discharged';
         default:
@@ -209,21 +217,21 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   
   const ebpCount = records.filter(r => {
     const status = normalizeStatus(r);
-    if (r.protocol !== 'EBP' || status !== 'active') return false;
+    if (normalizeProtocol(r.protocol) !== 'ebp' || status !== 'active') return false;
     if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
   const isolationCount = records.filter(r => {
     const status = normalizeStatus(r);
-    if (r.protocol !== 'Isolation' || status !== 'active') return false;
+    if (normalizeProtocol(r.protocol) !== 'isolation' || status !== 'active') return false;
     if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
   
   const standardCount = records.filter(r => {
     const status = normalizeStatus(r);
-    if (r.protocol !== 'Standard Precautions' || status !== 'active') return false;
+    if (normalizeProtocol(r.protocol) !== 'standard' || status !== 'active') return false;
     if (!isActiveCensusMrn(r.mrn)) return false;
     return true;
   }).length;
@@ -446,7 +454,7 @@ const IPView = ({ onNavigate }: IPViewProps) => {
                 <SelectItem value="all">All protocols</SelectItem>
                 <SelectItem value="ebp">EBP</SelectItem>
                 <SelectItem value="isolation">Isolation</SelectItem>
-                <SelectItem value="standard precautions">Standard</SelectItem>
+                <SelectItem value="standard">Standard</SelectItem>
               </SelectContent>
             </Select>
             <Badge 
