@@ -1100,16 +1100,16 @@ export const generateStandardOfCareReport = (
   });
   
   const abtRows = abtStarted.length === 0
-    ? [['No new antibiotic regimens in this period', '', '', '', '', '', '']]
+    ? [['No new antibiotic regimens in this period', '', '', '', '', '', '', '', '']]
     : abtStarted.map(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const medication = record.medication || record.med_name || '';
+      const route = record.route || '';
       const startDate = formatDateValue(record.startDate || record.start_date || '');
       const endDate = formatDateValue(record.endDate || record.end_date || '');
       const indication = record.indication || '';
       const source = record.infection_source || record.sourceOfInfection || record.source_of_infection || '';
-      const dateRange = [startDate, endDate].filter(Boolean).join(' to ');
       
       return [
         record.unit,
@@ -1118,13 +1118,15 @@ export const generateStandardOfCareReport = (
         medication,
         indication,
         source,
-        dateRange
+        route,
+        startDate,
+        endDate
       ];
     });
   
   sections.push({
-    title: 'ABT Report — Antibiotic Initiation Report',
-    headers: ['Unit', 'Room', 'Name', 'Medication', 'Indication', 'Source of Infection', 'Start Date to End Date'],
+    title: 'Antibiotic Review',
+    headers: ['Unit', 'Room', 'Name', 'Medication', 'Indication', 'Source', 'Route', 'Start', 'End'],
     rows: abtRows
   });
   
@@ -1135,53 +1137,30 @@ export const generateStandardOfCareReport = (
     return onset >= fromDate && onset <= toDate;
   });
   
-  const isolationRows: string[][] = [];
-  const ebpRows: string[][] = [];
-  ipStarted.forEach(ipCase => {
-    const resident = db.census.residentsByMrn[ipCase.mrn];
-    const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
-    const precautionType = getPrecautionDisplay(ipCase);
-    const source = ipCase.sourceOfInfection || ipCase.source_of_infection || '';
-    const startDate = formatDateValue(ipCase.onsetDate || ipCase.onset_date || '');
-    const protocol = (ipCase.protocol || '').toLowerCase();
-    const isEBP = protocol.includes('ebp') || protocol.includes('enhanced');
-    
-    const row = [
-      ipCase.unit,
-      ipCase.room,
-      residentName,
-      precautionType,
-      source,
-      startDate
-    ];
-    
-    if (isEBP) {
-      ebpRows.push(row);
-    } else {
-      isolationRows.push(row);
-    }
-  });
-  
-  const ipRows: string[][] = [];
-  if (ipStarted.length === 0) {
-    ipRows.push(['No new precaution starts in this period', '', '', '', '', '']);
-  } else {
-    if (isolationRows.length > 0) {
-      ipRows.push(['Isolation Precaution List', '', '', '', '', '']);
-      ipRows.push(...isolationRows);
-    }
-    if (ebpRows.length > 0) {
-      if (isolationRows.length > 0) {
-        ipRows.push(['', '', '', '', '', '']);
-      }
-      ipRows.push(['Enhanced Barrier Precaution List', '', '', '', '', '']);
-      ipRows.push(...ebpRows);
-    }
-  }
+  const ipRows: string[][] = ipStarted.length === 0
+    ? [['No new precaution starts in this period', '', '', '', '', '', '']]
+    : ipStarted.map(ipCase => {
+      const resident = db.census.residentsByMrn[ipCase.mrn];
+      const residentName = ipCase.residentName || ipCase.name || resident?.name || 'Unknown';
+      const precautionType = getPrecautionDisplay(ipCase);
+      const isolationType = ipCase.isolationType || ipCase.isolation_type || '';
+      const source = ipCase.sourceOfInfection || ipCase.source_of_infection || '';
+      const startDate = formatDateValue(ipCase.onsetDate || ipCase.onset_date || '');
+      
+      return [
+        ipCase.unit,
+        ipCase.room,
+        residentName,
+        precautionType,
+        isolationType,
+        source,
+        startDate
+      ];
+    });
   
   sections.push({
-    title: 'IP Report — Precaution List Initiation',
-    headers: ['Unit', 'Room', 'Name', 'Precaution Type', 'Source of Infection', 'Start Date'],
+    title: 'Precaution List Review',
+    headers: ['Unit', 'Room', 'Name', 'Precaution Type', 'Isolation Type', 'Source', 'Onset Date'],
     rows: ipRows
   });
   
@@ -1213,14 +1192,14 @@ export const generateStandardOfCareReport = (
         record.room,
         residentName,
         vaccine,
-        date,
-        (record.status || '').toUpperCase()
+        (record.status || '').toUpperCase(),
+        date
       ];
     });
   
   sections.push({
-    title: 'Vax Report — Vaccination Offered Report',
-    headers: ['Unit', 'Room', 'Name', 'Vaccine Type', 'Date Given or Date Declined', 'Status'],
+    title: 'Vaccination Review',
+    headers: ['Unit', 'Room', 'Name', 'Vaccine', 'Status', 'Date'],
     rows: vaxRows
   });
   

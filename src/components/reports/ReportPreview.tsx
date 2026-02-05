@@ -13,10 +13,17 @@ const isPrecautionListReport = (title: string) => {
   return title.toUpperCase().includes('PRECAUTION') || title.toUpperCase().includes('ISOLATION');
 };
 
+const isActiveDailyPrecautionList = (title: string) => {
+  const upper = title.toUpperCase();
+  return upper.includes('RESIDENTS ON PRECAUTIONS') || upper.includes('DAILY PRECAUTION');
+};
+
 const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnWidth = 'wide' }: ReportPreviewProps) => {
   const db = loadDB();
   const facility = facilityName || db.settings.facilityName || 'Long Beach Nursing & Rehabilitation Center';
   const isPrecautionList = isPrecautionListReport(report.title);
+  const isDailyPrecautionList = isActiveDailyPrecautionList(report.title);
+  const useBrandedTemplate = !isDailyPrecautionList;
   const isCompact = printFontSize === 'compact';
   const tableLayout = columnWidth === 'narrow' ? 'fixed' : 'auto';
   const wordBreak = columnWidth === 'narrow' ? 'break-word' : 'normal';
@@ -27,6 +34,23 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
   const subtitleFontSize = isCompact ? '11px' : '12px';
   const filterFontSize = isCompact ? '10px' : '12px';
   const footerFontSize = isCompact ? '9px' : '10px';
+  const logoWidth = isCompact ? 150 : 170;
+  const reportTitle = report.reportType === 'standard_of_care' ? 'STANDARD OF CARE' : report.title;
+  const datePeriod = report.filters.fromDate && report.filters.toDate
+    ? `Date Period: ${report.filters.fromDate} to ${report.filters.toDate}`
+    : report.filters.date
+      ? `Date: ${report.filters.date}`
+      : '';
+  const filterLine = Object.entries(report.filters || {})
+    .filter(([key, value]) => value && !['fromDate', 'toDate'].includes(key))
+    .filter(([key]) => !(datePeriod && key === 'date'))
+    .map(([key, value]) => {
+      const label = key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, char => char.toUpperCase());
+      return `${label}: ${value}`;
+    })
+    .join(' • ');
   
   const renderTable = (headers: string[], rows: string[][]) => (
     <div className="border border-black" style={{ border: '1px solid #000' }}>
@@ -40,13 +64,17 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
         }}
       >
         <thead>
-          <tr style={{ backgroundColor: '#FBBF24' }} className="border-b border-black">
+          <tr
+            style={{ backgroundColor: useBrandedTemplate ? '#2B2B2B' : '#FBBF24' }}
+            className="border-b border-black"
+          >
             {headers.map((header, idx) => (
               <th
                 key={idx}
                 className="font-bold border-r border-black last:border-r-0 py-1 px-2 text-left align-middle"
                 style={{
                   fontWeight: 700,
+                  color: useBrandedTemplate ? '#FFFFFF' : '#000000',
                   borderRight: idx === headers.length - 1 ? 'none' : '1px solid #000',
                   padding: cellPadding,
                   textAlign: 'left',
@@ -114,44 +142,75 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
         </style>
       )}
       {/* Header - Exact template layout */}
-      <div className="text-center mb-4" style={{ textAlign: 'center', marginBottom: '16px' }}>
-        {/* Facility name - bold, larger */}
-        <h1 className="font-bold mb-1" style={{ fontSize: headerFontSize }}>{facility}</h1>
-        
-        {/* Report title - bold, slightly smaller */}
-        <h2 className="font-bold mb-3" style={{ fontSize: subtitleFontSize }}>{report.title}</h2>
-        
-        {/* Filter row: UNIT / DATE / SHIFT on same line */}
-        <div
-          className="flex justify-center gap-8 text-xs"
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '32px',
-            fontSize: filterFontSize,
-            flexWrap: 'wrap'
-          }}
-        >
-          <span>
-            <strong>UNIT:</strong>{' '}
-            <span className="border-b border-black px-2 inline-block" style={{ minWidth: '60px' }}>
-              {report.filters.unit || ''}
-            </span>
-          </span>
-          <span>
-            <strong>DATE:</strong>{' '}
-            <span className="border-b border-black px-2 inline-block" style={{ minWidth: '80px' }}>
-              {report.filters.date || ''}
-            </span>
-          </span>
-          <span>
-            <strong>SHIFT:</strong>{' '}
-            <span className="border-b border-black px-2 inline-block" style={{ minWidth: '40px' }}>
-              {report.filters.shift || '—'}
-            </span>
-          </span>
+      {useBrandedTemplate ? (
+        <div className="mb-4" style={{ marginBottom: '16px' }}>
+          <div
+            className="flex items-start justify-between"
+            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
+          >
+            <div style={{ width: logoWidth }} aria-hidden="true" />
+            <div className="text-center flex-1" style={{ textAlign: 'center' }}>
+              <h1 className="font-bold" style={{ fontSize: headerFontSize }}>{reportTitle}</h1>
+              {datePeriod && (
+                <p className="italic" style={{ fontSize: subtitleFontSize, marginTop: '2px' }}>
+                  {datePeriod}
+                </p>
+              )}
+              {filterLine && (
+                <p style={{ fontSize: filterFontSize, marginTop: '6px' }}>
+                  {filterLine}
+                </p>
+              )}
+            </div>
+            <div style={{ width: logoWidth, display: 'flex', justifyContent: 'flex-end' }}>
+              <img
+                src="/long-beach-logo.svg"
+                alt={`${facility} logo`}
+                style={{ width: logoWidth, height: 'auto' }}
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="text-center mb-4" style={{ textAlign: 'center', marginBottom: '16px' }}>
+          {/* Facility name - bold, larger */}
+          <h1 className="font-bold mb-1" style={{ fontSize: headerFontSize }}>{facility}</h1>
+          
+          {/* Report title - bold, slightly smaller */}
+          <h2 className="font-bold mb-3" style={{ fontSize: subtitleFontSize }}>{report.title}</h2>
+          
+          {/* Filter row: UNIT / DATE / SHIFT on same line */}
+          <div
+            className="flex justify-center gap-8 text-xs"
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '32px',
+              fontSize: filterFontSize,
+              flexWrap: 'wrap'
+            }}
+          >
+            <span>
+              <strong>UNIT:</strong>{' '}
+              <span className="border-b border-black px-2 inline-block" style={{ minWidth: '60px' }}>
+                {report.filters.unit || ''}
+              </span>
+            </span>
+            <span>
+              <strong>DATE:</strong>{' '}
+              <span className="border-b border-black px-2 inline-block" style={{ minWidth: '80px' }}>
+                {report.filters.date || ''}
+              </span>
+            </span>
+            <span>
+              <strong>SHIFT:</strong>{' '}
+              <span className="border-b border-black px-2 inline-block" style={{ minWidth: '40px' }}>
+                {report.filters.shift || '—'}
+              </span>
+            </span>
+          </div>
+        </div>
+      )}
       
       {/* Table - Exact template columns */}
       {report.sections && report.sections.length > 0 ? (

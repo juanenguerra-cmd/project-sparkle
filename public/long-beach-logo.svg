@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="260" height="80" viewBox="0 0 260 80" role="img" aria-label="Long Beach Nursing and Rehabilitation Center">
+  <rect width="260" height="80" fill="white"/>
+  <g transform="translate(8,8)">
+    <path d="M20 4 C38 2 56 16 56 32 C56 48 38 62 20 60 C16 46 16 18 20 4Z" fill="#C9A24A"/>
+    <path d="M24 12 C33 20 40 30 44 44" fill="none" stroke="#8C6A20" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g fill="#2E3A4E" font-family="Arial, sans-serif">
+    <text x="78" y="28" font-size="18" font-weight="700" letter-spacing="1">LONG BEACH</text>
+    <text x="78" y="44" font-size="9" font-weight="600">nursing and rehabilitation center</text>
+    <text x="78" y="60" font-size="7">375 East Bay Drive • Long Beach, NY 11561</text>
+    <text x="78" y="70" font-size="7">(516) 897-1700 • www.longbeachnrc.com</text>
+  </g>
+</svg>
