@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { nowISO, todayISO } from '@/lib/parsers';
+import { getEducationScript } from '@/lib/vaccineEducationScripts';
 
 interface VAXCaseModalProps {
   open: boolean;
@@ -92,6 +93,13 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
   const isHistorical = isVaccinated && formData.administrationSource === 'historical';
   const isInHouse = isVaccinated && formData.administrationSource === 'in_house';
   const showDueDate = formData.status === 'due' || isInHouse;
+  const educationNote = useMemo(() => {
+    const residentName = formData.residentName || selectedResident?.name || 'Resident';
+    const script = getEducationScript(formData.vaccine || 'Other');
+    const date = todayISO();
+
+    return `**${script.shortTitle} Provided**\n\nDate: ${date}\nResident: ${residentName}\n\n**Key Points Discussed:**\n${script.keyPoints.map(point => `• ${point}`).join('\n')}\n\n**Benefits:** ${script.benefitsStatement}\n\n**Risks Discussed:** ${script.riskStatement}\n\n---\nEducation documented per F883/F887 requirements.`;
+  }, [formData.residentName, formData.vaccine, selectedResident?.name]);
 
   useEffect(() => {
     if (!isVaccinated) return;
@@ -213,6 +221,22 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       toast({ title: 'VAX Record Deleted' });
       onSave();
       onClose();
+    }
+  };
+
+  const handleCopyEducationNote = async () => {
+    try {
+      await navigator.clipboard.writeText(educationNote);
+      toast({
+        title: 'Education note copied',
+        description: 'The education note is ready to paste into your progress note.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy the education note. Please copy it manually.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -408,6 +432,24 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
                 )}
               </div>
             )}
+
+            {/* Education Note */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-primary">Education Note (auto)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={handleCopyEducationNote}>
+                  Copy
+                </Button>
+              </div>
+              <Textarea
+                value={educationNote}
+                readOnly
+                className="text-sm h-40"
+              />
+              <p className="text-xs text-muted-foreground">
+                Auto-populated education documentation based on vaccine type.
+              </p>
+            </div>
 
             {/* Notes */}
             <div className="space-y-1">
