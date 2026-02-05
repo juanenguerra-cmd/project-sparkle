@@ -157,7 +157,15 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
       {report.sections && report.sections.length > 0 ? (
         <div className="flex flex-col gap-6">
           {report.sections.map((section, sectionIdx) => (
-            <div key={sectionIdx} className="flex flex-col gap-2">
+            <div
+              key={sectionIdx}
+              className="flex flex-col gap-2"
+              style={
+                report.reportType === 'standard_of_care' && sectionIdx > 0
+                  ? { breakBefore: 'page', pageBreakBefore: 'always' }
+                  : undefined
+              }
+            >
               <h3 className="font-bold text-sm">{section.title}</h3>
               {renderTable(section.headers, section.rows)}
             </div>
