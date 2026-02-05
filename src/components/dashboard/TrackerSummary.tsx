@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { TrendingUp, TrendingDown, Minus, Activity, AlertTriangle, CheckCircle } from 'lucide-react';
 import { loadDB, getActiveABT, getActiveIPCases, getVaxDue } from '@/lib/database';
-import { isoDateFromAny } from '@/lib/parsers';
+import { isoDateFromAny, mrnMatchKeys } from '@/lib/parsers';
 import { subDays, isAfter, parseISO } from 'date-fns';
 
 interface TrackerSummaryProps {
@@ -145,11 +145,18 @@ const TrackerSummary = ({ type }: TrackerSummaryProps) => {
       const dueRecords = getVaxDue(db);
       
       // Get active census MRNs
-      const activeCensusMrns = new Set(
-        Object.values(db.census.residentsByMrn)
-          .filter(r => r.active_on_census)
-          .map(r => r.mrn)
-      );
+      const activeCensusMrns = new Set<string>();
+      Object.values(db.census.residentsByMrn)
+        .filter(r => r.active_on_census)
+        .forEach(r => {
+          mrnMatchKeys(r.mrn).forEach(key => activeCensusMrns.add(key));
+        });
+
+      const isActiveCensusMrn = (mrn?: string) => {
+        const matchKeys = mrnMatchKeys(mrn || '');
+        if (matchKeys.length === 0) return true;
+        return matchKeys.some(key => activeCensusMrns.has(key));
+      };
       
       // Count given this month
       const givenThisMonth = allRecords.filter(r => {
@@ -168,14 +175,14 @@ const TrackerSummary = ({ type }: TrackerSummaryProps) => {
       // Declined count
       const declinedCount = allRecords.filter(r => {
         if (r.status !== 'declined') return false;
-        if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+        if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
         return true;
       }).length;
       
       // Overdue count
       const overdueCount = allRecords.filter(r => {
         if (r.status !== 'overdue') return false;
-        if (r.mrn && !activeCensusMrns.has(r.mrn)) return false;
+        if (r.mrn && !isActiveCensusMrn(r.mrn)) return false;
         return true;
       }).length;
       

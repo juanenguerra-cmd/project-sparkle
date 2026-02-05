@@ -11,6 +11,17 @@ export const canonicalMRN = (raw: string): string => {
     .slice(0, 20);
 };
 
+export const mrnMatchKeys = (raw: string): string[] => {
+  const canonical = canonicalMRN(raw);
+  if (!canonical) return [];
+  const digitsOnly = canonical.replace(/[^0-9]/g, "");
+  const keys = new Set([canonical]);
+  if (digitsOnly && digitsOnly !== canonical) {
+    keys.add(digitsOnly);
+  }
+  return Array.from(keys);
+};
+
 export const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 export const nowISO = (): string => new Date().toISOString();

@@ -1,6 +1,7 @@
 import { loadDB, getActiveABT, getActiveIPCases, getVaxDue, getRecentNotes } from '@/lib/database';
 import { getReofferCandidates } from '@/lib/vaccineReofferLogic';
 import { RotateCcw } from 'lucide-react';
+import { mrnMatchKeys } from '@/lib/parsers';
 
 interface WorklistSummaryProps {
   onNavigateVax?: () => void;
@@ -16,11 +17,12 @@ const WorklistSummary = ({ onNavigateVax }: WorklistSummaryProps) => {
   const recentNotesCount = getRecentNotes(db, 7).length;
   
   // Get re-offer count with outbreak integration
-  const activeCensusMrns = new Set(
-    Object.values(db.census.residentsByMrn)
-      .filter(r => r.active_on_census)
-      .map(r => r.mrn)
-  );
+  const activeCensusMrns = new Set<string>();
+  Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .forEach(r => {
+      mrnMatchKeys(r.mrn).forEach(key => activeCensusMrns.add(key));
+    });
   const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
   const reofferCount = getReofferCandidates(db.records.vax, activeCensusMrns, activeOutbreaks).length;
 

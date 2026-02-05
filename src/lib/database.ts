@@ -21,7 +21,7 @@ import {
   SymptomCategory,
   SYMPTOM_OPTIONS
 } from './types';
-import { isoDateFromAny, nowISO, canonicalMRN, todayISO } from './parsers';
+import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
 
 export interface ICNDatabase {
@@ -451,11 +451,13 @@ export const getResidentByMRN = (db: ICNDatabase, mrn: string): Resident | undef
 
 // Get active resident MRNs from census
 const getActiveCensusMrns = (db: ICNDatabase): Set<string> => {
-  return new Set(
-    Object.values(db.census.residentsByMrn)
-      .filter(r => r.active_on_census)
-      .map(r => r.mrn)
-  );
+  const activeMrns = new Set<string>();
+  Object.values(db.census.residentsByMrn)
+    .filter(r => r.active_on_census)
+    .forEach(r => {
+      mrnMatchKeys(r.mrn).forEach(key => activeMrns.add(key));
+    });
+  return activeMrns;
 };
 
 // ABT helpers - excludes discharged residents
@@ -469,7 +471,10 @@ export const getActiveABT = (db: ICNDatabase): ABTRecord[] => {
     const status = (r.status || '').toLowerCase();
     if (status === 'discontinued') return false;
     // Hard exclude discharged residents regardless of date
-    if (r.mrn && !activeMrns.has(r.mrn)) return false;
+    if (r.mrn) {
+      const matchKeys = mrnMatchKeys(r.mrn);
+      if (matchKeys.length > 0 && !matchKeys.some(key => activeMrns.has(key))) return false;
+    }
     const endDate = r.endDate || r.end_date;
     const endIso = endDate ? isoDateFromAny(endDate) : '';
     const isWithinCourse = !endIso || endIso >= today;
@@ -550,7 +555,10 @@ export const getActiveIPCases = (db: ICNDatabase): IPCase[] => {
     const status = normalizeIPStatus(r.status || r.case_status);
     if (status !== 'active') return false;
     const mrn = canonicalMRN(r.mrn || '');
-    if (mrn && !activeMrns.has(mrn)) return false;
+    if (mrn) {
+      const matchKeys = mrnMatchKeys(mrn);
+      if (matchKeys.length > 0 && !matchKeys.some(key => activeMrns.has(key))) return false;
+    }
     return true;
   });
 };
@@ -562,7 +570,10 @@ export const getVaxDue = (db: ICNDatabase): VaxRecord[] => {
   return db.records.vax.filter(r => {
     const status = (r.status || '').toLowerCase();
     if (status !== 'due' && status !== 'overdue') return false;
-    if (r.mrn && !activeMrns.has(r.mrn)) return false;
+    if (r.mrn) {
+      const matchKeys = mrnMatchKeys(r.mrn);
+      if (matchKeys.length > 0 && !matchKeys.some(key => activeMrns.has(key))) return false;
+    }
     return true;
   });
 };
