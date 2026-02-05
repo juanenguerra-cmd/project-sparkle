@@ -151,6 +151,14 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const activeIP = getActiveIPCases(db).length;
   const vaxDue = getVaxDue(db).length;
   const activeOutbreaks = getActiveOutbreaks(db);
+  const reportSections = [
+    { id: 'report-executive', label: 'Executive' },
+    { id: 'report-operational', label: 'Operational' },
+    { id: 'report-surveillance', label: 'Surveillance' },
+    { id: 'report-line-listing', label: 'Line Listing' },
+    { id: 'report-scheduled', label: 'Scheduled' },
+    { id: 'report-output', label: 'Output' }
+  ];
 
   // Get unique units from census
   const units = [...new Set(
@@ -920,6 +928,20 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     recordAction('Cleared report');
   };
 
+  const handleJumpToSection = (sectionId: string) => {
+    if (sectionId === 'report-executive') setExecutiveOpen(true);
+    if (sectionId === 'report-operational') setOperationalOpen(true);
+    if (sectionId === 'report-surveillance') setSurveillanceOpen(true);
+    if (sectionId === 'report-line-listing') setLineListingOpen(true);
+
+    window.requestAnimationFrame(() => {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -984,19 +1006,65 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         </div>
       </div>
 
+      <SectionCard title="Report Flow Navigator">
+        <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Follow the guided path to find the right report, apply filters, and export with confidence.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { step: '1', title: 'Choose a report', detail: 'Executive, Operational, Surveillance' },
+                { step: '2', title: 'Set filters', detail: 'Unit, dates, protocol' },
+                { step: '3', title: 'Preview & export', detail: 'Review, share, archive' }
+              ].map((item) => (
+                <div key={item.step} className="rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs">
+                      {item.step}
+                    </span>
+                    {item.title}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">{item.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <p className="text-xs font-medium text-muted-foreground mb-3">Jump to a section</p>
+            <div className="flex flex-wrap gap-2">
+              {reportSections.map((section) => (
+                <Button
+                  key={section.id}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleJumpToSection(section.id)}
+                >
+                  {section.label}
+                </Button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              Tip: Use Quick Precautions for urgent listings, then return here to export or print a full report.
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
       {/* Report Sections */}
-      <Collapsible open={executiveOpen} onOpenChange={setExecutiveOpen}>
-        <SectionCard 
-          title="Executive & Regulatory Reports"
-          actions={
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ChevronDown className={`w-4 h-4 transition-transform ${executiveOpen ? '' : '-rotate-90'}`} />
-              </Button>
-            </CollapsibleTrigger>
-          }
-        >
-          <CollapsibleContent>
+      <div id="report-executive">
+        <Collapsible open={executiveOpen} onOpenChange={setExecutiveOpen}>
+          <SectionCard 
+            title="Executive & Regulatory Reports"
+            actions={
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${executiveOpen ? '' : '-rotate-90'}`} />
+                </Button>
+              </CollapsibleTrigger>
+            }
+          >
+            <CollapsibleContent>
             {/* QAPI Reports Settings Panel */}
             <div className="bg-muted/30 rounded-lg p-4 mb-4">
               <div className="text-sm font-medium mb-3">QAPI Report Settings</div>
@@ -1085,22 +1153,24 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                 />
               ))}
             </div>
-          </CollapsibleContent>
-        </SectionCard>
-      </Collapsible>
+            </CollapsibleContent>
+          </SectionCard>
+        </Collapsible>
+      </div>
 
-      <Collapsible open={operationalOpen} onOpenChange={setOperationalOpen}>
-        <SectionCard 
-          title="Operational Management Reports"
-          actions={
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ChevronDown className={`w-4 h-4 transition-transform ${operationalOpen ? '' : '-rotate-90'}`} />
-              </Button>
-            </CollapsibleTrigger>
-          }
-        >
-          <CollapsibleContent>
+      <div id="report-operational">
+        <Collapsible open={operationalOpen} onOpenChange={setOperationalOpen}>
+          <SectionCard 
+            title="Operational Management Reports"
+            actions={
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${operationalOpen ? '' : '-rotate-90'}`} />
+                </Button>
+              </CollapsibleTrigger>
+            }
+          >
+            <CollapsibleContent>
             <div className="divide-y divide-border">
               {operationalReports.map((report) => (
                 <ReportListItem
@@ -1111,9 +1181,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                 />
               ))}
             </div>
-          </CollapsibleContent>
-        </SectionCard>
-      </Collapsible>
+            </CollapsibleContent>
+          </SectionCard>
+        </Collapsible>
+      </div>
 
       {/* Trend Prediction Analytics */}
       <SectionCard title="Trend Prediction & Forecasting">
@@ -1121,18 +1192,19 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       </SectionCard>
 
       {/* Antibiotic & Infection Surveillance Reports */}
-      <Collapsible open={surveillanceOpen} onOpenChange={setSurveillanceOpen}>
-        <SectionCard 
-          title="Antibiotic & Infection Surveillance"
-          actions={
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ChevronDown className={`w-4 h-4 transition-transform ${surveillanceOpen ? '' : '-rotate-90'}`} />
-              </Button>
-            </CollapsibleTrigger>
-          }
-        >
-          <CollapsibleContent>
+      <div id="report-surveillance">
+        <Collapsible open={surveillanceOpen} onOpenChange={setSurveillanceOpen}>
+          <SectionCard 
+            title="Antibiotic & Infection Surveillance"
+            actions={
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${surveillanceOpen ? '' : '-rotate-90'}`} />
+                </Button>
+              </CollapsibleTrigger>
+            }
+          >
+            <CollapsibleContent>
             {/* Date Range / Quarter Selector */}
             <div className="bg-muted/30 rounded-lg p-4 mb-4">
               <div className="flex flex-wrap items-end gap-4">
@@ -1235,9 +1307,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                 />
               ))}
             </div>
-          </CollapsibleContent>
-        </SectionCard>
-      </Collapsible>
+            </CollapsibleContent>
+          </SectionCard>
+        </Collapsible>
+      </div>
 
       {/* Floor Layout Heatmap */}
       <Collapsible open={floorLayoutOpen} onOpenChange={setFloorLayoutOpen}>
@@ -1283,18 +1356,19 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       </Collapsible>
 
       {/* Line Listing Reports */}
-      <Collapsible open={lineListingOpen} onOpenChange={setLineListingOpen}>
-        <SectionCard 
-          title="Line Listing Reports"
-          actions={
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <ChevronDown className={`w-4 h-4 transition-transform ${lineListingOpen ? '' : '-rotate-90'}`} />
-              </Button>
-            </CollapsibleTrigger>
-          }
-        >
-          <CollapsibleContent>
+      <div id="report-line-listing">
+        <Collapsible open={lineListingOpen} onOpenChange={setLineListingOpen}>
+          <SectionCard 
+            title="Line Listing Reports"
+            actions={
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ChevronDown className={`w-4 h-4 transition-transform ${lineListingOpen ? '' : '-rotate-90'}`} />
+                </Button>
+              </CollapsibleTrigger>
+            }
+          >
+            <CollapsibleContent>
             <p className="text-sm text-muted-foreground mb-4">
               Generate line listing reports matching CDC/CMS templates for outbreak documentation.
               Customize form fields in Settings → Line Listing Form Configuration.
@@ -1380,9 +1454,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                 Download blank line listing forms for manual documentation during outbreaks.
               </p>
             </div>
-          </CollapsibleContent>
-        </SectionCard>
-      </Collapsible>
+            </CollapsibleContent>
+          </SectionCard>
+        </Collapsible>
+      </div>
 
       <SectionCard title="Infection Control Binder Organization">
         <div className="space-y-4">
@@ -1423,9 +1498,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       </SectionCard>
 
       {/* Scheduled Reports */}
-      <SectionCard title="Scheduled Reports">
-        <ScheduledReportsPanel />
-      </SectionCard>
+      <div id="report-scheduled">
+        <SectionCard title="Scheduled Reports">
+          <ScheduledReportsPanel />
+        </SectionCard>
+      </div>
 
       <SectionCard title="Reporting Process & QA">
         <div className="grid gap-6 md:grid-cols-2">
@@ -1524,7 +1601,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       </SectionCard>
 
       {/* Report Output */}
-      <SectionCard title="Report Output">
+      <div id="report-output">
+        <SectionCard title="Report Output">
         <div className="filter-panel mb-6">
           {/* Row 1: Common filters */}
           <div className="flex flex-wrap items-end gap-4 mb-4">
@@ -1812,7 +1890,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
             Print
           </Button>
         </div>
-      </SectionCard>
+        </SectionCard>
+      </div>
 
       {onNavigate && (
         <SectionCard title="Next Steps">
