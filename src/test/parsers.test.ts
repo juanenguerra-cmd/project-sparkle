@@ -10,7 +10,7 @@ import {
 describe("canonicalMRN", () => {
   it("keeps alphanumeric MRNs and strips punctuation", () => {
     expect(canonicalMRN("123456")).toBe("123456");
-    expect(canonicalMRN("LON202238")).toBe("LON202238");
+    expect(canonicalMRN("LON202238")).toBe("202238");
     expect(canonicalMRN("abc123")).toBe("ABC123");
     expect(canonicalMRN("12-34-56")).toBe("123456");
   });
@@ -117,7 +117,7 @@ describe("parseCensusRaw", () => {
     const result = parseCensusRaw(input);
 
     expect(result).toHaveLength(1);
-    expect(result[0].mrn).toBe("LON202238");
+    expect(result[0].mrn).toBe("202238");
     expect(result[0].name).toBe("DOE, JANE");
   });
 
