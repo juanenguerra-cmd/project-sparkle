@@ -138,7 +138,13 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
     >
       {report.reportType === 'standard_of_care' && (
         <style>
-          {`@media print { @page { size: landscape; } }`}
+          {`@media print {
+            @page { size: landscape; }
+            #report-content { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            #report-content table { page-break-inside: auto; }
+            #report-content thead { display: table-header-group; }
+            #report-content tr { page-break-inside: avoid; page-break-after: auto; }
+          }`}
         </style>
       )}
       {/* Header - Exact template layout */}
