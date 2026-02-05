@@ -13,6 +13,8 @@ describe("canonicalMRN", () => {
     expect(canonicalMRN("LON202238")).toBe("202238");
     expect(canonicalMRN("abc123")).toBe("ABC123");
     expect(canonicalMRN("12-34-56")).toBe("123456");
+    expect(canonicalMRN("MRN: 654321")).toBe("654321");
+    expect(canonicalMRN("(MRN 7654321)")).toBe("7654321");
   });
 
   it("handles empty or null input", () => {

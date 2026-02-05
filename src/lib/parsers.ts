@@ -3,8 +3,10 @@
 
 export const canonicalMRN = (raw: string): string => {
   const rawValue = String(raw || "");
+  const labeledMatch = rawValue.match(/\bMRN[:\s#-]*([A-Za-z0-9]+)\b/i);
+  const labeledCandidate = labeledMatch ? labeledMatch[1] : "";
   const parenMatch = rawValue.match(/\(([^)]+)\)/);
-  const candidate = parenMatch ? parenMatch[1] : rawValue;
+  const candidate = labeledCandidate || (parenMatch ? parenMatch[1] : rawValue);
   const normalized = candidate
     .replace(/[^A-Za-z0-9]/g, "")
     .toUpperCase()
