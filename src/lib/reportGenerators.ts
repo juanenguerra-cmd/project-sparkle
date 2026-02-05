@@ -1208,8 +1208,8 @@ export const generateStandardOfCareReport = (
     subtitle: 'Those started on the date range selected',
     generatedAt: new Date().toISOString(),
     filters: {
-      fromDate: format(new Date(fromDate), 'MM/dd/yyyy'),
-      toDate: format(new Date(toDate), 'MM/dd/yyyy'),
+      fromDate: formatDateValue(fromDate),
+      toDate: formatDateValue(toDate),
       date: format(new Date(), 'MM/dd/yyyy')
     },
     headers: [],
