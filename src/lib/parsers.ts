@@ -5,10 +5,17 @@ export const canonicalMRN = (raw: string): string => {
   const rawValue = String(raw || "");
   const parenMatch = rawValue.match(/\(([^)]+)\)/);
   const candidate = parenMatch ? parenMatch[1] : rawValue;
-  return candidate
+  const normalized = candidate
     .replace(/[^A-Za-z0-9]/g, "")
     .toUpperCase()
     .slice(0, 20);
+  if (normalized.startsWith("LON")) {
+    const withoutPrefix = normalized.slice(3);
+    if (/^\d+$/.test(withoutPrefix)) {
+      return withoutPrefix;
+    }
+  }
+  return normalized;
 };
 
 export const mrnMatchKeys = (raw: string): string[] => {
