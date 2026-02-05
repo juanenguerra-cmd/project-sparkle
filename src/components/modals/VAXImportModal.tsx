@@ -24,7 +24,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
     mrn: '',
     vaccine: 'FLU',
     dose: '',
-    status: 'due' as 'given' | 'due' | 'overdue' | 'declined',
+    status: 'due' as 'given' | 'due' | 'declined',
     dateGiven: '',
     dueDate: todayISO(),
     notes: ''
@@ -152,16 +152,15 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
               <Label>Status</Label>
               <Select 
                 value={formData.status} 
-                onValueChange={(v: 'given' | 'due' | 'overdue' | 'declined') => setFormData(p => ({ ...p, status: v }))}
+                onValueChange={(v: 'given' | 'due' | 'declined') => setFormData(p => ({ ...p, status: v }))}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="due">Due</SelectItem>
-                  <SelectItem value="given">Given</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="declined">Declined</SelectItem>
+                  <SelectItem value="given">Vaccinated</SelectItem>
+                  <SelectItem value="declined">Decline</SelectItem>
                 </SelectContent>
               </Select>
             </div>
