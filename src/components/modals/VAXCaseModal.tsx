@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord, Resident } from '@/lib/types';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { nowISO, todayISO } from '@/lib/parsers';
 
 interface VAXCaseModalProps {
@@ -89,6 +88,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
   };
 
   const isVaccinated = formData.status === 'given';
+  const isDeclined = formData.status === 'declined';
   const isHistorical = isVaccinated && formData.administrationSource === 'historical';
   const isInHouse = isVaccinated && formData.administrationSource === 'in_house';
   const showDueDate = formData.status === 'due' || isInHouse;
@@ -109,6 +109,16 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       setFormData(prev => ({ ...prev, dueDate: '' }));
     }
   }, [formData.administrationSource, isVaccinated, formData.dueDate]);
+
+  useEffect(() => {
+    if (!isDeclined) return;
+
+    const today = todayISO();
+    setFormData(prev => ({
+      ...prev,
+      dateGiven: prev.dateGiven || today,
+    }));
+  }, [isDeclined]);
 
   const handleResidentSelect = (resident: Resident) => {
     setSelectedResident(resident);
@@ -150,6 +160,15 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       return;
     }
 
+    if (isDeclined && !formData.dateGiven) {
+      toast({
+        title: 'Declined date required',
+        description: 'Enter the date the vaccine was declined.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const now = nowISO();
     
     const recordData: VaxRecord = {
@@ -163,8 +182,8 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       vaccine: formData.vaccine,
       vaccine_type: formData.vaccine,
       dose: formData.dose,
-      dateGiven: isVaccinated ? formData.dateGiven : '',
-      date_given: isVaccinated ? formData.dateGiven : '',
+      dateGiven: isVaccinated || isDeclined ? formData.dateGiven : '',
+      date_given: isVaccinated || isDeclined ? formData.dateGiven : '',
       dueDate: showDueDate ? formData.dueDate : '',
       due_date: showDueDate ? formData.dueDate : '',
       status: formData.status,
@@ -223,7 +242,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
           <DialogTitle>{editRecord ? 'Edit VAX Record' : 'Add VAX Record'}</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           <div className="space-y-4 pb-4">
             {/* Resident Selection */}
             <div className="space-y-1">
@@ -323,7 +342,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
                       ...p,
                       status: v,
                       administrationSource: v === 'given' ? p.administrationSource : '',
-                      dateGiven: v === 'given' ? p.dateGiven : '',
+                      dateGiven: v === 'given' ? p.dateGiven : v === 'declined' ? (p.dateGiven || todayISO()) : '',
                       dueDate: v === 'due' ? p.dueDate : '',
                     }))
                   }
@@ -379,7 +398,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
               </div>
             )}
 
-            {(isHistorical || showDueDate) && (
+            {(isHistorical || showDueDate || isDeclined) && (
               <div className="grid grid-cols-2 gap-4">
                 {isHistorical && (
                   <div className="space-y-1">
@@ -406,6 +425,17 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
                     />
                   </div>
                 )}
+                {isDeclined && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-primary">Declined Date</Label>
+                    <Input
+                      type="date"
+                      value={formData.dateGiven}
+                      onChange={(e) => setFormData(p => ({ ...p, dateGiven: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -420,7 +450,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
               />
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="flex justify-between items-center px-6 py-4 border-t">
