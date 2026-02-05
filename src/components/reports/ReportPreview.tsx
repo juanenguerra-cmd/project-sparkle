@@ -34,7 +34,6 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
   const subtitleFontSize = isCompact ? '11px' : '12px';
   const filterFontSize = isCompact ? '10px' : '12px';
   const footerFontSize = isCompact ? '9px' : '10px';
-  const logoWidth = isCompact ? 150 : 170;
   const reportTitle = report.reportType === 'standard_of_care' ? 'STANDARD OF CARE' : report.title;
   const datePeriod = report.filters.fromDate && report.filters.toDate
     ? `Date Period: ${report.filters.fromDate} to ${report.filters.toDate}`
@@ -151,10 +150,9 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
       {useBrandedTemplate ? (
         <div className="mb-4" style={{ marginBottom: '16px' }}>
           <div
-            className="flex items-start justify-between"
-            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}
+            className="flex items-start justify-center"
+            style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}
           >
-            <div style={{ width: logoWidth }} aria-hidden="true" />
             <div className="text-center flex-1" style={{ textAlign: 'center' }}>
               <h1 className="font-bold" style={{ fontSize: headerFontSize }}>{reportTitle}</h1>
               {datePeriod && (
@@ -167,13 +165,6 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
                   {filterLine}
                 </p>
               )}
-            </div>
-            <div style={{ width: logoWidth, display: 'flex', justifyContent: 'flex-end' }}>
-              <img
-                src="/long-beach-logo.svg"
-                alt={`${facility} logo`}
-                style={{ width: logoWidth, height: 'auto' }}
-              />
             </div>
           </div>
         </div>
