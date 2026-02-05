@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { nowISO } from '@/lib/parsers';
+import { nowISO, todayISO } from '@/lib/parsers';
 
 interface VAXCaseModalProps {
   open: boolean;
@@ -19,8 +19,6 @@ interface VAXCaseModalProps {
 }
 
 const VACCINE_TYPES = ['FLU', 'COVID', 'PNA', 'RSV', 'Tdap', 'Shingles', 'Hep B', 'Other'];
-const STATUS_OPTIONS = ['due', 'given', 'overdue', 'declined'];
-
 const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,8 +33,9 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     dose: '',
     dateGiven: '',
     dueDate: '',
-    status: 'due' as 'due' | 'given' | 'overdue' | 'declined',
+    status: 'due' as 'due' | 'given' | 'declined',
     notes: '',
+    administrationSource: '' as '' | 'historical' | 'in_house',
   });
 
   const db = loadDB();
@@ -61,8 +60,9 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
         dose: editRecord.dose || '',
         dateGiven: editRecord.dateGiven || editRecord.date_given || '',
         dueDate: editRecord.dueDate || editRecord.due_date || '',
-        status: editRecord.status,
+        status: editRecord.status === 'overdue' ? 'due' : editRecord.status,
         notes: editRecord.notes || '',
+        administrationSource: editRecord.administrationSource || (editRecord.status === 'given' ? 'historical' : ''),
       });
       setSearchTerm(editRecord.residentName || editRecord.name || '');
     } else {
@@ -84,8 +84,31 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       dueDate: '',
       status: 'due',
       notes: '',
+      administrationSource: '',
     });
   };
+
+  const isVaccinated = formData.status === 'given';
+  const isHistorical = isVaccinated && formData.administrationSource === 'historical';
+  const isInHouse = isVaccinated && formData.administrationSource === 'in_house';
+  const showDueDate = formData.status === 'due' || isInHouse;
+
+  useEffect(() => {
+    if (!isVaccinated) return;
+
+    if (formData.administrationSource === 'in_house') {
+      const today = todayISO();
+      setFormData(prev => ({
+        ...prev,
+        dateGiven: prev.dateGiven || today,
+        dueDate: prev.dueDate || today,
+      }));
+    }
+
+    if (formData.administrationSource === 'historical' && formData.dueDate) {
+      setFormData(prev => ({ ...prev, dueDate: '' }));
+    }
+  }, [formData.administrationSource, isVaccinated, formData.dueDate]);
 
   const handleResidentSelect = (resident: Resident) => {
     setSelectedResident(resident);
@@ -109,6 +132,24 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       return;
     }
 
+    if (isVaccinated && !formData.administrationSource) {
+      toast({
+        title: 'Vaccination source required',
+        description: 'Select Historical or In-House for vaccinated records.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (isHistorical && !formData.dateGiven) {
+      toast({
+        title: 'Date given required',
+        description: 'Enter the historical vaccination date.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     const now = nowISO();
     
     const recordData: VaxRecord = {
@@ -122,13 +163,14 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       vaccine: formData.vaccine,
       vaccine_type: formData.vaccine,
       dose: formData.dose,
-      dateGiven: formData.dateGiven,
-      date_given: formData.dateGiven,
-      dueDate: formData.dueDate,
-      due_date: formData.dueDate,
+      dateGiven: isVaccinated ? formData.dateGiven : '',
+      date_given: isVaccinated ? formData.dateGiven : '',
+      dueDate: showDueDate ? formData.dueDate : '',
+      due_date: showDueDate ? formData.dueDate : '',
       status: formData.status,
       notes: formData.notes,
       createdAt: editRecord?.createdAt || now,
+      administrationSource: formData.administrationSource || undefined,
     };
 
     const currentDb = loadDB();
@@ -270,41 +312,102 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
               </div>
             </div>
 
-            {/* Dates and Status */}
+            {/* Status */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">Date Given</Label>
-                <Input 
-                  type="date"
-                  value={formData.dateGiven}
-                  onChange={(e) => setFormData(p => ({ ...p, dateGiven: e.target.value }))}
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-primary">Due Date</Label>
-                <Input 
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData(p => ({ ...p, dueDate: e.target.value }))}
-                  className="text-sm"
-                />
-              </div>
-              <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Status</Label>
-                <Select value={formData.status} onValueChange={(v: 'due' | 'given' | 'overdue' | 'declined') => setFormData(p => ({ ...p, status: v }))}>
+                <Select
+                  value={formData.status}
+                  onValueChange={(v: 'due' | 'given' | 'declined') =>
+                    setFormData(p => ({
+                      ...p,
+                      status: v,
+                      administrationSource: v === 'given' ? p.administrationSource : '',
+                      dateGiven: v === 'given' ? p.dateGiven : '',
+                      dueDate: v === 'due' ? p.dueDate : '',
+                    }))
+                  }
+                >
                   <SelectTrigger className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="given">Vaccinated</SelectItem>
                     <SelectItem value="due">Due</SelectItem>
-                    <SelectItem value="given">Given</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
+                    <SelectItem value="declined">Decline</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {isVaccinated && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    id="vax-source-historical"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    checked={formData.administrationSource === 'historical'}
+                    onChange={() =>
+                      setFormData(p => ({
+                        ...p,
+                        administrationSource: p.administrationSource === 'historical' ? '' : 'historical',
+                      }))
+                    }
+                  />
+                  <Label htmlFor="vax-source-historical" className="text-xs font-semibold text-primary">
+                    Historical
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    id="vax-source-inhouse"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    checked={formData.administrationSource === 'in_house'}
+                    onChange={() =>
+                      setFormData(p => ({
+                        ...p,
+                        administrationSource: p.administrationSource === 'in_house' ? '' : 'in_house',
+                      }))
+                    }
+                  />
+                  <Label htmlFor="vax-source-inhouse" className="text-xs font-semibold text-primary">
+                    In-House
+                  </Label>
+                </div>
+              </div>
+            )}
+
+            {(isHistorical || showDueDate) && (
+              <div className="grid grid-cols-2 gap-4">
+                {isHistorical && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-primary">Date Given</Label>
+                    <Input
+                      type="date"
+                      value={formData.dateGiven}
+                      onChange={(e) => setFormData(p => ({ ...p, dateGiven: e.target.value }))}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+                {showDueDate && (
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-primary">
+                      Due Date{isInHouse ? ' (auto)' : ''}
+                    </Label>
+                    <Input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData(p => ({ ...p, dueDate: e.target.value }))}
+                      className="text-sm"
+                      readOnly={isInHouse}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Notes */}
             <div className="space-y-1">

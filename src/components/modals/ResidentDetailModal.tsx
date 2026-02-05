@@ -783,9 +783,8 @@ const EditRecordModal = ({
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="due">Due</SelectItem>
-                    <SelectItem value="given">Given</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
-                    <SelectItem value="declined">Declined</SelectItem>
+                    <SelectItem value="given">Vaccinated</SelectItem>
+                    <SelectItem value="declined">Decline</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

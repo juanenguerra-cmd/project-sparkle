@@ -119,6 +119,7 @@ export interface VaxRecord {
   due_date?: string;
   notes?: string;
   createdAt?: string;
+  administrationSource?: 'historical' | 'in_house';
   // F883/F887 Enhanced Fields
   offerDate?: string;
   educationProvided?: boolean;

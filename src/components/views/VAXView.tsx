@@ -385,13 +385,13 @@ const VAXView = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'given':
-        return <span className="badge-status badge-ok">Given</span>;
+        return <span className="badge-status badge-ok">Vaccinated</span>;
       case 'due':
         return <span className="badge-status badge-info">Due</span>;
       case 'overdue':
         return <span className="badge-status badge-bad">Overdue</span>;
       case 'declined':
-        return <span className="badge-status badge-muted">Declined</span>;
+        return <span className="badge-status badge-muted">Decline</span>;
       default:
         return <span className="badge-status badge-muted">{status}</span>;
     }
