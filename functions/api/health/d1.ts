@@ -14,7 +14,16 @@ export const onRequest: PagesFunction<Env> = async ({ env }) => {
   if (!db) {
     const msg = "Missing D1 binding: DB";
     console.error(msg);
-    return json({ ok: false, error: msg }, 500);
+    return json(
+      {
+        ok: false,
+        status: "INACTIVE",
+        sync: "NOT_SYNCED",
+        indicator: "🔴 INACTIVE · NOT SYNCED",
+        error: msg,
+      },
+      500
+    );
   }
 
   try {
@@ -34,15 +43,26 @@ export const onRequest: PagesFunction<Env> = async ({ env }) => {
     return json({
       ok: true,
       source: "d1",
+      status: "ACTIVE",
+      sync: "COMPLETE",
+      indicator: "🟢 ACTIVE · SYNCED",
       wrote: true,
       rows: row?.c ?? 0,
       route: "/api/health/d1",
+      checkedAt: new Date().toISOString(),
     });
   } catch (err: unknown) {
-    // Log full details privately
     console.error("D1 healthcheck failed:", err);
 
-    // Keep response clean (no internal error leakage)
-    return json({ ok: false, error: "D1 healthcheck failed" }, 500);
+    return json(
+      {
+        ok: false,
+        status: "ACTIVE",
+        sync: "FAILED",
+        indicator: "🟡 ACTIVE · SYNC FAILED",
+        error: "D1 healthcheck failed",
+      },
+      500
+    );
   }
 };
