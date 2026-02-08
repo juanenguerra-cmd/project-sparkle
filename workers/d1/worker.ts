@@ -1,3 +1,10 @@
+import {
+  getMigrationStatus,
+  getSqliteVersion,
+  listTables,
+  runHardSyncCheck,
+} from './d1Health';
+
 export interface Env {
   DB: D1Database;
 }
@@ -30,6 +37,39 @@ export default {
     }
 
     if (url.pathname !== '/api/db') {
+      if (url.pathname === '/api/health/d1' && request.method === 'GET') {
+        const hardCheck = await runHardSyncCheck(env.DB, env as Env);
+        const sqliteVersion = await getSqliteVersion(env.DB);
+        const tables = await listTables(env.DB);
+
+        const responseBody = {
+          ok: hardCheck.ok,
+          envTag: hardCheck.envTag,
+          insertedId: hardCheck.insertedId,
+          readBackId: hardCheck.readBackId,
+          sqliteVersion: sqliteVersion.value,
+          tables: tables.tables,
+          error: hardCheck.error ?? sqliteVersion.error ?? tables.error,
+        };
+
+        return json(responseBody, hardCheck.ok ? 200 : 500);
+      }
+
+      if (
+        url.pathname === '/api/health/d1/schema' &&
+        request.method === 'GET'
+      ) {
+        const migrationStatus = await getMigrationStatus(env.DB);
+        return json(
+          {
+            ok: migrationStatus.ok,
+            migrations: migrationStatus.migrations,
+            message: migrationStatus.message,
+          },
+          200
+        );
+      }
+
       return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
 
@@ -47,8 +87,10 @@ export default {
         return badRequest('Missing request body');
       }
       await env.DB.prepare(
-        'INSERT OR REPLACE INTO app_state (id, data) VALUES (1, ?)' 
-      ).bind(text).run();
+        'INSERT OR REPLACE INTO app_state (id, data) VALUES (1, ?)'
+      )
+        .bind(text)
+        .run();
       return ok(JSON.stringify({ status: 'ok' }), jsonHeaders);
     }
 
