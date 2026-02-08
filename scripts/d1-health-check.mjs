@@ -29,7 +29,7 @@ const waitForHealthy = async () => {
           `Health endpoint returned ${response.status}: ${JSON.stringify(body)}`
         );
       }
-      if (!body?.ok) {
+      if (!body?.ok || body?.source !== 'd1') {
         throw new Error(`Health check failed: ${JSON.stringify(body)}`);
       }
       return;
@@ -48,7 +48,7 @@ const main = async () => {
     'd1',
     'migrations',
     'apply',
-    'DB',
+    'project_sparkle_db',
     '--local',
     '--config',
     'wrangler.toml',
@@ -58,8 +58,9 @@ const main = async () => {
     'npx',
     [
       'wrangler',
+      'pages',
       'dev',
-      'workers/d1/worker.ts',
+      'dist',
       '--local',
       '--persist',
       '--port',

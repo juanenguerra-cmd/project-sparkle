@@ -13,7 +13,10 @@
     "test:e2e:install": "npx playwright install --with-deps",
     "test": "vitest run",
     "test:watch": "vitest",
-    "d1:health": "node scripts/d1-health-check.mjs"
+    "d1:health": "node scripts/d1-health-check.mjs",
+    "d1:check": "node scripts/d1-health-check.mjs",
+    "d1:migrate:local": "wrangler d1 migrations apply project_sparkle_db --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply project_sparkle_db --remote"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
