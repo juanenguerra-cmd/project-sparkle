@@ -76,7 +76,6 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
                   color: useBrandedTemplate ? '#FFFFFF' : '#000000',
                   borderRight: idx === headers.length - 1 ? 'none' : '1px solid #000',
                   padding: cellPadding,
-                  textAlign: 'left',
                   verticalAlign: 'middle',
                   wordBreak,
                   overflowWrap,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 type D1Health = {
   ok: boolean;
@@ -10,7 +10,7 @@ type D1Health = {
   error?: string;
 };
 
-export function D1Status() {
+export default function D1Status() {
   const [data, setData] = useState<D1Health | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,7 +20,7 @@ export function D1Status() {
       const res = await fetch("/api/health/d1", { cache: "no-store" });
       const json = (await res.json()) as D1Health;
       setData(json);
-    } catch (e) {
+    } catch {
       setData({
         ok: false,
         indicator: "🔴 INACTIVE · NOT SYNCED",
@@ -35,23 +35,24 @@ export function D1Status() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 15000); // refresh every 15s
+    const id = setInterval(load, 15000);
     return () => clearInterval(id);
   }, []);
 
   const indicator = loading ? "⏳ Checking D1…" : data?.indicator ?? "—";
   const rows = data?.rows;
 
-  // Simple pill styling without assuming any CSS framework
-  const bg =
-    indicator.includes("🟢") ? "#e7f7ee" :
-    indicator.includes("🟡") ? "#fff5db" :
-    "#fde8e8";
+  const bg = indicator.includes("🟢")
+    ? "#e7f7ee"
+    : indicator.includes("🟡")
+    ? "#fff5db"
+    : "#fde8e8";
 
-  const border =
-    indicator.includes("🟢") ? "#34c759" :
-    indicator.includes("🟡") ? "#f5a623" :
-    "#ff3b30";
+  const border = indicator.includes("🟢")
+    ? "#34c759"
+    : indicator.includes("🟡")
+    ? "#f5a623"
+    : "#ff3b30";
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -71,13 +72,12 @@ export function D1Status() {
       </span>
 
       {!loading && typeof rows === "number" && (
-        <span style={{ fontSize: 12, opacity: 0.8 }}>
-          rows: {rows}
-        </span>
+        <span style={{ fontSize: 12, opacity: 0.8 }}>rows: {rows}</span>
       )}
 
       <button
         onClick={load}
+        type="button"
         style={{
           padding: "6px 10px",
           borderRadius: 10,
