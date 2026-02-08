@@ -7,3 +7,9 @@ CREATE TABLE IF NOT EXISTS app_state (
 INSERT OR IGNORE INTO app_state (id, data) VALUES (1, '{}');
 
 CREATE INDEX IF NOT EXISTS idx_app_state_updated ON app_state(updated_at);
+
+CREATE TABLE IF NOT EXISTS healthcheck (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT DEFAULT (datetime('now')),
+  note TEXT
+);
