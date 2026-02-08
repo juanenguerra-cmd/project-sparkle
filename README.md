@@ -71,3 +71,24 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## D1 health checks
+
+### Local D1 sync check
+
+Run the D1 sync health endpoint locally (runs migrations, starts Wrangler, and verifies the response):
+
+```sh
+npm run d1:health
+```
+
+If the command fails, inspect the JSON response for `error`, and confirm the D1 binding exists plus migrations are applied.
+
+### CI D1 sync check
+
+The CI workflow runs the same check via `npm run d1:health` and fails if:
+
+- `/api/health/d1` responds with a non-200 status, or
+- the response JSON `ok` field is not `true`.
+
+If CI fails, rerun the command locally and check the D1 migration status endpoint at `/api/health/d1/schema` for missing migrations.
