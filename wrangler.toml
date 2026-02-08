@@ -10,7 +10,7 @@ migrations_dir = "workers/d1/migrations"
 [[d1_databases]]
 binding = "DB"
 database_name = "project-sparkle-db"
-database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+database_id = "icn_db"
 
 [dev]
 ip = "127.0.0.1"
