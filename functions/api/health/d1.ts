@@ -42,8 +42,17 @@ export const onRequest: PagesFunction<Env> = async ({ env }) => {
       rows: row?.c ?? 0,
       route: "/api/health/d1",
     });
-  } catch (err) {
-    console.error("D1 healthcheck failed", err);
-    return json({ ok: false, error: "D1 healthcheck failed" }, 500);
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : String(err);
+
+    // Keep full error in logs
+    console.error("D1 healthcheck failed:", err);
+
+    // TEMP: return details to the client so we can debug quickly
+    return json(
+      { ok: false, error: "D1 healthcheck failed", detail: message },
+      500
+    );
   }
 };
