@@ -9,7 +9,7 @@ migrations_dir = "workers/d1/migrations"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "DB"
+database_name = "project-sparkle"
 database_id = "icn_db"
 
 [dev]
