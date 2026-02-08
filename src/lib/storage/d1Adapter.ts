@@ -2,7 +2,8 @@ import type { StorageAdapter, StorageConfig } from './types';
 import type { ICNDatabase } from '../database';
 import { defaultDatabase } from './defaults';
 
-const API_BASE_URL = 'https://your-worker.your-subdomain.workers.dev';
+const API_BASE_URL =
+  import.meta.env.VITE_D1_API_BASE_URL ?? 'http://127.0.0.1:8787';
 
 export class D1StorageAdapter implements StorageAdapter {
   readonly name = 'd1';
