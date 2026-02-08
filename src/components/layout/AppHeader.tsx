@@ -29,6 +29,10 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
 
         <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
           <NotificationCenter />
+          <div className="hidden sm:flex items-center gap-2 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-50">
+            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.9)]" aria-hidden="true" />
+            <span>DB Sync: Updated</span>
+          </div>
           <Button
             variant="ghost"
             size="sm"
