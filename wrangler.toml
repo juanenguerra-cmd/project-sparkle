@@ -1,15 +1,11 @@
-name = "project-sparkle-db"
+name = "project-sparkle"
 compatibility_date = "2024-11-01"
 pages_build_output_dir = "dist"
 
-[vars]
-# Optional: if you want to consume a different API base in local dev
-# API_BASE_URL = "http://127.0.0.1:8787"
-
 [[d1_databases]]
 binding = "DB"
-database_name = "project-sparkle-db"
-database_id = "icn_db"
+database_name = "project_sparkle_db"
+database_id = "ip_infection_db"
 migrations_dir = "workers/d1/migrations"
 
 [dev]
