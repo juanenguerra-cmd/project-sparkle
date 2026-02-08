@@ -26,6 +26,7 @@ interface DashboardViewProps {
 const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const [db, setDb] = useState(() => loadDB());
   const [showDataModal, setShowDataModal] = useState(false);
+  const [activeInsight, setActiveInsight] = useState<'coverage' | 'abt' | 'ip' | 'notes'>('coverage');
   
   const activeResidents = getActiveResidents(db).length;
   const activeABT = getActiveABT(db).length;
@@ -43,6 +44,55 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const abtPercent = Math.min(100, Math.round((activeABT / residentDenominator) * 100));
   const ipPercent = Math.min(100, Math.round((activeIP / residentDenominator) * 100));
   const notesPercent = Math.min(100, Math.round((pendingNotes / residentDenominator) * 100));
+
+  const insightOptions = [
+    {
+      id: 'coverage',
+      label: 'Coverage',
+      value: `${clinicalCoveragePercent}%`,
+      helper: `${clinicalTouchpoints} touchpoints logged today.`,
+      recommendation:
+        clinicalCoveragePercent >= 85
+          ? 'Coverage is strong. Focus on documenting any late-day notes before shift close.'
+          : 'Boost coverage by logging remaining IP rounds or pending clinical notes.',
+      onNavigate: () => onNavigate('notes'),
+    },
+    {
+      id: 'abt',
+      label: 'ABT Courses',
+      value: `${activeABT}`,
+      helper: `${abtPercent}% of residents on antibiotics.`,
+      recommendation:
+        abtPercent > 15
+          ? 'Review antibiotic stop dates and confirm indications for active courses.'
+          : 'ABT utilization is low. Ensure prophylaxis orders are captured.',
+      onNavigate: () => onNavigate('abt'),
+    },
+    {
+      id: 'ip',
+      label: 'IP Cases',
+      value: `${activeIP}`,
+      helper: `${ipPercent}% of residents under isolation.`,
+      recommendation:
+        ipPercent > 10
+          ? 'Prioritize IP re-evaluations and verify PPE signage coverage.'
+          : 'Isolation load is stable. Keep monitoring for symptom onset.',
+      onNavigate: () => onNavigate('ip'),
+    },
+    {
+      id: 'notes',
+      label: 'Recent Notes',
+      value: `${pendingNotes}`,
+      helper: `${notesPercent}% of residents have new notes.`,
+      recommendation:
+        notesPercent > 20
+          ? 'Triage new notes to flag residents needing follow-up or labs.'
+          : 'Notes volume is manageable. Encourage timely end-of-shift summaries.',
+      onNavigate: () => onNavigate('notes'),
+    },
+  ] as const;
+
+  const activeInsightDetails = insightOptions.find((option) => option.id === activeInsight);
 
   const handleRefresh = () => {
     setDb(loadDB());
@@ -140,8 +190,32 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
       )}
 
       <SectionCard title="Infection Control Infographic">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2">
+          <div>
+            <p className="text-sm font-medium text-foreground">Interactive focus</p>
+            <p className="text-xs text-muted-foreground">Select a metric to spotlight recommendations.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {insightOptions.map((option) => (
+              <Button
+                key={option.id}
+                size="sm"
+                variant={activeInsight === option.id ? 'default' : 'outline'}
+                onClick={() => setActiveInsight(option.id)}
+                aria-pressed={activeInsight === option.id}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="flex flex-col items-start gap-4 rounded-lg border border-border bg-muted/30 p-5">
+          <div
+            className={`flex flex-col items-start gap-4 rounded-lg border border-border p-5 transition ${
+              activeInsight === 'coverage' ? 'bg-primary/10 shadow-sm' : 'bg-muted/30'
+            }`}
+          >
             <div className="flex items-center gap-4">
               <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/15 to-transparent text-primary shadow-inner">
                 <div className="text-center">
@@ -170,7 +244,11 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           </div>
 
           <div className="lg:col-span-2 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+            <div
+              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
+                activeInsight === 'abt' ? 'ring-2 ring-destructive/40' : ''
+              }`}
+            >
               <div className="flex items-center justify-between text-sm font-medium text-foreground">
                 <span>ABT Courses</span>
                 <span className="text-destructive">{activeABT}</span>
@@ -180,7 +258,11 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
               </div>
               <p className="text-xs text-muted-foreground">{abtPercent}% of residents on active antibiotics.</p>
             </div>
-            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+            <div
+              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
+                activeInsight === 'ip' ? 'ring-2 ring-warning/40' : ''
+              }`}
+            >
               <div className="flex items-center justify-between text-sm font-medium text-foreground">
                 <span>IP Cases</span>
                 <span className="text-warning">{activeIP}</span>
@@ -190,7 +272,11 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
               </div>
               <p className="text-xs text-muted-foreground">{ipPercent}% of residents under isolation.</p>
             </div>
-            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+            <div
+              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
+                activeInsight === 'notes' ? 'ring-2 ring-info/40' : ''
+              }`}
+            >
               <div className="flex items-center justify-between text-sm font-medium text-foreground">
                 <span>Recent Notes</span>
                 <span className="text-info">{pendingNotes}</span>
@@ -202,6 +288,23 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
             </div>
           </div>
         </div>
+        {activeInsightDetails && (
+          <div className="mt-5 grid gap-4 rounded-lg border border-border bg-background p-4 sm:grid-cols-[1.5fr_auto] sm:items-center">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-semibold text-foreground">{activeInsightDetails.label} Insights</span>
+                <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                  Current: {activeInsightDetails.value}
+                </span>
+                <span className="text-xs text-muted-foreground">{activeInsightDetails.helper}</span>
+              </div>
+              <p className="text-sm text-foreground">{activeInsightDetails.recommendation}</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={activeInsightDetails.onNavigate}>
+              Go to {activeInsightDetails.label}
+            </Button>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Start-of-Shift Workflow">
