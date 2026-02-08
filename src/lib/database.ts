@@ -197,12 +197,42 @@ export const importDBFromJSON = async (
 ): Promise<{ success: boolean; message: string }> => {
   try {
     const data = JSON.parse(jsonStr);
-    
+
+    const residentsFromArray = (residents: any[] | undefined): Record<string, any> => {
+      if (!Array.isArray(residents)) return {};
+      return residents.reduce((acc, resident, index) => {
+        const rawMrn = resident?.mrn ?? resident?.MRN ?? resident?.medicalRecordNumber;
+        const canonical = canonicalMRN(String(rawMrn ?? ''));
+        if (!canonical) return acc;
+        acc[canonical] = {
+          ...resident,
+          mrn: canonical,
+          id: resident?.id || `res_${canonical}`,
+        };
+        return acc;
+      }, {} as Record<string, any>);
+    };
+
+    const legacyResidentArray = data.census?.residents || data.residents;
+    const legacyResidentsByMrn = residentsFromArray(legacyResidentArray);
+
     // Basic validation - support multiple backup schemas
     // Accept: census, records, residentsByMrn (direct), or any known record arrays
-    const hasCensus = data.census?.residentsByMrn || data.residentsByMrn;
-    const hasRecords = data.records || data.abx || data.ip_cases || data.vax || data.notes || 
-                       data.abt_worklist || data.vax_due;
+    const hasCensus =
+      data.census?.residentsByMrn ||
+      data.residentsByMrn ||
+      (Array.isArray(legacyResidentArray) && legacyResidentArray.length > 0);
+    const hasRecords =
+      data.records ||
+      data.abx ||
+      data.ip_cases ||
+      data.vax ||
+      data.notes ||
+      data.abt_worklist ||
+      data.vax_due ||
+      data.line_listings ||
+      data.outbreaks ||
+      data.contacts;
     
     if (!hasCensus && !hasRecords) {
       return { success: false, message: 'Invalid backup file: missing census or records data' };
@@ -210,7 +240,13 @@ export const importDBFromJSON = async (
     
     // Normalize structure if data is in flat format
     const normalizedData = {
-      census: data.census || (data.residentsByMrn ? { residentsByMrn: data.residentsByMrn, meta: data.meta } : undefined),
+      census:
+        data.census ||
+        (data.residentsByMrn
+          ? { residentsByMrn: data.residentsByMrn, meta: data.meta }
+          : legacyResidentsByMrn && Object.keys(legacyResidentsByMrn).length > 0
+            ? { residentsByMrn: legacyResidentsByMrn }
+            : undefined),
       records: data.records || {
         abx: data.abx || data.abt_worklist || [],
         ip_cases: data.ip_cases || [],
