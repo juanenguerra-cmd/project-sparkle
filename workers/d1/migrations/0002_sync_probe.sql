@@ -1,5 +1,2 @@
-CREATE TABLE IF NOT EXISTS __sync_probe (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  env TEXT NOT NULL,
-  inserted_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+-- Ensure note column exists even if __ping existed from early testing
+ALTER TABLE __ping ADD COLUMN note TEXT;
