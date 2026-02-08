@@ -88,9 +88,10 @@ Set the API base URL for the D1 worker via Vite env vars:
 ```bash
 # .env
 VITE_D1_API_BASE_URL="https://project-sparkle-db.your-subdomain.workers.dev"
+VITE_USE_D1="true"
 ```
 
-The app now uses the D1 adapter by default.
+The app switches to the D1 adapter when `VITE_USE_D1` is set to `true` (otherwise it falls back to localStorage).
 
 ## Step 8: Test the Integration
 
@@ -166,6 +167,7 @@ Consider using Cloudflare Access to restrict who can reach your API.
 ### Data not persisting
 - Ensure you're using the D1 adapter (check console for "[D1StorageAdapter]" logs)
 - Verify the database has data: `npx wrangler d1 execute project-sparkle-db --command "SELECT * FROM app_state"`
+- Confirm all migrations ran (including `0002_sync_probe.sql`, which powers the `/api/health/d1` sync probe)
 
 ## Monitoring
 
