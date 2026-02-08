@@ -1,5 +1,13 @@
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import "./index.css";
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
+import { initDB } from './lib/database';
 
-createRoot(document.getElementById("root")!).render(<App />);
+const root = createRoot(document.getElementById('root')!);
+
+const startApp = async () => {
+  await initDB();
+  root.render(<App />);
+};
+
+startApp();
