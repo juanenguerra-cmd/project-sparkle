@@ -5,7 +5,7 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "project_sparkle_db"
-database_id = "ip_infection_db"
+database_id = "ce4c1b45-e262-407e-8ee4-abb3c938fcc3"
 migrations_dir = "workers/d1/migrations"
 
 [dev]
