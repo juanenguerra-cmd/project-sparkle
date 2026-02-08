@@ -2,6 +2,7 @@ name = "project-sparkle-db"
 main = "workers/d1/worker.ts"
 compatibility_date = "2024-11-01"
 migrations_dir = "workers/d1/migrations"
+pages_build_output_dir = "dist"
 
 [vars]
 # Optional: if you want to consume a different API base in local dev
