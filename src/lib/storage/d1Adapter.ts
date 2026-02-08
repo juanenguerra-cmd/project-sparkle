@@ -9,6 +9,7 @@ export class D1StorageAdapter implements StorageAdapter {
   readonly name = 'd1';
   private readonly apiBase: string;
   private readonly debug: boolean;
+  private healthCheckStarted = false;
 
   constructor(config: StorageConfig & { apiBase?: string } = {}) {
     this.apiBase = config.apiBase || API_BASE_URL;
@@ -16,6 +17,7 @@ export class D1StorageAdapter implements StorageAdapter {
   }
 
   async load(): Promise<ICNDatabase> {
+    this.startHealthCheck('load');
     try {
       const response = await fetch(`${this.apiBase}/api/db`, {
         method: 'GET',
@@ -38,6 +40,7 @@ export class D1StorageAdapter implements StorageAdapter {
   }
 
   async save(db: ICNDatabase): Promise<void> {
+    this.startHealthCheck('save');
     try {
       const toSave = { ...db };
       delete toSave.cache;
@@ -62,6 +65,7 @@ export class D1StorageAdapter implements StorageAdapter {
   }
 
   async clear(): Promise<void> {
+    this.startHealthCheck('clear');
     try {
       const response = await fetch(`${this.apiBase}/api/db`, {
         method: 'DELETE',
@@ -81,6 +85,37 @@ export class D1StorageAdapter implements StorageAdapter {
   private log(message: string): void {
     if (this.debug) {
       console.log(`[D1StorageAdapter] ${message}`);
+    }
+  }
+
+  private startHealthCheck(trigger: 'load' | 'save' | 'clear'): void {
+    if (this.healthCheckStarted) return;
+    this.healthCheckStarted = true;
+    void this.runHealthCheck(trigger);
+  }
+
+  private async runHealthCheck(
+    trigger: 'load' | 'save' | 'clear'
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${this.apiBase}/api/health/d1`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`HTTP ${response.status}: ${message}`);
+      }
+
+      this.log(`D1 health check ok (${trigger})`);
+    } catch (error) {
+      console.error(
+        `D1StorageAdapter: Health check failed (${trigger}):`,
+        error
+      );
     }
   }
 }
