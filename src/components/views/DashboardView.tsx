@@ -34,6 +34,15 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const lineListingRecommendations = getLineListingRecommendations(db);
   const hasResidentData = activeResidents > 0;
   const hasClinicalData = activeABT > 0 || activeIP > 0 || pendingNotes > 0;
+  const clinicalTouchpoints = activeABT + activeIP + pendingNotes;
+  const residentDenominator = Math.max(activeResidents, 1);
+  const clinicalCoveragePercent = Math.min(
+    100,
+    Math.round((clinicalTouchpoints / residentDenominator) * 100)
+  );
+  const abtPercent = Math.min(100, Math.round((activeABT / residentDenominator) * 100));
+  const ipPercent = Math.min(100, Math.round((activeIP / residentDenominator) * 100));
+  const notesPercent = Math.min(100, Math.round((pendingNotes / residentDenominator) * 100));
 
   const handleRefresh = () => {
     setDb(loadDB());
@@ -129,6 +138,71 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           </AlertDescription>
         </Alert>
       )}
+
+      <SectionCard title="Infection Control Infographic">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="flex flex-col items-start gap-4 rounded-lg border border-border bg-muted/30 p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/15 to-transparent text-primary shadow-inner">
+                <div className="text-center">
+                  <p className="text-2xl font-semibold leading-none">{activeResidents}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Residents</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Clinical Coverage</p>
+                <p className="text-xs text-muted-foreground">Touchpoints logged today</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{clinicalCoveragePercent}%</p>
+              </div>
+            </div>
+            <div className="w-full">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Coverage Goal</span>
+                <span>100%</span>
+              </div>
+              <div className="mt-2 h-2 w-full rounded-full bg-muted">
+                <div
+                  className="h-2 rounded-full bg-primary transition-all"
+                  style={{ width: `${clinicalCoveragePercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 grid gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm font-medium text-foreground">
+                <span>ABT Courses</span>
+                <span className="text-destructive">{activeABT}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-destructive" style={{ width: `${abtPercent}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground">{abtPercent}% of residents on active antibiotics.</p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm font-medium text-foreground">
+                <span>IP Cases</span>
+                <span className="text-warning">{activeIP}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-warning" style={{ width: `${ipPercent}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground">{ipPercent}% of residents under isolation.</p>
+            </div>
+            <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between text-sm font-medium text-foreground">
+                <span>Recent Notes</span>
+                <span className="text-info">{pendingNotes}</span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-muted">
+                <div className="h-2 rounded-full bg-info" style={{ width: `${notesPercent}%` }} />
+              </div>
+              <p className="text-xs text-muted-foreground">{notesPercent}% of residents with new notes.</p>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard title="Start-of-Shift Workflow">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
