@@ -1,12 +1,8 @@
 // Storage Layer Entry Point
 // 
-// TO SWITCH TO D1:
-// 1. Rename d1Adapter.template.ts to d1Adapter.ts
-// 2. Update the API_BASE_URL in d1Adapter.ts
-// 3. Change the export below to use D1StorageAdapter
+// To switch storage backends, update the adapter export below.
 
-import { LocalStorageAdapter } from './localStorageAdapter';
-// import { D1StorageAdapter } from './d1Adapter';
+import { D1StorageAdapter } from './d1Adapter';
 
 export type { StorageAdapter, StorageConfig, StorageResult } from './types';
 export { LocalStorageAdapter } from './localStorageAdapter';
@@ -14,10 +10,7 @@ export { defaultDatabase, defaultSettings } from './defaults';
 
 // Current active storage adapter
 // Change this line to switch storage backends:
-export const storage = new LocalStorageAdapter();
-
-// For D1, uncomment and use:
-// export const storage = new D1StorageAdapter({ 
-//   apiBase: 'https://your-worker.workers.dev',
-//   debug: true 
-// });
+export const storage = new D1StorageAdapter({
+  apiBase: import.meta.env.VITE_D1_API_BASE_URL,
+  debug: import.meta.env.DEV,
+});
