@@ -1,7 +1,5 @@
 name = "project-sparkle-db"
-main = "workers/d1/worker.ts"
 compatibility_date = "2024-11-01"
-migrations_dir = "workers/d1/migrations"
 pages_build_output_dir = "dist"
 
 [vars]
@@ -12,6 +10,7 @@ pages_build_output_dir = "dist"
 binding = "DB"
 database_name = "project-sparkle-db"
 database_id = "icn_db"
+migrations_dir = "workers/d1/migrations"
 
 [dev]
 ip = "127.0.0.1"
