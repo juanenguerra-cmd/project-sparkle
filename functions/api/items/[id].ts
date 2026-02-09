@@ -1,13 +1,29 @@
-export async function onRequest({ request, env, params }: any) {
+interface Env {
+  DB?: D1Database;
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+export const onRequest: PagesFunction<Env> = async ({ request, env, params }) => {
   const db = env.DB;
-  if (!db) return new Response("Missing DB", { status: 500 });
+  if (!db) return json({ ok: false, error: "Missing D1 binding: DB" }, 500);
 
   if (request.method !== "DELETE") {
-    return new Response("Method Not Allowed", { status: 405 });
+    return json({ ok: false, error: "Method Not Allowed" }, 405);
   }
 
-  const id = params.id;
-  await db.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
+  try {
+    const id = String(params.id || "");
+    if (!id) return json({ ok: false, error: "Missing id" }, 400);
 
-  return Response.json({ ok: true, deleted: id });
-}
+    await db.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
+    return json({ ok: true, deleted: id });
+  } catch (err) {
+    console.error("delete item failed:", err);
+    return json({ ok: false, error: "Delete failed" }, 500);
+  }
+};
