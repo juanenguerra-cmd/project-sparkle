@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Pill, ShieldAlert, FileText, RefreshCw, TrendingUp, Database, UserCheck, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { Users, Pill, ShieldAlert, FileText, RefreshCw, TrendingUp, Database, ClipboardCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatCard from '@/components/dashboard/StatCard';
 import SectionCard from '@/components/dashboard/SectionCard';
@@ -415,61 +415,9 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
         )}
       </SectionCard>
 
-      {/* Two Column Layout */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2">
-          <SectionCard title="Recent Activity">
-            <RecentActivity />
-          </SectionCard>
-        </div>
-
-        {/* Quick Actions */}
-        <SectionCard title="Quick Actions">
-          <div className="space-y-3">
-            <Button 
-              variant="default" 
-              className="w-full justify-start"
-              onClick={() => onNavigate('resident_overview')}
-            >
-              <UserCheck className="w-4 h-4 mr-2" />
-              Resident Overview
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={() => onNavigate('abt')}
-            >
-              <Pill className="w-4 h-4 mr-2" />
-              Manage ABT
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={() => onNavigate('ip')}
-            >
-              <ShieldAlert className="w-4 h-4 mr-2" />
-              Add IP Case
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={() => onNavigate('reports')}
-            >
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Generate Report
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start"
-              onClick={() => onNavigate('census')}
-            >
-              <Users className="w-4 h-4 mr-2" />
-              View Census
-            </Button>
-          </div>
-        </SectionCard>
-      </div>
+      <SectionCard title="Recent Activity">
+        <RecentActivity />
+      </SectionCard>
 
       <DataManagementModal 
         open={showDataModal}

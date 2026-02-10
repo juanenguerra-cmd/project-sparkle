@@ -85,7 +85,6 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
   const [excludedMrns, setExcludedMrns] = useState<Set<string>>(() => getExcludedMrns());
   const [dateOverrides, setDateOverrides] = useState<Record<string, string>>(() => getDateOverrides());
   const [editingDate, setEditingDate] = useState<{ mrn: string; date: string } | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
@@ -93,6 +92,15 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
   const db = loadDB();
   const today = new Date();
   const cutoffDate = subDays(today, daysBack);
+  const existingScreeningMrns = useMemo(() => {
+    const trackedMrns = new Set<string>();
+
+    db.records.ip_cases.forEach((c) => {
+      if (c.mrn) trackedMrns.add(c.mrn);
+    });
+
+    return trackedMrns;
+  }, [db]);
   
   // Find new admissions - residents whose admitDate is after cutoff OR 
   // residents who appear in current census but weren't in previous (detected on import)
@@ -105,6 +113,10 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       
       // Skip excluded residents
       if (excludedMrns.has(resident.mrn)) return;
+
+      // New-admission screening list should only show census-detected residents
+      // who do not already have an IP screening/case entry.
+      if (existingScreeningMrns.has(resident.mrn)) return;
       
       // Use date override if available
       let admitDate = dateOverrides[resident.mrn] || resident.admitDate;
@@ -142,21 +154,14 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       const daysSinceAdmit = admitDate ? differenceInDays(today, parseISO(admitDate)) : 0;
       
       // Check for existing clinical records
-      const ipCases = db.records.ip_cases.filter(c => c.mrn === resident.mrn);
-      const hasActiveIP = ipCases.some(c => (c.status || '').toLowerCase() === 'active');
-      const hasEBP = ipCases.some(c => c.protocol === 'EBP' && (c.status || '').toLowerCase() === 'active');
-      const hasIsolation = ipCases.some(c => c.protocol === 'Isolation' && (c.status || '').toLowerCase() === 'active');
+      const hasEBP = false;
+      const hasIsolation = false;
       
       const abtRecords = db.records.abx.filter(r => r.mrn === resident.mrn);
       const hasActiveABT = abtRecords.some(r => (r.status || '').toLowerCase() === 'active');
       
       // Determine screening status
-      let screeningStatus: 'pending' | 'complete' | 'overdue' = 'pending';
-      if (hasActiveIP) {
-        screeningStatus = 'complete'; // Has IP case = screened
-      } else if (daysSinceAdmit > 3) {
-        screeningStatus = 'overdue';
-      }
+      const screeningStatus: 'pending' | 'complete' | 'overdue' = daysSinceAdmit > 3 ? 'overdue' : 'pending';
       
       // Check vaccination records
       const vaxRecords = db.records.vax.filter(v => v.mrn === resident.mrn);
@@ -200,11 +205,7 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
         hasAntibiotics: hasActiveABT,
         hasEBP,
         hasIsolation,
-        hasMDROHistory: ipCases.some(c => 
-          (c.infectionType || c.infection_type || '').toLowerCase().includes('mdro') ||
-          (c.sourceOfInfection || c.source_of_infection || '').toLowerCase().includes('mrsa') ||
-          (c.sourceOfInfection || c.source_of_infection || '').toLowerCase().includes('vre')
-        ),
+        hasMDROHistory: false,
         hasWoundCare: false,
         hasIndwellingDevice: false,
         screeningStatus,
@@ -217,7 +218,7 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       if (!b.admitDate) return -1;
       return parseISO(b.admitDate).getTime() - parseISO(a.admitDate).getTime();
     });
-  }, [db, cutoffDate, today, excludedMrns, dateOverrides, refreshKey]);
+  }, [db, cutoffDate, today, excludedMrns, dateOverrides, existingScreeningMrns]);
   
   const pendingCount = screeningList.filter(s => s.screeningStatus === 'pending').length;
   const overdueCount = screeningList.filter(s => s.screeningStatus === 'overdue').length;
@@ -257,7 +258,6 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     setExcludedMrns(newExcluded);
     saveExcludedMrns(newExcluded);
     toast.success(`${name} excluded from screening list`);
-    setRefreshKey(k => k + 1);
   };
   
   const handleEditDate = (mrn: string, currentDate: string) => {
@@ -271,7 +271,6 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     saveDateOverrides(newOverrides);
     toast.success('Admission date updated');
     setEditingDate(null);
-    setRefreshKey(k => k + 1);
   };
   
   const generatePDF = (formData: ScreeningFormData) => {
