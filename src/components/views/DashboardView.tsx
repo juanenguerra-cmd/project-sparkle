@@ -34,7 +34,7 @@ interface DashboardViewProps {
 const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const [db, setDb] = useState(() => loadDB());
   const [showDataModal, setShowDataModal] = useState(false);
-  const [activeInsight, setActiveInsight] = useState<'coverage' | 'abt' | 'ip' | 'notes'>('coverage');
+  const [activeInsight, setActiveInsight] = useState<'census' | 'abt' | 'ip'>('census');
   
   const activeResidents = getActiveResidents(db).length;
   const activeABT = getActiveABT(db).length;
@@ -53,18 +53,59 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const abtPercent = Math.min(100, Math.round((activeABT / residentDenominator) * 100));
   const ipPercent = Math.min(100, Math.round((activeIP / residentDenominator) * 100));
   const notesPercent = Math.min(100, Math.round((pendingNotes / residentDenominator) * 100));
+  const censusByUnit = Object.values(db.census.residentsByMrn)
+    .filter((resident) => resident.active_on_census)
+    .reduce((acc, resident) => {
+      const unit = resident.unit || 'Unassigned';
+      acc[unit] = (acc[unit] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  const maxUnitCount = Math.max(1, ...Object.values(censusByUnit));
+
+  const inferMedClass = (medicationName: string) => {
+    const normalized = medicationName.toLowerCase();
+    if (/cef|penem|cillin|amox|pip\/tazo|aztreonam/.test(normalized)) return 'Beta-lactam';
+    if (/vanco|linezolid|daptomycin/.test(normalized)) return 'Gram-positive';
+    if (/cipro|levo|moxi/.test(normalized)) return 'Fluoroquinolone';
+    if (/flagyl|metronidazole|difficile/.test(normalized)) return 'Anaerobic/GI';
+    if (/tmp|bactrim|nitro|fosfo/.test(normalized)) return 'Urinary';
+    return 'Other';
+  };
+  const abtClasses = db.records.abt
+    .filter((record) => record.status === 'active')
+    .reduce((acc, record) => {
+      const name = record.medication || record.med_name || record.indication || 'Other';
+      const medClass = inferMedClass(name);
+      acc[medClass] = (acc[medClass] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  const maxAbtClass = Math.max(1, ...Object.values(abtClasses));
+
+  const isolationByUnit = db.records.ip_cases
+    .filter((record) => record.status === 'Active')
+    .reduce((acc, record) => {
+      const unit = record.unit || 'Unassigned';
+      if (!acc[unit]) acc[unit] = { ebp: 0, isolation: 0 };
+      if (record.protocol === 'EBP') acc[unit].ebp += 1;
+      if (record.protocol === 'Isolation') acc[unit].isolation += 1;
+      return acc;
+    }, {} as Record<string, { ebp: number; isolation: number }>);
+  const maxIsolationLoad = Math.max(
+    1,
+    ...Object.values(isolationByUnit).map((counts) => counts.ebp + counts.isolation),
+  );
 
   const insightOptions = [
     {
-      id: 'coverage',
-      label: 'Coverage',
-      value: `${clinicalCoveragePercent}%`,
-      helper: `${clinicalTouchpoints} touchpoints logged today.`,
+      id: 'census',
+      label: 'Census',
+      value: `${activeResidents}`,
+      helper: `${Object.keys(censusByUnit).length || 0} active units represented.`,
       recommendation:
-        clinicalCoveragePercent >= 85
-          ? 'Coverage is strong. Focus on documenting any late-day notes before shift close.'
-          : 'Boost coverage by logging remaining IP rounds or pending clinical notes.',
-      onNavigate: () => onNavigate('notes'),
+        activeResidents > 0
+          ? 'Hover the census tile to review residents per unit and spot uneven assignments.'
+          : 'Import census data to unlock unit-level census graphics.',
+      onNavigate: () => onNavigate('census'),
     },
     {
       id: 'abt',
@@ -81,23 +122,12 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
       id: 'ip',
       label: 'IP Cases',
       value: `${activeIP}`,
-      helper: `${ipPercent}% of residents under isolation.`,
+      helper: `${ipPercent}% of residents under IP surveillance.`,
       recommendation:
         ipPercent > 10
-          ? 'Prioritize IP re-evaluations and verify PPE signage coverage.'
-          : 'Isolation load is stable. Keep monitoring for symptom onset.',
+          ? 'Hover IP to view EBP/Isolation heat map and prioritize high-load units.'
+          : 'Isolation load is stable. Continue daily review by unit.',
       onNavigate: () => onNavigate('ip'),
-    },
-    {
-      id: 'notes',
-      label: 'Recent Notes',
-      value: `${pendingNotes}`,
-      helper: `${notesPercent}% of residents have new notes.`,
-      recommendation:
-        notesPercent > 20
-          ? 'Triage new notes to flag residents needing follow-up or labs.'
-          : 'Notes volume is manageable. Encourage timely end-of-shift summaries.',
-      onNavigate: () => onNavigate('notes'),
     },
   ] as const;
 
@@ -211,6 +241,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
                 size="sm"
                 variant={activeInsight === option.id ? 'default' : 'outline'}
                 onClick={() => setActiveInsight(option.id)}
+                onMouseEnter={() => setActiveInsight(option.id)}
                 aria-pressed={activeInsight === option.id}
               >
                 {option.label}
@@ -219,82 +250,87 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div
-            className={`flex flex-col items-start gap-4 rounded-lg border border-border p-5 transition ${
-              activeInsight === 'coverage' ? 'bg-primary/10 shadow-sm' : 'bg-muted/30'
-            }`}
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/15 to-transparent text-primary shadow-inner">
-                <div className="text-center">
-                  <p className="text-2xl font-semibold leading-none">{activeResidents}</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Residents</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Clinical Coverage</p>
-                <p className="text-xs text-muted-foreground">Touchpoints logged today</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">{clinicalCoveragePercent}%</p>
-              </div>
-            </div>
-            <div className="w-full">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Coverage Goal</span>
-                <span>100%</span>
-              </div>
-              <div className="mt-2 h-2 w-full rounded-full bg-muted">
-                <div
-                  className="h-2 rounded-full bg-primary transition-all"
-                  style={{ width: `${clinicalCoveragePercent}%` }}
-                />
-              </div>
-            </div>
+        <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+          <div className="space-y-3">
+            {insightOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseEnter={() => setActiveInsight(option.id)}
+                onFocus={() => setActiveInsight(option.id)}
+                onClick={() => setActiveInsight(option.id)}
+                className={`w-full rounded-lg border px-4 py-3 text-left transition ${
+                  activeInsight === option.id ? 'border-primary bg-primary/10 shadow-sm' : 'border-border bg-background hover:bg-muted/40'
+                }`}
+              >
+                <p className="text-sm font-semibold">{option.label}</p>
+                <p className="text-xl font-bold">{option.value}</p>
+                <p className="text-xs text-muted-foreground">{option.helper}</p>
+              </button>
+            ))}
           </div>
 
-          <div className="lg:col-span-2 grid gap-4 sm:grid-cols-3">
-            <div
-              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
-                activeInsight === 'abt' ? 'ring-2 ring-destructive/40' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between text-sm font-medium text-foreground">
-                <span>ABT Courses</span>
-                <span className="text-destructive">{activeABT}</span>
+          <div className="rounded-lg border border-border bg-background p-4">
+            {activeInsight === 'census' && (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Residents per Unit</p>
+                {Object.entries(censusByUnit).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No census records available.</p>
+                ) : (
+                  Object.entries(censusByUnit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, count]) => (
+                    <div key={unit} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span>{unit}</span><span>{count}</span>
+                      </div>
+                      <div className="h-2 rounded bg-muted">
+                        <div className="h-2 rounded bg-primary" style={{ width: `${(count / maxUnitCount) * 100}%` }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-destructive" style={{ width: `${abtPercent}%` }} />
+            )}
+            {activeInsight === 'abt' && (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">ABT Medication Class Distribution</p>
+                {Object.entries(abtClasses).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No active ABT courses to classify.</p>
+                ) : (
+                  Object.entries(abtClasses).sort(([, a], [, b]) => b - a).map(([medClass, count]) => (
+                    <div key={medClass} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span>{medClass}</span><span>{count}</span>
+                      </div>
+                      <div className="h-2 rounded bg-muted">
+                        <div className="h-2 rounded bg-destructive" style={{ width: `${(count / maxAbtClass) * 100}%` }} />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">{abtPercent}% of residents on active antibiotics.</p>
-            </div>
-            <div
-              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
-                activeInsight === 'ip' ? 'ring-2 ring-warning/40' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between text-sm font-medium text-foreground">
-                <span>IP Cases</span>
-                <span className="text-warning">{activeIP}</span>
+            )}
+            {activeInsight === 'ip' && (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">Isolation / EBP Heat Map</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Object.entries(isolationByUnit).length === 0 ? (
+                    <p className="text-sm text-muted-foreground col-span-full">No active IP cases to map.</p>
+                  ) : (
+                    Object.entries(isolationByUnit).sort(([a], [b]) => a.localeCompare(b)).map(([unit, counts]) => {
+                      const total = counts.ebp + counts.isolation;
+                      const opacity = 0.2 + (total / maxIsolationLoad) * 0.7;
+                      return (
+                        <div key={unit} className="rounded border border-border p-3" style={{ backgroundColor: `rgba(251, 146, 60, ${opacity})` }}>
+                          <p className="text-xs font-semibold">{unit}</p>
+                          <p className="text-xs">Isolation: {counts.isolation}</p>
+                          <p className="text-xs">EBP: {counts.ebp}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-warning" style={{ width: `${ipPercent}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground">{ipPercent}% of residents under isolation.</p>
-            </div>
-            <div
-              className={`rounded-lg border border-border bg-background p-4 space-y-3 transition ${
-                activeInsight === 'notes' ? 'ring-2 ring-info/40' : ''
-              }`}
-            >
-              <div className="flex items-center justify-between text-sm font-medium text-foreground">
-                <span>Recent Notes</span>
-                <span className="text-info">{pendingNotes}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-info" style={{ width: `${notesPercent}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground">{notesPercent}% of residents with new notes.</p>
-            </div>
+            )}
           </div>
         </div>
         {activeInsightDetails && (
