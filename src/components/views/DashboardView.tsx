@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { Users, Pill, ShieldAlert, FileText, RefreshCw, TrendingUp, Database, ClipboardCheck, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import StatCard from '@/components/dashboard/StatCard';
 import SectionCard from '@/components/dashboard/SectionCard';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import WorklistSummary from '@/components/dashboard/WorklistSummary';
 import DataManagementModal from '@/components/modals/DataManagementModal';
-import { IPCase, ViewType } from '@/lib/types';
+import { ViewType } from '@/lib/types';
 import { 
   loadDB, 
   saveDB, 
@@ -21,7 +19,6 @@ import {
   dismissLineListingRecommendation 
 } from '@/lib/database';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import PillInput from '@/components/ui/pill-input';
 
 interface DashboardViewProps {
   onNavigate: (
@@ -38,10 +35,6 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const [db, setDb] = useState(() => loadDB());
   const [showDataModal, setShowDataModal] = useState(false);
   const [activeInsight, setActiveInsight] = useState<'census' | 'abt' | 'ip'>('census');
-  const [ipCaseDate, setIpCaseDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [ipCaseUnit, setIpCaseUnit] = useState('Unit 2');
-  const [sourceConditions, setSourceConditions] = useState<string[]>([]);
-  const [pathogenTypes, setPathogenTypes] = useState<string[]>([]);
   
   const activeResidents = getActiveResidents(db).length;
   const activeABT = getActiveABT(db).length;
@@ -102,28 +95,6 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
     ...Object.values(isolationByUnit).map((counts) => counts.ebp + counts.isolation),
   );
 
-  const sourceConditionCounts = db.records.ip_cases.reduce((acc, record) => {
-    const values = (record.sourceOfInfection || record.source_of_infection || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-    values.forEach((value) => {
-      acc[value] = (acc[value] || 0) + 1;
-    });
-    return acc;
-  }, {} as Record<string, number>);
-
-  const pathogenTypeCounts = db.records.ip_cases.reduce((acc, record) => {
-    const values = (record.infectionType || record.infection_type || '')
-      .split(',')
-      .map((value) => value.trim())
-      .filter(Boolean);
-    values.forEach((value) => {
-      acc[value] = (acc[value] || 0) + 1;
-    });
-    return acc;
-  }, {} as Record<string, number>);
-
   const insightOptions = [
     {
       id: 'census',
@@ -168,35 +139,6 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
 
   const handleDataChange = () => {
     setDb(loadDB());
-  };
-
-  const handleAddDashboardIPCase = () => {
-    if (sourceConditions.length === 0 && pathogenTypes.length === 0) return;
-
-    const nextDb = loadDB();
-    const newCase: IPCase = {
-      id: `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      mrn: `dashboard-${Date.now()}`,
-      residentName: 'Dashboard Entry',
-      name: 'Dashboard Entry',
-      unit: ipCaseUnit || 'Unassigned',
-      room: 'N/A',
-      protocol: 'Isolation',
-      status: 'Active',
-      onsetDate: ipCaseDate,
-      onset_date: ipCaseDate,
-      sourceOfInfection: sourceConditions.join(', '),
-      source_of_infection: sourceConditions.join(', '),
-      infectionType: pathogenTypes.join(', '),
-      infection_type: pathogenTypes.join(', '),
-      createdAt: new Date().toISOString(),
-    };
-
-    nextDb.records.ip_cases.push(newCase);
-    saveDB(nextDb);
-    setDb(nextDb);
-    setSourceConditions([]);
-    setPathogenTypes([]);
   };
 
   const handleDismissRecommendation = (recommendationId: string) => {
@@ -408,84 +350,6 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
             </Button>
           </div>
         )}
-      </SectionCard>
-
-      <SectionCard title="IP Add Case + Type Reports">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4 rounded-lg border border-border bg-background p-4">
-            <p className="text-sm font-semibold">Quick Add Case</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Case Date</Label>
-                <Input type="date" value={ipCaseDate} onChange={(event) => setIpCaseDate(event.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Unit</Label>
-                <Input value={ipCaseUnit} onChange={(event) => setIpCaseUnit(event.target.value)} placeholder="Unit 2" />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Source Condition</Label>
-              <PillInput
-                value={sourceConditions}
-                onChange={setSourceConditions}
-                placeholder="Enter source condition and press Enter"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Pathogen</Label>
-              <PillInput
-                value={pathogenTypes}
-                onChange={setPathogenTypes}
-                placeholder="Enter pathogen and press Enter"
-              />
-            </div>
-
-            <Button
-              onClick={handleAddDashboardIPCase}
-              disabled={sourceConditions.length === 0 && pathogenTypes.length === 0}
-            >
-              Add IP Case
-            </Button>
-          </div>
-
-          <div className="space-y-4 rounded-lg border border-border bg-background p-4">
-            <p className="text-sm font-semibold">Generated Type Reports</p>
-
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Source Condition Type Counts</p>
-              {Object.entries(sourceConditionCounts).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No source condition data yet.</p>
-              ) : (
-                Object.entries(sourceConditionCounts)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([type, count]) => (
-                    <div key={type} className="flex items-center justify-between rounded border border-border px-2 py-1 text-xs">
-                      <span>{type}</span>
-                      <span className="font-semibold">{count}</span>
-                    </div>
-                  ))
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Pathogen Type Counts</p>
-              {Object.entries(pathogenTypeCounts).length === 0 ? (
-                <p className="text-xs text-muted-foreground">No pathogen data yet.</p>
-              ) : (
-                Object.entries(pathogenTypeCounts)
-                  .sort(([, a], [, b]) => b - a)
-                  .map(([type, count]) => (
-                    <div key={type} className="flex items-center justify-between rounded border border-border px-2 py-1 text-xs">
-                      <span>{type}</span>
-                      <span className="font-semibold">{count}</span>
-                    </div>
-                  ))
-              )}
-            </div>
-          </div>
-        </div>
       </SectionCard>
 
       <SectionCard title="Start-of-Shift Workflow">
