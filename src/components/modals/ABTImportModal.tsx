@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { parseABTMedlistRaw, ParsedABTRow, canonicalMRN, nowISO, computeTxDays, makeAbxRecordId } from '@/lib/parsers';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Check } from 'lucide-react';
+import { Search, Check, AlertTriangle } from 'lucide-react';
 
 interface ABTImportModalProps {
   open: boolean;
@@ -24,7 +24,13 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
   const [parsed, setParsed] = useState<ParsedABTRow[]>([]);
   const [included, setIncluded] = useState<Set<number>>(new Set());
   const [sources, setSources] = useState<Record<number, string>>({});
+  const [potentialDuplicates, setPotentialDuplicates] = useState<Record<number, string>>({});
   const { toast } = useToast();
+
+  const hasPotentialDuplicates = useMemo(
+    () => Object.keys(potentialDuplicates).length > 0,
+    [potentialDuplicates],
+  );
 
   const updateField = (idx: number, field: keyof ParsedABTRow, value: string) => {
     setParsed(prev => prev.map((row, i) => 
@@ -34,25 +40,56 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
 
   const handleParse = useCallback(() => {
     const rows = parseABTMedlistRaw(rawText);
+    const db = loadDB();
     setParsed(rows);
-    
+
     // Default: include non-TOP rows
     const defaultIncluded = new Set<number>();
     const defaultSources: Record<number, string> = {};
-    
+    const duplicateFlags: Record<number, string> = {};
+
+    const existingIds = new Set(db.records.abx.map(r => r.record_id || r.id));
+    const existingSignatureKeys = new Set(
+      db.records.abx.map(r => [
+        canonicalMRN(r.mrn),
+        (r.medication || r.med_name || '').trim().toLowerCase(),
+        r.startDate || r.start_date || ''
+      ].join('|')),
+    );
+    const parsedSignatureSeen = new Set<string>();
+
     rows.forEach((r, idx) => {
       if (r._include) {
         defaultIncluded.add(idx);
       }
       defaultSources[idx] = r.infection_source;
+
+      const recordId = r.record_id || makeAbxRecordId(r);
+      const signatureKey = [
+        canonicalMRN(r.mrn),
+        (r.med_name || '').trim().toLowerCase(),
+        r.start_date || ''
+      ].join('|');
+
+      if (existingIds.has(recordId) || existingSignatureKeys.has(signatureKey)) {
+        duplicateFlags[idx] = 'Possible duplicate of an existing ABT record';
+      } else if (parsedSignatureSeen.has(signatureKey)) {
+        duplicateFlags[idx] = 'Potential duplicate within this import batch';
+      }
+
+      parsedSignatureSeen.add(signatureKey);
     });
-    
+
     setIncluded(defaultIncluded);
     setSources(defaultSources);
-    
+    setPotentialDuplicates(duplicateFlags);
+
+    const duplicateCount = Object.keys(duplicateFlags).length;
     toast({
       title: `Parsed ${rows.length} ABT records`,
-      description: 'TOP routes are excluded by default. Select records to import.'
+      description: duplicateCount > 0
+        ? `Detected ${duplicateCount} potential duplicates. Review flagged rows before import.`
+        : 'TOP routes are excluded by default. Select records to import.'
     });
   }, [rawText, toast]);
 
@@ -145,6 +182,7 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
     setRawText('');
     setIncluded(new Set());
     setSources({});
+    setPotentialDuplicates({});
   };
 
   const handleClose = () => {
@@ -153,6 +191,7 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
     setRawText('');
     setIncluded(new Set());
     setSources({});
+    setPotentialDuplicates({});
   };
 
   return (
@@ -189,6 +228,17 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
                 <div className="text-sm text-muted-foreground mb-2">
                   Parsed {parsed.length} rows. {included.size} selected for import. TOP routes excluded by default.
                 </div>
+                {hasPotentialDuplicates && (
+                  <div className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
+                    <div className="flex items-center gap-2 font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+                      Potential duplicates detected
+                    </div>
+                    <div className="mt-1 text-muted-foreground">
+                      {Object.keys(potentialDuplicates).length} row(s) appear to match existing records or duplicate entries in this batch.
+                    </div>
+                  </div>
+                )}
                 <ScrollArea className="h-[280px] border rounded-lg">
                   <table className="w-full text-sm">
                     <thead className="bg-muted sticky top-0">
@@ -204,6 +254,7 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
                         <th className="px-2 py-2 text-left">Start</th>
                         <th className="px-2 py-2 text-left">End</th>
                         <th className="px-2 py-2 text-left">Days</th>
+                        <th className="px-2 py-2 text-left">Duplicate Check</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -289,6 +340,13 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
                             />
                           </td>
                           <td className="px-2 py-1 text-xs text-center">{row.tx_days || '—'}</td>
+                          <td className="px-2 py-1">
+                            {potentialDuplicates[idx] ? (
+                              <span className="text-[11px] text-warning font-medium">{potentialDuplicates[idx]}</span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">No issues found</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
