@@ -99,6 +99,22 @@ const parseDateValue = (value?: string): Date | null => {
   return null;
 };
 
+const isDateInRange = (value: string | undefined, fromDate: string, toDate: string): boolean => {
+  const parsedValue = parseDateValue(value);
+  const parsedFrom = parseDateValue(fromDate);
+  const parsedTo = parseDateValue(toDate);
+
+  if (!parsedValue || !parsedFrom || !parsedTo) {
+    return false;
+  }
+
+  const valueDay = format(parsedValue, 'yyyy-MM-dd');
+  const fromDay = format(parsedFrom, 'yyyy-MM-dd');
+  const toDay = format(parsedTo, 'yyyy-MM-dd');
+
+  return valueDay >= fromDay && valueDay <= toDay;
+};
+
 const getSymptomNames = (symptoms?: string[]): string => {
   if (!symptoms || symptoms.length === 0) return '';
   return symptoms
@@ -1094,9 +1110,8 @@ export const generateStandardOfCareReport = (
   
   // Section 1: ABT regimens started within date range
   const abtStarted = db.records.abx.filter(r => {
-    const start = r.startDate || r.start_date || '';
-    if (!start) return false;
-    return start >= fromDate && start <= toDate;
+    const start = r.startDate || r.start_date;
+    return isDateInRange(start, fromDate, toDate);
   });
   
   const abtRows = abtStarted.length === 0
@@ -1132,9 +1147,8 @@ export const generateStandardOfCareReport = (
   
   // Section 2: IP cases started within date range
   const ipStarted = db.records.ip_cases.filter(c => {
-    const onset = c.onsetDate || c.onset_date || '';
-    if (!onset) return false;
-    return onset >= fromDate && onset <= toDate;
+    const onset = c.onsetDate || c.onset_date;
+    return isDateInRange(onset, fromDate, toDate);
   });
   
   const ipRows: string[][] = ipStarted.length === 0
@@ -1166,9 +1180,8 @@ export const generateStandardOfCareReport = (
   
   // Section 3: VAX records within date range
   const vaxInRange = db.records.vax.filter(v => {
-    const date = v.dateGiven || v.date_given || v.dueDate || v.due_date || '';
-    if (!date) return false;
-    return date >= fromDate && date <= toDate;
+    const date = v.dateGiven || v.date_given || v.dueDate || v.due_date;
+    return isDateInRange(date, fromDate, toDate);
   });
   
   const vaxRows = vaxInRange.length === 0
