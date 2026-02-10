@@ -143,14 +143,14 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
 
     const startIso = isoDateFromAny(r.startDate || r.start_date || '');
-    const endIso = isoDateFromAny(r.endDate || r.end_date || '') || startIso;
+    const endIso = isoDateFromAny(r.endDate || r.end_date || '');
 
     if (startDateFilter) {
-      if (!endIso || endIso < startDateFilter) return false;
+      if (!startIso || startIso < startDateFilter) return false;
     }
 
     if (endDateFilter) {
-      if (!startIso || startIso > endDateFilter) return false;
+      if (!endIso || endIso > endDateFilter) return false;
     }
     
     // Status filter
