@@ -1942,42 +1942,29 @@ export const generateNewAdmissionScreeningReport = (
       return dateB.getTime() - dateA.getTime();
     });
   
-  // Check if each resident has IP case or screening
-  const rows = recentAdmissions.map(resident => {
-    const admitDate = resident.admitDate || '';
-    const daysSinceAdmit = differenceInDays(today, parseISO(admitDate));
-    
-    // Check for any IP cases
-    const ipCases = db.records.ip_cases.filter(c => c.mrn === resident.mrn);
-    const hasActiveIP = ipCases.some(c => normalizeIPStatus(c.status || c.case_status) === 'active');
-    const hasAnyIP = ipCases.length > 0;
-    
-    // Screening status based on IP data
-    let screeningStatus = 'PENDING';
-    let screeningNotes = 'Needs admission screening';
-    
-    if (hasActiveIP) {
-      screeningStatus = 'ACTIVE PRECAUTION';
-      screeningNotes = ipCases.find(c => normalizeIPStatus(c.status || c.case_status) === 'active')?.protocol || 'On precautions';
-    } else if (hasAnyIP) {
-      screeningStatus = 'REVIEWED';
-      screeningNotes = 'History noted';
-    } else if (daysSinceAdmit > 3) {
-      screeningStatus = '⚠️ OVERDUE';
-      screeningNotes = 'Screening overdue - review needed';
-    }
-    
-    return [
-      resident.room,
-      resident.name,
-      resident.mrn,
-      resident.unit,
-      format(parseISO(admitDate), 'MM/dd/yyyy'),
-      `${daysSinceAdmit} days`,
-      screeningStatus,
-      screeningNotes
-    ];
-  });
+  // Only include census-detected new admissions that do not already exist in IP screening/cases.
+  const rows = recentAdmissions
+    .filter((resident) => !db.records.ip_cases.some((c) => c.mrn === resident.mrn))
+    .map(resident => {
+      const admitDate = resident.admitDate || '';
+      const daysSinceAdmit = differenceInDays(today, parseISO(admitDate));
+
+      const screeningStatus = daysSinceAdmit > 3 ? '⚠️ OVERDUE' : 'PENDING';
+      const screeningNotes = daysSinceAdmit > 3
+        ? 'Screening overdue - review needed'
+        : 'Needs admission screening';
+
+      return [
+        resident.room,
+        resident.name,
+        resident.mrn,
+        resident.unit,
+        format(parseISO(admitDate), 'MM/dd/yyyy'),
+        `${daysSinceAdmit} days`,
+        screeningStatus,
+        screeningNotes
+      ];
+    });
   
   const pendingCount = rows.filter(r => r[6] === 'PENDING' || r[6] === '⚠️ OVERDUE').length;
   const overdueCount = rows.filter(r => r[6] === '⚠️ OVERDUE').length;
@@ -1997,7 +1984,7 @@ export const generateNewAdmissionScreeningReport = (
       signature: '',
       title: '',
       dateTime: '',
-      disclaimer: `Total new admissions: ${recentAdmissions.length} | Pending screening: ${pendingCount} | Overdue (>3 days): ${overdueCount}. Per CMS guidelines, new admissions should be screened for MDRO history, current infections, and vaccination status within 72 hours.`
+      disclaimer: `Total new admissions needing screening: ${rows.length} | Pending screening: ${pendingCount} | Overdue (>3 days): ${overdueCount}. Per CMS guidelines, new admissions should be screened for MDRO history, current infections, and vaccination status within 72 hours.`
     }
   };
 };
