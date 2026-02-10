@@ -59,6 +59,79 @@ let dbCache: ICNDatabase | null = null;
 
 const createEmptyDB = (): ICNDatabase => defaultDatabase() as ICNDatabase;
 
+const isD1Storage = (): boolean => storage.name === 'd1';
+
+const pickId = (value: unknown): string => {
+  if (!value || typeof value !== 'object') return '';
+  const obj = value as Record<string, unknown>;
+  const id = obj.id ?? obj.record_id;
+  return typeof id === 'string' ? id : '';
+};
+
+const mergeEntityList = <T extends Record<string, unknown>>(
+  remoteList: T[],
+  localList: T[]
+): T[] => {
+  const merged = new Map<string, T>();
+
+  remoteList.forEach((item) => {
+    const id = pickId(item);
+    if (!id) return;
+    merged.set(id, item);
+  });
+
+  localList.forEach((item) => {
+    const id = pickId(item);
+    if (!id) return;
+    merged.set(id, item);
+  });
+
+  return Array.from(merged.values());
+};
+
+const mergeDatabases = (remoteDb: ICNDatabase, localDb: ICNDatabase): ICNDatabase => {
+  const mergedResidents = {
+    ...remoteDb.census.residentsByMrn,
+    ...localDb.census.residentsByMrn,
+  };
+
+  const remoteAudit = Array.isArray(remoteDb.audit_log) ? remoteDb.audit_log : [];
+  const localAudit = Array.isArray(localDb.audit_log) ? localDb.audit_log : [];
+  const mergedAudit = mergeEntityList(remoteAudit, localAudit)
+    .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+    .slice(0, 1000);
+
+  return {
+    ...remoteDb,
+    ...localDb,
+    census: {
+      ...remoteDb.census,
+      ...localDb.census,
+      residentsByMrn: mergedResidents,
+      meta: {
+        ...remoteDb.census.meta,
+        ...localDb.census.meta,
+      },
+    },
+    records: {
+      ...remoteDb.records,
+      ...localDb.records,
+      abx: mergeEntityList(remoteDb.records.abx, localDb.records.abx),
+      ip_cases: mergeEntityList(remoteDb.records.ip_cases, localDb.records.ip_cases),
+      vax: mergeEntityList(remoteDb.records.vax, localDb.records.vax),
+      notes: mergeEntityList(remoteDb.records.notes, localDb.records.notes),
+      line_listings: mergeEntityList(remoteDb.records.line_listings, localDb.records.line_listings),
+      outbreaks: mergeEntityList(remoteDb.records.outbreaks, localDb.records.outbreaks),
+      contacts: mergeEntityList(remoteDb.records.contacts, localDb.records.contacts),
+    },
+    audit_log: mergedAudit,
+    settings: {
+      ...remoteDb.settings,
+      ...localDb.settings,
+    },
+  };
+};
+
 /**
  * Load database synchronously (uses cache, falls back to sync localStorage)
  * For async D1, call initDB() first at app startup
@@ -124,8 +197,13 @@ export const saveDBAsync = async (
 ): Promise<void> => {
   const optimistic = opts.optimistic ?? true;
   if (optimistic) dbCache = db;
-  await storage.save(db);
-  if (!optimistic) dbCache = db;
+
+  const persistPayload = isD1Storage()
+    ? mergeDatabases((await storage.load()) as ICNDatabase, db)
+    : db;
+
+  await storage.save(persistPayload);
+  dbCache = persistPayload;
 };
 
 export const saveDB = (db: ICNDatabase): void => {
