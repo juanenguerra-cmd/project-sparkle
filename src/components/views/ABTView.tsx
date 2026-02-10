@@ -27,9 +27,10 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
 
 interface ABTViewProps {
   onNavigate?: (view: ViewType) => void;
+  initialStatusFilter?: 'active' | 'completed' | 'all';
 }
 
-const ABTView = ({ onNavigate }: ABTViewProps) => {
+const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('active');
@@ -39,6 +40,12 @@ const ABTView = ({ onNavigate }: ABTViewProps) => {
   const [editingRecord, setEditingRecord] = useState<ABTRecord | null>(null);
   const [db, setDb] = useState(() => loadDB());
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter);
+    }
+  }, [initialStatusFilter]);
   
   const records = db.records.abx;
   const today = todayISO();

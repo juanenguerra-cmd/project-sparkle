@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,11 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
   return str;
 };
 
-const VAXView = () => {
+interface VAXViewProps {
+  initialStatusFilter?: 'due' | 'overdue' | 'due_or_overdue' | 'all';
+}
+
+const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [db, setDb] = useState(() => loadDB());
@@ -47,6 +51,20 @@ const VAXView = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState<string | null>('_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+
+  useEffect(() => {
+    if (!initialStatusFilter) return;
+    if (initialStatusFilter === 'all') {
+      setActiveFilter('all');
+      return;
+    }
+    if (initialStatusFilter === 'overdue') {
+      setActiveFilter('overdue');
+      return;
+    }
+    setActiveFilter('due');
+  }, [initialStatusFilter]);
   const records = db.records.vax;
   const activeOutbreaks = db.records.outbreaks.filter(o => o.status === 'active');
 
@@ -117,7 +135,7 @@ const VAXView = () => {
         
         switch (activeFilter) {
           case 'due':
-            return r.status === 'due';
+            return initialStatusFilter === 'due_or_overdue' ? (r.status === 'due' || r.status === 'overdue') : r.status === 'due';
           case 'overdue':
             return r.status === 'overdue';
           case 'given':

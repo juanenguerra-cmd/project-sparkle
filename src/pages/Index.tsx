@@ -24,12 +24,19 @@ import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/toaster';
 import { useDataLoader } from '@/hooks/useDataLoader';
 
+interface ViewFilters {
+  ipStatus?: 'active' | 'resolved';
+  abtStatus?: 'active' | 'completed' | 'all';
+  vaxStatus?: 'due' | 'overdue' | 'due_or_overdue' | 'all';
+}
+
 const Index = () => {
   const [activeView, setActiveView] = useState<ViewType>('dashboard');
   const [surveyorMode, setSurveyorMode] = useState(false);
   const [showDataModal, setShowDataModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showLoadError, setShowLoadError] = useState(false);
+  const [viewFilters, setViewFilters] = useState<ViewFilters>({});
 
   const handleDataChange = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -53,20 +60,25 @@ const Index = () => {
     setActiveView('census');
   };
 
+  const handleNavigate = useCallback((view: ViewType, filters?: ViewFilters) => {
+    setActiveView(view);
+    setViewFilters(filters ?? {});
+  }, []);
+
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView onNavigate={setActiveView} />;
+        return <DashboardView onNavigate={handleNavigate} />;
       case 'abt':
-        return <ABTView onNavigate={setActiveView} />;
+        return <ABTView onNavigate={handleNavigate} initialStatusFilter={viewFilters.abtStatus} />;
       case 'census':
         return <CensusView onNavigate={setActiveView} />;
       case 'resident_overview':
         return <ResidentOverviewView />;
       case 'ip':
-        return <IPView onNavigate={setActiveView} />;
+        return <IPView onNavigate={handleNavigate} initialStatusFilter={viewFilters.ipStatus} />;
       case 'vax':
-        return <VAXView />;
+        return <VAXView initialStatusFilter={viewFilters.vaxStatus} />;
       case 'notes':
         return <NotesView onNavigate={setActiveView} />;
       case 'outbreak':
@@ -80,7 +92,7 @@ const Index = () => {
       case 'settings':
         return <SettingsView />;
       default:
-        return <DashboardView onNavigate={setActiveView} />;
+        return <DashboardView onNavigate={handleNavigate} />;
     }
   };
 
@@ -131,7 +143,7 @@ const Index = () => {
         <div className="flex flex-1 overflow-hidden">
           <Sidebar 
             activeView={activeView} 
-            onViewChange={setActiveView} 
+            onViewChange={(view) => handleNavigate(view)} 
           />
           
           <main className="flex-1 p-4 md:p-6 pb-20 lg:pb-6 overflow-auto">
@@ -143,7 +155,7 @@ const Index = () => {
 
         <MobileNav 
           activeView={activeView} 
-          onViewChange={setActiveView} 
+          onViewChange={(view) => handleNavigate(view)} 
         />
         
         <DataManagementModal

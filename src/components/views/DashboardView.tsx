@@ -14,13 +14,21 @@ import {
   getActiveABT, 
   getActiveIPCases, 
   getRecentNotes, 
+  getVaxDue,
   getLineListingRecommendations, 
   dismissLineListingRecommendation 
 } from '@/lib/database';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface DashboardViewProps {
-  onNavigate: (view: ViewType) => void;
+  onNavigate: (
+    view: ViewType,
+    filters?: {
+      ipStatus?: 'active' | 'resolved';
+      abtStatus?: 'active' | 'completed' | 'all';
+      vaxStatus?: 'due' | 'overdue' | 'due_or_overdue' | 'all';
+    },
+  ) => void;
 }
 
 const DashboardView = ({ onNavigate }: DashboardViewProps) => {
@@ -32,6 +40,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   const activeABT = getActiveABT(db).length;
   const activeIP = getActiveIPCases(db).length;
   const pendingNotes = getRecentNotes(db, 3).length;
+  const dueVaxCount = getVaxDue(db).length;
   const lineListingRecommendations = getLineListingRecommendations(db);
   const hasResidentData = activeResidents > 0;
   const hasClinicalData = activeABT > 0 || activeIP > 0 || pendingNotes > 0;
@@ -147,25 +156,25 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           icon={<Pill className="w-5 h-5" />}
           iconVariant="red"
           value={activeABT}
-          label="Active ABT"
+          label="Pending ABT"
           change={{ value: '—', positive: false }}
-          onClick={() => onNavigate('abt')}
+          onClick={() => onNavigate('abt', { abtStatus: 'active' })}
         />
         <StatCard
           icon={<ShieldAlert className="w-5 h-5" />}
           iconVariant="amber"
           value={activeIP}
-          label="IP Cases"
+          label="Active IP Cases"
           change={{ value: '—', positive: true }}
-          onClick={() => onNavigate('ip')}
+          onClick={() => onNavigate('ip', { ipStatus: 'active' })}
         />
         <StatCard
           icon={<FileText className="w-5 h-5" />}
           iconVariant="green"
-          value={pendingNotes}
-          label="Pending Notes"
+          value={dueVaxCount}
+          label="Vaccination Due"
           change={{ value: '—', positive: true }}
-          onClick={() => onNavigate('notes')}
+          onClick={() => onNavigate('vax', { vaxStatus: 'due_or_overdue' })}
         />
       </div>
 

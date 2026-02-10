@@ -29,9 +29,10 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
 
 interface IPViewProps {
   onNavigate?: (view: ViewType) => void;
+  initialStatusFilter?: 'active' | 'resolved';
 }
 
-const IPView = ({ onNavigate }: IPViewProps) => {
+const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const { toast } = useToast();
   const [db, setDb] = useState(() => loadDB());
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +44,12 @@ const IPView = ({ onNavigate }: IPViewProps) => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setActiveFilter(initialStatusFilter === 'resolved' ? 'resolved' : 'active');
+    }
+  }, [initialStatusFilter]);
 
   const normalizeStatus = (record: IPCase) => normalizeIPStatus(record.status || record.case_status);
   const normalizeProtocol = (protocol?: string) => {

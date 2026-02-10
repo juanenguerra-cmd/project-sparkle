@@ -30,12 +30,20 @@ const StatCard = ({
   };
 
   return (
-    <div 
+    <div
       className={cn(
         'stat-card',
-        onClick && 'cursor-pointer'
+        onClick && 'cursor-pointer hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
       )}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
     >
       <div className="flex items-start justify-between mb-3">
         <div className={cn('stat-icon', iconClasses[iconVariant])}>
