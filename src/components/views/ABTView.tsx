@@ -35,6 +35,8 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'completed'>('active');
   const [unitFilter, setUnitFilter] = useState('all');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ABTRecord | null>(null);
@@ -139,6 +141,17 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     if (!matchesSearch) return false;
 
     if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
+
+    const startIso = isoDateFromAny(r.startDate || r.start_date || '');
+    const endIso = isoDateFromAny(r.endDate || r.end_date || '') || startIso;
+
+    if (startDateFilter) {
+      if (!endIso || endIso < startDateFilter) return false;
+    }
+
+    if (endDateFilter) {
+      if (!startIso || startIso > endDateFilter) return false;
+    }
     
     // Status filter
     if (statusFilter === 'all') return true;
@@ -171,7 +184,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, unitFilter]);
+  }, [searchTerm, statusFilter, unitFilter, startDateFilter, endDateFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -346,6 +359,20 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
                 ))}
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => setStartDateFilter(e.target.value)}
+              className="w-[150px]"
+              aria-label="Start date filter"
+            />
+            <Input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => setEndDateFilter(e.target.value)}
+              className="w-[150px]"
+              aria-label="End date filter"
+            />
             <Badge 
               variant="outline" 
               className={`cursor-pointer ${statusFilter === 'all' ? 'bg-primary text-primary-foreground' : 'hover:bg-primary hover:text-primary-foreground'}`}
@@ -374,6 +401,8 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
                 setSearchTerm('');
                 setStatusFilter('active');
                 setUnitFilter('all');
+                setStartDateFilter('');
+                setEndDateFilter('');
               }}
             >
               Clear filters
