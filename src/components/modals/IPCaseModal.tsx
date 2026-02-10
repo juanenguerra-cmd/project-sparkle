@@ -1,9 +1,8 @@
-import { useState, useEffect, type KeyboardEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,6 +11,7 @@ import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { IPCase, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
+import PillInput from '@/components/ui/pill-input';
 
 interface IPCaseModalProps {
   open: boolean;
@@ -61,8 +61,6 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
-  const [sourceInput, setSourceInput] = useState('');
-  const [pathogenInput, setPathogenInput] = useState('');
   
   const [formData, setFormData] = useState({
     residentName: '',
@@ -136,8 +134,6 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const resetForm = () => {
     setSelectedResident(null);
     setSearchTerm('');
-    setSourceInput('');
-    setPathogenInput('');
     setFormData({
       residentName: '',
       mrn: '',
@@ -210,37 +206,6 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     
     setFormData(prev => ({ ...prev, requiredPPE: ppe }));
     toast({ title: 'PPE Rules Applied', description: ppe || 'No specific PPE requirements' });
-  };
-
-
-  const addPillValue = (field: 'sourceConditions' | 'pathogenResistances', rawValue: string) => {
-    const nextValue = rawValue.trim();
-    if (!nextValue) return;
-    setFormData((prev) => {
-      const existing = prev[field].map((value) => value.toLowerCase());
-      if (existing.includes(nextValue.toLowerCase())) return prev;
-      return { ...prev, [field]: [...prev[field], nextValue] };
-    });
-  };
-
-  const removePillValue = (field: 'sourceConditions' | 'pathogenResistances', valueToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: prev[field].filter((value) => value !== valueToRemove),
-    }));
-  };
-
-  const handlePillInputKeyDown = (
-    event: KeyboardEvent<HTMLInputElement>,
-    field: 'sourceConditions' | 'pathogenResistances',
-    inputValue: string,
-    clearInput: () => void,
-  ) => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      addPillValue(field, inputValue);
-      clearInput();
-    }
   };
 
   const handleSubmit = () => {
@@ -492,23 +457,11 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Source Condition / Reason</Label>
-                <div className="min-h-10 rounded-md border border-input bg-background px-2 py-1">
-                  <div className="mb-1 flex flex-wrap gap-1">
-                    {formData.sourceConditions.map((value) => (
-                      <Badge key={value} variant="secondary" className="cursor-pointer" onClick={() => removePillValue('sourceConditions', value)}>
-                        {value} ×
-                      </Badge>
-                    ))}
-                  </div>
-                  <Input
-                    placeholder="Type and press Enter (e.g., COVID positive)"
-                    value={sourceInput}
-                    onChange={(e) => setSourceInput(e.target.value)}
-                    onBlur={() => { addPillValue('sourceConditions', sourceInput); setSourceInput(''); }}
-                    onKeyDown={(e) => handlePillInputKeyDown(e, 'sourceConditions', sourceInput, () => setSourceInput(''))}
-                    className="h-7 border-0 px-0 shadow-none focus-visible:ring-0"
-                  />
-                </div>
+                <PillInput
+                  value={formData.sourceConditions}
+                  onChange={(values) => setFormData((prev) => ({ ...prev, sourceConditions: values }))}
+                  placeholder="Type and press Enter (e.g., COVID positive)"
+                />
               </div>
             </div>
 
@@ -516,23 +469,11 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Pathogen / Resistance (free text)</Label>
-                <div className="min-h-10 rounded-md border border-input bg-background px-2 py-1">
-                  <div className="mb-1 flex flex-wrap gap-1">
-                    {formData.pathogenResistances.map((value) => (
-                      <Badge key={value} variant="secondary" className="cursor-pointer" onClick={() => removePillValue('pathogenResistances', value)}>
-                        {value} ×
-                      </Badge>
-                    ))}
-                  </div>
-                  <Input
-                    placeholder="Type and press Enter (e.g., MRSA)"
-                    value={pathogenInput}
-                    onChange={(e) => setPathogenInput(e.target.value)}
-                    onBlur={() => { addPillValue('pathogenResistances', pathogenInput); setPathogenInput(''); }}
-                    onKeyDown={(e) => handlePillInputKeyDown(e, 'pathogenResistances', pathogenInput, () => setPathogenInput(''))}
-                    className="h-7 border-0 px-0 shadow-none focus-visible:ring-0"
-                  />
-                </div>
+                <PillInput
+                  value={formData.pathogenResistances}
+                  onChange={(values) => setFormData((prev) => ({ ...prev, pathogenResistances: values }))}
+                  placeholder="Type and press Enter (e.g., MRSA)"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">NHSN Pathogen Code</Label>
