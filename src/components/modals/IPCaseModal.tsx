@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type KeyboardEvent } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,6 +61,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [sourceInput, setSourceInput] = useState('');
+  const [pathogenInput, setPathogenInput] = useState('');
   
   const [formData, setFormData] = useState({
     residentName: '',
@@ -73,8 +76,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     onsetDate: '',
     resolutionDate: '',
     status: 'Active' as 'Active' | 'Resolved' | 'Discharged',
-    sourceCondition: '',
-    pathogenResistance: '',
+    sourceConditions: [] as string[],
+    pathogenResistances: [] as string[],
     nhsnPathogenCode: '',
     vaccineStatus: '',
     requiredPPE: '',
@@ -113,8 +116,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
         onsetDate: editCase.onsetDate || editCase.onset_date || '',
         resolutionDate: editCase.resolutionDate || editCase.resolution_date || '',
         status: editCase.status,
-        sourceCondition: editCase.sourceOfInfection || editCase.source_of_infection || '',
-        pathogenResistance: editCase.infectionType || editCase.infection_type || '',
+        sourceConditions: (editCase.sourceOfInfection || editCase.source_of_infection || '').split(',').map(v => v.trim()).filter(Boolean),
+        pathogenResistances: (editCase.infectionType || editCase.infection_type || '').split(',').map(v => v.trim()).filter(Boolean),
         nhsnPathogenCode: '',
         vaccineStatus: '',
         requiredPPE: editCase.requiredPPE || '',
@@ -133,6 +136,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const resetForm = () => {
     setSelectedResident(null);
     setSearchTerm('');
+    setSourceInput('');
+    setPathogenInput('');
     setFormData({
       residentName: '',
       mrn: '',
@@ -145,8 +150,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       onsetDate: todayISO(),
       resolutionDate: '',
       status: 'Active',
-      sourceCondition: '',
-      pathogenResistance: '',
+      sourceConditions: [],
+      pathogenResistances: [],
       nhsnPathogenCode: '',
       vaccineStatus: '',
       requiredPPE: '',
@@ -207,6 +212,37 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     toast({ title: 'PPE Rules Applied', description: ppe || 'No specific PPE requirements' });
   };
 
+
+  const addPillValue = (field: 'sourceConditions' | 'pathogenResistances', rawValue: string) => {
+    const nextValue = rawValue.trim();
+    if (!nextValue) return;
+    setFormData((prev) => {
+      const existing = prev[field].map((value) => value.toLowerCase());
+      if (existing.includes(nextValue.toLowerCase())) return prev;
+      return { ...prev, [field]: [...prev[field], nextValue] };
+    });
+  };
+
+  const removePillValue = (field: 'sourceConditions' | 'pathogenResistances', valueToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((value) => value !== valueToRemove),
+    }));
+  };
+
+  const handlePillInputKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+    field: 'sourceConditions' | 'pathogenResistances',
+    inputValue: string,
+    clearInput: () => void,
+  ) => {
+    if (event.key === 'Enter' || event.key === ',') {
+      event.preventDefault();
+      addPillValue(field, inputValue);
+      clearInput();
+    }
+  };
+
   const handleSubmit = () => {
     if (!formData.mrn) {
       toast({
@@ -226,13 +262,13 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       name: formData.residentName,
       unit: formData.unit,
       room: formData.room,
-      infectionType: formData.pathogenResistance,
-      infection_type: formData.pathogenResistance,
+      infectionType: formData.pathogenResistances.join(', '),
+      infection_type: formData.pathogenResistances.join(', '),
       protocol: protocol as 'EBP' | 'Isolation' | 'Standard Precautions',
       isolationType: formData.isolationType as any,
       isolation_type: formData.isolationType,
-      sourceOfInfection: formData.sourceCondition,
-      source_of_infection: formData.sourceCondition,
+      sourceOfInfection: formData.sourceConditions.join(', '),
+      source_of_infection: formData.sourceConditions.join(', '),
       dob: formData.dob,
       onsetDate: formData.onsetDate,
       onset_date: formData.onsetDate,
@@ -262,7 +298,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       }
     } else {
       db.records.ip_cases.push(caseData);
-      addAudit(db, 'ip_add', `Added IP case: ${formData.pathogenResistance || 'Unknown'} for ${formData.residentName}`, 'ip');
+      addAudit(db, 'ip_add', `Added IP case: ${formData.pathogenResistances.join(', ') || 'Unknown'} for ${formData.residentName}`, 'ip');
     }
     
     saveDB(db);
@@ -456,12 +492,23 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Source Condition / Reason</Label>
-                <Input 
-                  placeholder="e.g., COVID positive, MDRO wound..."
-                  value={formData.sourceCondition}
-                  onChange={(e) => setFormData(p => ({ ...p, sourceCondition: e.target.value }))}
-                  className="text-sm"
-                />
+                <div className="min-h-10 rounded-md border border-input bg-background px-2 py-1">
+                  <div className="mb-1 flex flex-wrap gap-1">
+                    {formData.sourceConditions.map((value) => (
+                      <Badge key={value} variant="secondary" className="cursor-pointer" onClick={() => removePillValue('sourceConditions', value)}>
+                        {value} ×
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    placeholder="Type and press Enter (e.g., COVID positive)"
+                    value={sourceInput}
+                    onChange={(e) => setSourceInput(e.target.value)}
+                    onBlur={() => { addPillValue('sourceConditions', sourceInput); setSourceInput(''); }}
+                    onKeyDown={(e) => handlePillInputKeyDown(e, 'sourceConditions', sourceInput, () => setSourceInput(''))}
+                    className="h-7 border-0 px-0 shadow-none focus-visible:ring-0"
+                  />
+                </div>
               </div>
             </div>
 
@@ -469,12 +516,23 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Pathogen / Resistance (free text)</Label>
-                <Input 
-                  placeholder="e.g., MRSA, VRE, CRE, ESBL..."
-                  value={formData.pathogenResistance}
-                  onChange={(e) => setFormData(p => ({ ...p, pathogenResistance: e.target.value }))}
-                  className="text-sm"
-                />
+                <div className="min-h-10 rounded-md border border-input bg-background px-2 py-1">
+                  <div className="mb-1 flex flex-wrap gap-1">
+                    {formData.pathogenResistances.map((value) => (
+                      <Badge key={value} variant="secondary" className="cursor-pointer" onClick={() => removePillValue('pathogenResistances', value)}>
+                        {value} ×
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    placeholder="Type and press Enter (e.g., MRSA)"
+                    value={pathogenInput}
+                    onChange={(e) => setPathogenInput(e.target.value)}
+                    onBlur={() => { addPillValue('pathogenResistances', pathogenInput); setPathogenInput(''); }}
+                    onKeyDown={(e) => handlePillInputKeyDown(e, 'pathogenResistances', pathogenInput, () => setPathogenInput(''))}
+                    className="h-7 border-0 px-0 shadow-none focus-visible:ring-0"
+                  />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">NHSN Pathogen Code</Label>

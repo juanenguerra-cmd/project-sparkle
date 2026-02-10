@@ -340,6 +340,71 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
     URL.revokeObjectURL(url);
   };
 
+
+  const downloadIpSubsetReport = (reportType: 'pathogen' | 'source', reportValue: string) => {
+    const headers = ['Resident Name', 'MRN', 'Unit', 'Room', 'Protocol', 'Status', 'Onset Date', 'Resolution Date'];
+    const normalizeValues = (value: string) => value.split(',').map((part) => part.trim().toLowerCase()).filter(Boolean);
+    const rows = records
+      .filter((record) => {
+        const fieldValue = reportType === 'pathogen'
+          ? (record.infectionType || record.infection_type || '')
+          : (record.sourceOfInfection || record.source_of_infection || '');
+        return normalizeValues(fieldValue).includes(reportValue.toLowerCase());
+      })
+      .map((record) => [
+        escapeCSV(record.residentName || record.name),
+        escapeCSV(record.mrn),
+        escapeCSV(record.unit),
+        escapeCSV(record.room),
+        escapeCSV(record.protocol),
+        escapeCSV(record.status),
+        escapeCSV(record.onsetDate || record.onset_date),
+        escapeCSV(record.resolutionDate || record.resolution_date),
+      ].join(','));
+
+    if (rows.length === 0) {
+      toast({ title: 'No matching cases', description: `No IP cases found for ${reportValue}.` });
+      return;
+    }
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ip_${reportType}_${reportValue.replace(/\s+/g, '_').toLowerCase()}_${todayISO()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const topPathogens = useMemo(() => {
+    const map: Record<string, number> = {};
+    records.forEach((record) => {
+      const values = (record.infectionType || record.infection_type || '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      values.forEach((value) => {
+        map[value] = (map[value] || 0) + 1;
+      });
+    });
+    return Object.entries(map).sort(([, a], [, b]) => b - a).slice(0, 6);
+  }, [records]);
+
+  const topSources = useMemo(() => {
+    const map: Record<string, number> = {};
+    records.forEach((record) => {
+      const values = (record.sourceOfInfection || record.source_of_infection || '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      values.forEach((value) => {
+        map[value] = (map[value] || 0) + 1;
+      });
+    });
+    return Object.entries(map).sort(([, a], [, b]) => b - a).slice(0, 6);
+  }, [records]);
+
   const getStatusBadge = (status: string) => {
     const normalizedStatus = normalizeIPStatus(status);
     switch (normalizedStatus) {
@@ -394,6 +459,39 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
       {/* Trend Summary */}
       <TrackerSummary type="ip" />
+
+      <SectionCard title="IP Reports by Type">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">Pathogen / Resistance</p>
+            <div className="flex flex-wrap gap-2">
+              {topPathogens.length === 0 ? (
+                <span className="text-xs text-muted-foreground">No pathogen tags yet.</span>
+              ) : (
+                topPathogens.map(([value, count]) => (
+                  <Button key={value} size="sm" variant="outline" onClick={() => downloadIpSubsetReport('pathogen', value)}>
+                    {value} ({count})
+                  </Button>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">Source Condition</p>
+            <div className="flex flex-wrap gap-2">
+              {topSources.length === 0 ? (
+                <span className="text-xs text-muted-foreground">No source tags yet.</span>
+              ) : (
+                topSources.map(([value, count]) => (
+                  <Button key={value} size="sm" variant="outline" onClick={() => downloadIpSubsetReport('source', value)}>
+                    {value} ({count})
+                  </Button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
