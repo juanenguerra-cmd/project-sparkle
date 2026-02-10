@@ -71,7 +71,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
     if (/tmp|bactrim|nitro|fosfo/.test(normalized)) return 'Urinary';
     return 'Other';
   };
-  const abtClasses = db.records.abt
+  const abtClasses = db.records.abx
     .filter((record) => record.status === 'active')
     .reduce((acc, record) => {
       const name = record.medication || record.med_name || record.indication || 'Other';
