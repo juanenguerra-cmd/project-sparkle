@@ -153,16 +153,13 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
 
     const startIso = isoDateFromAny(r.startDate || r.start_date || '');
-    const endIso = isoDateFromAny(r.endDate || r.end_date || '');
 
-    const recordStart = startIso || endIso;
-    const recordEnd = endIso || startIso;
-    if ((startDateFilter || endDateFilter) && (!recordStart || !recordEnd)) return false;
-
-    // Date range should include any ABT course that overlaps the selected window.
-    // This captures active courses that started before the selected start date.
-    if (startDateFilter && recordEnd < startDateFilter) return false;
-    if (endDateFilter && recordStart > endDateFilter) return false;
+    // Date filters are based on ABT initiation/start date only.
+    // If a date range is selected, require a valid start date and keep records
+    // where start date falls within the selected bounds.
+    if ((startDateFilter || endDateFilter) && !startIso) return false;
+    if (startDateFilter && startIso < startDateFilter) return false;
+    if (endDateFilter && startIso > endDateFilter) return false;
     
     // Status filter
     if (statusFilter === 'all') return true;
