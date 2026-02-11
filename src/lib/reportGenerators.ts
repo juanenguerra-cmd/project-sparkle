@@ -1123,12 +1123,13 @@ export const generateStandardOfCareReport = (
   });
   
   const abtRows = abtStarted.length === 0
-    ? [['No new antibiotic regimens in this period', '', '', '', '', '', '', '', '']]
+    ? [['No new antibiotic regimens in this period', '', '', '', '', '', '', '', '', '']]
     : abtStarted.map(record => {
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const medication = record.medication || record.med_name || '';
-      const route = record.route || '';
+      const route = record.route || record.route_raw || '';
+      const frequency = record.frequency || '';
       const startDate = formatDateValue(record.startDate || record.start_date || '');
       const endDate = formatDateValue(record.endDate || record.end_date || '');
       const indication = record.indication || '';
@@ -1139,6 +1140,7 @@ export const generateStandardOfCareReport = (
         record.room,
         residentName,
         medication,
+        frequency,
         indication,
         source,
         route,
@@ -1149,7 +1151,7 @@ export const generateStandardOfCareReport = (
   
   sections.push({
     title: 'Antibiotic Review',
-    headers: ['Unit', 'Room', 'Name', 'Medication', 'Indication', 'Source', 'Route', 'Start', 'End'],
+    headers: ['Unit', 'Room', 'Name', 'Medication', 'Frequency', 'Indication', 'Source', 'Route', 'Start', 'End'],
     rows: abtRows
   });
   
