@@ -19,6 +19,7 @@ import {
   dismissLineListingRecommendation 
 } from '@/lib/database';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { inferMedicationClassFromRecord } from '@/lib/medicationClass';
 
 interface DashboardViewProps {
   onNavigate: (
@@ -62,20 +63,10 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
     }, {} as Record<string, number>);
   const maxUnitCount = Math.max(1, ...Object.values(censusByUnit));
 
-  const inferMedClass = (medicationName: string) => {
-    const normalized = medicationName.toLowerCase();
-    if (/cef|penem|cillin|amox|pip\/tazo|aztreonam/.test(normalized)) return 'Beta-lactam';
-    if (/vanco|linezolid|daptomycin/.test(normalized)) return 'Gram-positive';
-    if (/cipro|levo|moxi/.test(normalized)) return 'Fluoroquinolone';
-    if (/flagyl|metronidazole|difficile/.test(normalized)) return 'Anaerobic/GI';
-    if (/tmp|bactrim|nitro|fosfo/.test(normalized)) return 'Urinary';
-    return 'Other';
-  };
   const abtClasses = db.records.abx
     .filter((record) => record.status === 'active')
     .reduce((acc, record) => {
-      const name = record.medication || record.med_name || record.indication || 'Other';
-      const medClass = inferMedClass(name);
+      const medClass = inferMedicationClassFromRecord(record);
       acc[medClass] = (acc[medClass] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
