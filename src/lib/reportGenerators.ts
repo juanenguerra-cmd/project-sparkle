@@ -1,6 +1,7 @@
 // Report Generation Functions for ICN Hub
 import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActiveResidents, getNotesRequiringFollowUp, getActiveOutbreaks, normalizeIPStatus } from './database';
 import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from './types';
+import { isoDateFromAny } from './parsers';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
 
 export interface ReportSection {
@@ -88,6 +89,13 @@ const formatDateValue = (value?: string): string => {
 
 const parseDateValue = (value?: string): Date | null => {
   if (!value) return null;
+  const isoDate = isoDateFromAny(value);
+  if (isoDate) {
+    const normalized = new Date(`${isoDate}T00:00:00`);
+    if (!Number.isNaN(normalized.getTime())) {
+      return normalized;
+    }
+  }
   const parsed = parseISO(value);
   if (!Number.isNaN(parsed.getTime())) {
     return parsed;
