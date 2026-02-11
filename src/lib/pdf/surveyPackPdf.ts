@@ -226,7 +226,8 @@ const generateActiveABTList = (db: ICNDatabase): ReportData => {
       residentName,
       record.room,
       medication,
-      record.dose,
+      record.dose || '',
+      record.frequency || '',
       record.route,
       record.indication || '',
       startDate,
@@ -243,7 +244,7 @@ const generateActiveABTList = (db: ICNDatabase): ReportData => {
       date: format(new Date(), 'MM/dd/yyyy'),
       status: 'Active Only',
     },
-    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Route', 'Indication', 'Start', 'End', 'Days'],
+    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Days'],
     rows,
   };
 };
@@ -285,6 +286,8 @@ const generateTimeoutDueList = (db: ICNDatabase): ReportData => {
       residentName,
       record.room,
       medication,
+      record.dose || '',
+      record.frequency || '',
       startDate,
       format(new Date(start.getTime() + 2 * 24 * 60 * 60 * 1000), 'MM/dd/yyyy'),
       daysOverdue > 0 ? `${daysOverdue} days` : 'Due today',
@@ -300,7 +303,7 @@ const generateTimeoutDueList = (db: ICNDatabase): ReportData => {
       date: format(new Date(), 'MM/dd/yyyy'),
       threshold: '48-72 hours',
     },
-    headers: ['Resident', 'Room', 'Medication', 'Start Date', 'Review Due', 'Days Overdue', 'Status'],
+    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Frequency', 'Start Date', 'Review Due', 'Days Overdue', 'Status'],
     rows,
   };
 };
@@ -321,7 +324,8 @@ const generateMissingIndicationsReport = (db: ICNDatabase): ReportData => {
       residentName,
       record.room,
       medication,
-      record.dose,
+      record.dose || '',
+      record.frequency || '',
       record.route,
       startDate,
       'MISSING',
@@ -336,7 +340,7 @@ const generateMissingIndicationsReport = (db: ICNDatabase): ReportData => {
       date: format(new Date(), 'MM/dd/yyyy'),
       compliance: 'F881 Antibiotic Stewardship',
     },
-    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Route', 'Start Date', 'Indication'],
+    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Frequency', 'Route', 'Start Date', 'Indication'],
     rows,
   };
 };
@@ -363,6 +367,8 @@ const generateMissingStopDatesReport = (db: ICNDatabase): ReportData => {
       residentName,
       record.room,
       medication,
+      record.dose || '',
+      record.frequency || '',
       startDate,
       'NOT SET',
       `${daysSinceStart} days`,
@@ -377,7 +383,7 @@ const generateMissingStopDatesReport = (db: ICNDatabase): ReportData => {
     filters: {
       date: format(new Date(), 'MM/dd/yyyy'),
     },
-    headers: ['Resident', 'Room', 'Medication', 'Start Date', 'Stop Date', 'Duration', 'Action'],
+    headers: ['Resident', 'Room', 'Medication', 'Dose', 'Frequency', 'Start Date', 'Stop Date', 'Duration', 'Action'],
     rows,
   };
 };

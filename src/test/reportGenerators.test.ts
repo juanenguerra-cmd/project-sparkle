@@ -72,8 +72,8 @@ describe('generateStandardOfCareReport', () => {
     expect(abtSection?.title).toBe('Antibiotic Review');
     expect(abtSection?.rows).toHaveLength(1);
     expect(abtSection?.rows[0][3]).toBe('Levofloxacin');
-    expect(abtSection?.rows[0][4]).toBe('BID');
-    expect(abtSection?.rows[0][7]).toBe('PO');
+    expect(abtSection?.rows[0][5]).toBe('BID');
+    expect(abtSection?.rows[0][8]).toBe('PO');
   });
 
   it('filters IP by initiation date only and requires a valid start date when date filters are used', () => {
