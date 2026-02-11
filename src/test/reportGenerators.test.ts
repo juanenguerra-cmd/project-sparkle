@@ -75,4 +75,109 @@ describe('generateStandardOfCareReport', () => {
     expect(abtSection?.rows[0][4]).toBe('BID');
     expect(abtSection?.rows[0][7]).toBe('PO');
   });
+
+  it('filters IP by initiation date only and requires a valid start date when date filters are used', () => {
+    const db = createDb();
+    db.records.ip_cases = [
+      {
+        id: 'ip-in-range',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        protocol: 'Isolation',
+        status: 'active',
+        onsetDate: '2026-03-03',
+      },
+      {
+        id: 'ip-missing-start',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        protocol: 'Isolation',
+        status: 'active',
+      },
+      {
+        id: 'ip-out-of-range',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        protocol: 'Isolation',
+        status: 'active',
+        onsetDate: '2026-02-25',
+      },
+    ];
+
+    const report = generateStandardOfCareReport(db, '2026-03-01', '2026-03-07');
+    const ipSection = report.sections?.[1];
+
+    expect(ipSection?.title).toBe('Precaution List Review');
+    expect(ipSection?.rows).toHaveLength(1);
+    expect(ipSection?.rows[0][6]).toBe('03/03/2026');
+  });
+
+  it('filters VAX by given/due/decline start date based on status and excludes rows without a valid start date', () => {
+    const db = createDb();
+    db.records.vax = [
+      {
+        id: 'vax-given',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        vaccine: 'Influenza',
+        status: 'given',
+        dateGiven: '2026-03-02',
+      },
+      {
+        id: 'vax-due',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        vaccine: 'COVID-19',
+        status: 'due',
+        dueDate: '2026-03-04',
+      },
+      {
+        id: 'vax-declined',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        vaccine: 'RSV',
+        status: 'declined',
+        educationDate: '2026-03-05',
+      },
+      {
+        id: 'vax-missing-start',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        vaccine: 'Pneumococcal',
+        status: 'declined',
+      },
+      {
+        id: 'vax-out-of-range',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        vaccine: 'Tdap',
+        status: 'given',
+        dateGiven: '2026-02-20',
+      },
+    ];
+
+    const report = generateStandardOfCareReport(db, '2026-03-01', '2026-03-07');
+    const vaxSection = report.sections?.[2];
+
+    expect(vaxSection?.title).toBe('Vaccination Review');
+    expect(vaxSection?.rows).toHaveLength(3);
+    expect(vaxSection?.rows.map(row => row[3])).toEqual(['Influenza', 'COVID-19', 'RSV']);
+    expect(vaxSection?.rows.map(row => row[5])).toEqual(['03/02/2026', '03/04/2026', '03/05/2026']);
+  });
 });
