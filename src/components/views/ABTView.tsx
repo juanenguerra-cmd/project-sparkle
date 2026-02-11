@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,16 @@ const escapeCSV = (val: string | number | boolean | null | undefined): string =>
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+};
+
+const escapeHtml = (value: string | number | boolean | null | undefined): string => {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 };
 
 interface ABTViewProps {
@@ -143,15 +153,13 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
 
     const startIso = isoDateFromAny(r.startDate || r.start_date || '');
-    const endIso = isoDateFromAny(r.endDate || r.end_date || '');
 
-    if (startDateFilter) {
-      if (!startIso || startIso < startDateFilter) return false;
-    }
-
-    if (endDateFilter) {
-      if (!endIso || endIso > endDateFilter) return false;
-    }
+    // Date filters are based on ABT initiation/start date only.
+    // If a date range is selected, require a valid start date and keep records
+    // where start date falls within the selected bounds.
+    if ((startDateFilter || endDateFilter) && !startIso) return false;
+    if (startDateFilter && startIso < startDateFilter) return false;
+    if (endDateFilter && startIso > endDateFilter) return false;
     
     // Status filter
     if (statusFilter === 'all') return true;
@@ -277,6 +285,102 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     URL.revokeObjectURL(url);
   };
 
+  const handlePrintFilteredView = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({ title: 'Unable to print', description: 'Please allow popups to print this report.', variant: 'destructive' });
+      return;
+    }
+
+    const appliedFilters = [
+      `Status: ${statusFilter}`,
+      `Unit: ${unitFilter === 'all' ? 'All units' : unitFilter}`,
+      `Start from: ${startDateFilter || 'Any'}`,
+      `End by: ${endDateFilter || 'Any'}`,
+      `Search: ${searchTerm.trim() || 'None'}`,
+    ].join(' • ');
+
+    const tableRows = sortedRecords.map(record => {
+      const residentName = record.residentName || record.name || '—';
+      const medication = record.medication || record.med_name || '—';
+      const courseStatus = deriveStatus(record);
+
+      return `
+        <tr>
+          <td>${escapeHtml(residentName)}</td>
+          <td>${escapeHtml(`${record.unit || '—'} / ${record.room || '—'}`)}</td>
+          <td>${escapeHtml(medication)}</td>
+          <td>${escapeHtml(record.dose || '—')}</td>
+          <td>${escapeHtml(record.route || '—')}</td>
+          <td>${escapeHtml(record.indication || '—')}</td>
+          <td>${escapeHtml(record.infection_source || '—')}</td>
+          <td>${escapeHtml(formatDate(record.startDate || record.start_date))}</td>
+          <td>${escapeHtml(formatDate(record.endDate || record.end_date))}</td>
+          <td>${escapeHtml(record.tx_days || record.daysOfTherapy || '—')}</td>
+          <td>${escapeHtml(courseStatus)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const emptyState = `
+      <tr>
+        <td colspan="11" style="text-align:center; padding: 18px; color:#64748b;">No ABT records match the selected filters.</td>
+      </tr>
+    `;
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>ABT Filtered View</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; color: #0f172a; }
+            h1 { margin: 0 0 8px; font-size: 20px; }
+            .meta { margin-bottom: 12px; font-size: 12px; color: #475569; line-height: 1.5; }
+            table { border-collapse: collapse; width: 100%; font-size: 11px; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; vertical-align: top; }
+            th { background: #f1f5f9; font-weight: 700; }
+            @media print {
+              @page { margin: 12mm; }
+              body { margin: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>ABT Management — Filtered View</h1>
+          <div class="meta">
+            Generated: ${escapeHtml(new Date().toLocaleString())}<br />
+            Filters: ${escapeHtml(appliedFilters)}<br />
+            Total records: ${escapeHtml(sortedRecords.length)}
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Unit/Room</th>
+                <th>Medication</th>
+                <th>Dose</th>
+                <th>Route</th>
+                <th>Indication</th>
+                <th>Source</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Days</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows || emptyState}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -293,6 +397,10 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
             Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintFilteredView}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print filtered
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Upload className="w-4 h-4 mr-2" />
