@@ -3,6 +3,7 @@ import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActi
 import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from './types';
 import { isoDateFromAny } from './parsers';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
+import { inferMedicationClassFromRecord } from './medicationClass';
 
 export interface ReportSection {
   title: string;
@@ -1395,11 +1396,13 @@ export const generateMonthlyABTReport = (
     const endDate = record.endDate || record.end_date || '';
     const days = record.daysOfTherapy || record.tx_days || 
       (startDate ? differenceInDays(endDate ? new Date(endDate) : new Date(), new Date(startDate)) + 1 : 'N/A');
-    
+    const medicationClass = inferMedicationClassFromRecord(record);
+
     return [
       residentName,
       `${record.unit} / ${record.room}`,
       medication,
+      medicationClass,
       record.dose,
       getABTFrequency(record),
       getABTRoute(record),
@@ -1419,7 +1422,7 @@ export const generateMonthlyABTReport = (
       totalCourses: sorted.length.toString(),
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Resident', 'Unit/Room', 'Medication', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Days'],
+    headers: ['Resident', 'Unit/Room', 'Medication', 'Medication Class', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Days'],
     rows,
     footer: {
       disclaimer: 'Report includes all antibiotic courses that were active at any point during the selected month.'
