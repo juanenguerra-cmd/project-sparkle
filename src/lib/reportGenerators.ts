@@ -4,6 +4,8 @@ import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from '.
 import { isoDateFromAny } from './parsers';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
 import { inferMedicationClassFromRecord } from './medicationClass';
+import { getFilteredResidents, formatResidentNameForReport as formatResidentNameWithStatus } from './reports/residentFilter';
+import type { ResidentFilterConfig } from './types';
 
 export interface ReportSection {
   title: string;
@@ -1147,12 +1149,19 @@ export const generateSurveyorPacket = (
 export const generateStandardOfCareReport = (
   db: ICNDatabase,
   fromDate: string,
-  toDate: string
+  toDate: string,
+  residentFilterConfig: ResidentFilterConfig = {
+    mode: 'active_in_period',
+    dateRange: { fromDate, toDate },
+    showDischargedLabel: true,
+  }
 ): ReportData => {
   const sections: ReportSection[] = [];
+  const allowedMrns = getFilteredResidents(db, { ...residentFilterConfig, dateRange: { fromDate, toDate } });
   
   // Section 1: ABT regimens started within date range
   const abtStarted = db.records.abx.filter(r => {
+    if (!allowedMrns.has(r.mrn)) return false;
     const start = r.startDate || r.start_date;
     return isDateInRange(start, fromDate, toDate);
   });
@@ -1193,6 +1202,7 @@ export const generateStandardOfCareReport = (
   
   // Section 2: IP cases started within date range
   const ipStarted = db.records.ip_cases.filter(c => {
+    if (!allowedMrns.has(c.mrn)) return false;
     const initiationDate = c.onsetDate || c.onset_date;
     return isDateInRange(initiationDate, fromDate, toDate);
   });
@@ -1226,6 +1236,7 @@ export const generateStandardOfCareReport = (
   
   // Section 3: VAX records within date range
   const vaxInRange = db.records.vax.filter(v => {
+    if (!allowedMrns.has(v.mrn)) return false;
     const startDate = getVaxStartDate(v);
     return isDateInRange(startDate, fromDate, toDate);
   });
@@ -1358,16 +1369,26 @@ export const generateFollowUpNotesReport = (
 export const generateMonthlyABTReport = (
   db: ICNDatabase,
   month: number,
-  year: number
+  year: number,
+  residentFilterConfig: ResidentFilterConfig = {
+    mode: 'active_in_period',
+    showDischargedLabel: true,
+  }
 ): ReportData => {
   const monthStart = startOfMonth(new Date(year, month));
   const monthEnd = endOfMonth(new Date(year, month));
   const monthStartStr = format(monthStart, 'yyyy-MM-dd');
   const monthEndStr = format(monthEnd, 'yyyy-MM-dd');
   
+  const allowedMrns = getFilteredResidents(db, {
+    ...residentFilterConfig,
+    dateRange: residentFilterConfig.dateRange || { fromDate: monthStartStr, toDate: monthEndStr },
+  });
+
   // Find all ABT records active during the selected month
   // Active means: startDate <= month end AND (endDate >= month start OR endDate is null/ongoing)
   const activeInMonth = db.records.abx.filter(r => {
+    if (!allowedMrns.has(r.mrn)) return false;
     const startDate = r.startDate || r.start_date || '';
     const endDate = r.endDate || r.end_date || '';
     

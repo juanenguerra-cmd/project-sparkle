@@ -1,4 +1,4 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle, Filter, ClipboardCheck } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle, Filter, ClipboardCheck, Wand2, FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -82,11 +82,13 @@ import autoTable from 'jspdf-autotable';
 import { buildDailyPrecautionListPdf, isDailyPrecautionListReport } from '@/lib/pdf/dailyPrecautionListPdf';
 import { buildSurveyorPacketPdf, isSurveyorPacketReport } from '@/lib/pdf/surveyorPacketPdf';
 import { generateBinderCoverPdf, generateBinderDividersPdf } from '@/lib/pdf/binderPdf';
+import ReportBuilderWizard from '@/components/reports/builder/ReportBuilderWizard';
+import { generateReportPdf } from '@/lib/pdf/universalPdfGenerator';
 import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
-import { ViewType } from '@/lib/types';
+import { ViewType, type CustomReportTemplate, type ResidentFilterConfig } from '@/lib/types';
 import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
 
 interface ReportsViewProps {
@@ -114,6 +116,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const reportRef = useRef<HTMLDivElement>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [lastActionAt, setLastActionAt] = useState<Date | null>(null);
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState<CustomReportTemplate[]>([]);
   
   // New filter states for extended reports
   const [selectedVaccineType, setSelectedVaccineType] = useState('all');
@@ -319,6 +323,20 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     { id: 'ppe_usage', name: 'PPE Usage Tracking Report', description: 'Personal protective equipment monitoring by unit' },
   ];
 
+  const buildResidentFilterConfig = (reportTitle: string): ResidentFilterConfig => {
+    const monthlyOrHistorical = /MONTHLY|STANDARD OF CARE|INFECTION RATE|OUTBREAK/i.test(reportTitle);
+    return {
+      mode: monthlyOrHistorical ? 'active_in_period' : 'active_only',
+      dateRange: fromDate && toDate ? { fromDate, toDate } : undefined,
+      showDischargedLabel: true,
+    };
+  };
+
+  const handleSaveCustomReport = (template: CustomReportTemplate) => {
+    setCustomTemplates((prev) => [template, ...prev]);
+    toast.success(`Saved custom report template: ${template.name}`);
+  };
+
   const handleGenerateReport = async (reportId: string) => {
     const db = loadDB();
     let report: ReportData | null = null;
@@ -371,16 +389,16 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           // Default to last 7 days if not specified
           const defaultTo = format(new Date(), 'yyyy-MM-dd');
           const defaultFrom = format(subDays(new Date(), 7), 'yyyy-MM-dd');
-          report = generateStandardOfCareReport(db, fromDate || defaultFrom, toDate || defaultTo);
+          report = generateStandardOfCareReport(db, fromDate || defaultFrom, toDate || defaultTo, buildResidentFilterConfig('STANDARD OF CARE WEEKLY REPORT'));
         } else {
-          report = generateStandardOfCareReport(db, fromDate, toDate);
+          report = generateStandardOfCareReport(db, fromDate, toDate, buildResidentFilterConfig('STANDARD OF CARE WEEKLY REPORT'));
         }
         break;
       case 'followup_notes':
         report = generateFollowUpNotesReport(db, selectedFollowUpStatus);
         break;
       case 'monthly_abt':
-        report = generateMonthlyABTReport(db, parseInt(selectedMonth), parseInt(selectedYear));
+        report = generateMonthlyABTReport(db, parseInt(selectedMonth), parseInt(selectedYear), buildResidentFilterConfig('MONTHLY ANTIBIOTIC REPORT'));
         break;
       case 'medicare_compliance':
         report = generateMedicareABTComplianceReport(db);
@@ -705,7 +723,6 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
     const db = loadDB();
     const facility = db.settings.facilityName || 'Healthcare Facility';
 
-    // Daily Precaution List: strict template PDF (matches on-screen preview)
     if (isDailyPrecautionListReport(report)) {
       const doc = buildDailyPrecautionListPdf({ report, facility });
       const filename = `${sanitizedTitle}_${dateStr}.pdf`;
@@ -715,7 +732,6 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       return;
     }
 
-    // Surveyor Packet: no footer, repeating headers
     if (isSurveyorPacketReport(report)) {
       const doc = buildSurveyorPacketPdf({ report, facility });
       const filename = `${sanitizedTitle}_${dateStr}.pdf`;
@@ -738,21 +754,6 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
         doc.setFontSize(12);
         doc.text(report.title, pageWidth / 2, 22, { align: 'center' });
-
-        if (report.subtitle) {
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'normal');
-          doc.text(report.subtitle, pageWidth / 2, 28, { align: 'center' });
-        }
-
-        doc.setFontSize(9);
-        const filterParts = [];
-        if (report.filters.unit) filterParts.push(`Unit: ${report.filters.unit}`);
-        if (report.filters.date) filterParts.push(`Date: ${report.filters.date}`);
-        if (report.filters.shift) filterParts.push(`Shift: ${report.filters.shift}`);
-        if (filterParts.length > 0) {
-          doc.text(filterParts.join('  |  '), pageWidth / 2, 34, { align: 'center' });
-        }
       };
 
       const ensureSpace = (currentY: number, neededSpace = 14) => {
@@ -765,9 +766,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       };
 
       drawHeader();
-
       let startY = headerBottomY;
-      report.sections?.forEach(section => {
+      report.sections?.forEach((section) => {
         startY = ensureSpace(startY, 18);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
@@ -783,9 +783,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           alternateRowStyles: { fillColor: [250, 250, 250] },
           tableLineColor: [0, 0, 0],
           tableLineWidth: 0.1,
-          didDrawPage: () => {
-            drawHeader();
-          }
+          didDrawPage: drawHeader,
         });
         startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
         startY += 8;
@@ -798,40 +796,21 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       return;
     }
 
-    const doc = new jsPDF();
-
-    // Header
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(facility, doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
-
-    doc.setFontSize(12);
-    doc.text(report.title, doc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
-
-    if (report.subtitle) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(report.subtitle, doc.internal.pageSize.getWidth() / 2, 28, { align: 'center' });
-    }
-
-    // Filters line
-    doc.setFontSize(9);
-    const filterParts = [];
-    if (report.filters.unit) filterParts.push(`Unit: ${report.filters.unit}`);
-    if (report.filters.date) filterParts.push(`Date: ${report.filters.date}`);
-    if (report.filters.shift) filterParts.push(`Shift: ${report.filters.shift}`);
-    if (filterParts.length > 0) {
-      doc.text(filterParts.join('  |  '), doc.internal.pageSize.getWidth() / 2, 34, { align: 'center' });
-    }
-
     if (report.sections && report.sections.length > 0) {
+      const sectionDoc = new jsPDF();
+      sectionDoc.setFontSize(14);
+      sectionDoc.setFont('helvetica', 'bold');
+      sectionDoc.text(facility, sectionDoc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+      sectionDoc.setFontSize(12);
+      sectionDoc.text(report.title, sectionDoc.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+
       let startY = 40;
-      report.sections.forEach(section => {
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text(section.title, 14, startY);
+      report.sections.forEach((section) => {
+        sectionDoc.setFontSize(10);
+        sectionDoc.setFont('helvetica', 'bold');
+        sectionDoc.text(section.title, 14, startY);
         startY += 4;
-        autoTable(doc, {
+        autoTable(sectionDoc, {
           head: [section.headers],
           body: section.rows,
           startY,
@@ -841,39 +820,18 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           tableLineColor: [0, 0, 0],
           tableLineWidth: 0.1,
         });
-        startY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
+        startY = (sectionDoc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || startY;
         startY += 8;
       });
-    } else {
-      // Table
-      autoTable(doc, {
-        head: [report.headers],
-        body: report.rows,
-        startY: 40,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [250, 250, 250] },
-        tableLineColor: [0, 0, 0],
-        tableLineWidth: 0.1,
-      });
 
-      // Footer
-      const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable?.finalY || 40;
-      if (report.footer) {
-        doc.setFontSize(9);
-        doc.text(`Prepared by: ________________________`, 14, finalY + 15);
-        doc.text(`Signature: ________________________`, 14, finalY + 22);
-        doc.text(`Title: ________________________`, 110, finalY + 15);
-        doc.text(`Date/Time: ${report.footer.dateTime || new Date().toLocaleString()}`, 110, finalY + 22);
-
-        if (report.footer.disclaimer) {
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'italic');
-          doc.text(`* ${report.footer.disclaimer}`, 14, finalY + 35, { maxWidth: 180 });
-        }
-      }
+      const filename = `${sanitizedTitle}_${dateStr}.pdf`;
+      sectionDoc.save(filename);
+      recordAction(`Exported ${actionLabel}`);
+      toast.success(`Exported as ${filename}`);
+      return;
     }
 
+    const doc = generateReportPdf(report, { facilityName: facility });
     const filename = `${sanitizedTitle}_${dateStr}.pdf`;
     doc.save(filename);
     recordAction(`Exported ${actionLabel}`);
@@ -1044,6 +1002,23 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           <div className="text-2xl font-bold text-success">{vaxDue}</div>
           <div className="text-sm text-muted-foreground">Vaccinations Due</div>
           <div className="text-xs text-primary mt-1">Click for Full Report</div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-2xl font-bold">Reports</h2>
+          <p className="text-sm text-muted-foreground">Generate standardized and custom reports</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowReportBuilder(true)} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+            <Wand2 className="w-4 h-4 mr-2" />
+            Create Custom Report
+          </Button>
+          <Button variant="outline">
+            <FolderOpen className="w-4 h-4 mr-2" />
+            My Reports ({customTemplates.length})
+          </Button>
         </div>
       </div>
 
@@ -1948,6 +1923,12 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
             </Button>
           </div>
         </SectionCard>
+      )}
+      {showReportBuilder && (
+        <ReportBuilderWizard
+          onClose={() => setShowReportBuilder(false)}
+          onSave={handleSaveCustomReport}
+        />
       )}
     </div>
   );
