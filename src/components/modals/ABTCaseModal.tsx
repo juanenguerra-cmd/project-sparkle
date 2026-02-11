@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { ABTRecord, Resident } from '@/lib/types';
 import { computeTxDays, nowISO, todayISO } from '@/lib/parsers';
+import { deriveAbtStatus } from '@/lib/abtStatus';
 
 interface ABTCaseModalProps {
   open: boolean;
@@ -187,9 +188,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     const today = todayISO();
     const txDays = computeTxDays(formData.startDate, formData.endDate || today);
     const plannedStopDate = formData.endDate || formData.plannedStopDate;
-    const normalizedStatus = formData.status === 'discontinued'
-      ? 'discontinued'
-      : (formData.endDate ? 'completed' : 'active');
+    const normalizedStatus = deriveAbtStatus(formData.status, formData.endDate, today);
     
     const recordData: ABTRecord = {
       id: editRecord?.id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -458,6 +457,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                       ...p,
                       endDate: value,
                       plannedStopDate: value ? value : p.plannedStopDate,
+                      status: deriveAbtStatus(p.status, value),
                     }));
                   }}
                   className="text-sm"
@@ -465,7 +465,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
               </div>
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-primary">Status</Label>
-                <Select value={formData.status} onValueChange={(v: 'active' | 'completed' | 'discontinued') => setFormData(p => ({ ...p, status: v }))}>
+                <Select value={formData.status} onValueChange={(v: 'active' | 'completed' | 'discontinued') => setFormData(p => ({ ...p, status: deriveAbtStatus(v, p.endDate) }))}>
                   <SelectTrigger className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
