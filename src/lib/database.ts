@@ -24,6 +24,7 @@ import {
 import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
 import { migrateResidentIds } from './migrations';
+import { deriveAbtStatus } from './abtStatus';
 
 export interface ICNDatabase {
   census: {
@@ -414,6 +415,12 @@ export const importDBFromJSON = async (
         const id = r.id || r.record_id || `abx_${r.mrn}_${r.antibiotic || r.medication}_${r.startDate || r.start_date}`;
         if (existingIds.has(id)) return;
         
+        const endDate = r.endDate || r.end_date || r.end || '';
+        const rawStatus = String(r.status || '').toLowerCase();
+        const importedStatus = rawStatus.includes('discont')
+          ? 'discontinued'
+          : (r.isActive || rawStatus === 'active' ? 'active' : 'completed');
+
         db.records.abx.push({
           id,
           record_id: id,
@@ -430,9 +437,9 @@ export const importDBFromJSON = async (
           infection_source: r.infectionSource || r.infection_source || 'Other',
           start_date: r.startDate || r.start_date || r.start || '',
           startDate: r.startDate || r.start_date || r.start || '',
-          end_date: r.endDate || r.end_date || r.end || '',
-          endDate: r.endDate || r.end_date || r.end || '',
-          status: r.isActive || r.status === 'Active' ? 'active' : 'completed',
+          end_date: endDate,
+          endDate,
+          status: deriveAbtStatus(importedStatus, endDate),
           createdAt: now,
           source: 'json_import'
         });
