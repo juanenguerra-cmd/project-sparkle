@@ -48,6 +48,8 @@ describe('generateStandardOfCareReport', () => {
         id: 'abt-1',
         mrn: '123',
         medication: 'Levofloxacin',
+        frequency: 'BID',
+        route_raw: 'PO',
         start_date: '20260301',
         unit: 'Unit 3',
         room: '301',
@@ -70,5 +72,7 @@ describe('generateStandardOfCareReport', () => {
     expect(abtSection?.title).toBe('Antibiotic Review');
     expect(abtSection?.rows).toHaveLength(1);
     expect(abtSection?.rows[0][3]).toBe('Levofloxacin');
+    expect(abtSection?.rows[0][4]).toBe('BID');
+    expect(abtSection?.rows[0][7]).toBe('PO');
   });
 });
