@@ -87,6 +87,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
 import { ViewType } from '@/lib/types';
+import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
 
 interface ReportsViewProps {
   surveyorMode?: boolean;
@@ -152,10 +153,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const vaxDue = getVaxDue(db).length;
   const activeOutbreaks = getActiveOutbreaks(db);
   const reportSections = [
-    { id: 'report-executive', label: 'Executive' },
-    { id: 'report-operational', label: 'Operational' },
-    { id: 'report-surveillance', label: 'Surveillance' },
-    { id: 'report-line-listing', label: 'Line Listing' },
+    { id: 'report-executive', label: 'Surveyor Packet' },
+    { id: 'report-operational', label: 'Operational Worklists' },
+    { id: 'report-surveillance', label: 'Surveillance Analytics' },
+    { id: 'report-line-listing', label: 'QAPI Packet' },
     { id: 'report-scheduled', label: 'Scheduled' },
     { id: 'report-output', label: 'Output' }
   ];
@@ -277,6 +278,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       id: 'surv_aur', 
       name: 'Antibiotic Utilization Ratio (AUR)', 
       description: 'Days of therapy (DOT) per 1,000 resident days with benchmark comparison' 
+    },
+    {
+      id: 'metrics_definitions',
+      name: 'Metrics Definitions Appendix',
+      description: 'Central surveillance definitions used across Surveyor and QAPI packets'
     },
   ];
 
@@ -456,6 +462,17 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         }
         return;
       }
+      case 'metrics_definitions':
+        report = {
+          title: 'METRICS DEFINITIONS APPENDIX',
+          subtitle: 'Shared surveillance formulas used in Surveyor and QAPI packets',
+          generatedAt: new Date().toISOString(),
+          filters: { scope: 'Global', reference: '42 CFR §483.80 / CMS Appendix PP / CMS-20054' },
+          headers: ['Metric', 'Definition'],
+          rows: Object.entries(METRICS_DEFINITIONS).map(([metric, definition]) => [metric, definition]),
+        };
+        break;
+
       // Surveillance Reports
       case 'surv_trend':
       case 'surv_acquired':

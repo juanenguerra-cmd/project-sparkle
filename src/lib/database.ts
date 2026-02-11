@@ -23,10 +23,12 @@ import {
 } from './types';
 import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
+import { migrateResidentIds } from './migrations';
 
 export interface ICNDatabase {
   census: {
     residentsByMrn: Record<string, Resident>;
+    residentsById?: Record<string, Resident>;
     meta: {
       imported_at: string | null;
     };
@@ -39,6 +41,7 @@ export interface ICNDatabase {
     line_listings: LineListingEntry[];
     outbreaks: Outbreak[];
     contacts: ContactEntry[];
+    history?: import('./types').HistoryEvent[];
   };
   audit_log: AuditEntry[];
   settings: AppSettings & {
@@ -48,6 +51,10 @@ export interface ICNDatabase {
     auto_close_grace_days?: number;
   };
   cache?: Record<string, unknown>;
+  meta?: {
+    schemaVersion?: number;
+    residentIdByMrn?: Record<string, string>;
+  };
 }
 
 // Re-export for compatibility
@@ -151,6 +158,7 @@ export const loadDB = (): ICNDatabase => {
     dbCache = {
       census: {
         residentsByMrn: parsed.census?.residentsByMrn || {},
+        residentsById: parsed.census?.residentsById || {},
         meta: parsed.census?.meta || { imported_at: null }
       },
       records: {
@@ -160,11 +168,18 @@ export const loadDB = (): ICNDatabase => {
         notes: Array.isArray(parsed.records?.notes) ? parsed.records.notes : [],
         line_listings: Array.isArray(parsed.records?.line_listings) ? parsed.records.line_listings : [],
         outbreaks: Array.isArray(parsed.records?.outbreaks) ? parsed.records.outbreaks : [],
-        contacts: Array.isArray(parsed.records?.contacts) ? parsed.records.contacts : []
+        contacts: Array.isArray(parsed.records?.contacts) ? parsed.records.contacts : [],
+        history: Array.isArray(parsed.records?.history) ? parsed.records.history : []
       },
       audit_log: Array.isArray(parsed.audit_log) ? parsed.audit_log : [],
-      settings: { ...defaultSettings, ...parsed.settings }
+      settings: { ...defaultSettings, ...parsed.settings },
+      meta: parsed.meta || { schemaVersion: 1, residentIdByMrn: {} }
     };
+    const migrated = migrateResidentIds(dbCache as unknown as import('./types').AppDatabase);
+    dbCache = migrated.db as unknown as ICNDatabase;
+    if (migrated.migrated) {
+      localStorage.setItem('icn_hub_db', JSON.stringify(dbCache));
+    }
     return dbCache;
   } catch (e) {
     console.error('Failed to load DB:', e);
@@ -180,6 +195,11 @@ export const loadDB = (): ICNDatabase => {
 export const initDB = async (): Promise<ICNDatabase> => {
   try {
     dbCache = await storage.load() as ICNDatabase;
+    const migrated = migrateResidentIds(dbCache as unknown as import('./types').AppDatabase);
+    dbCache = migrated.db as unknown as ICNDatabase;
+    if (migrated.migrated) {
+      await storage.save(dbCache);
+    }
     return dbCache;
   } catch (e) {
     console.error('Failed to init DB:', e);
@@ -223,14 +243,20 @@ export const addAudit = (
   db: ICNDatabase, 
   action: string, 
   details: string, 
-  entityType: AuditEntry['entityType']
+  entityType: AuditEntry['entityType'],
+  options: { user?: string; entityId?: string; before?: Record<string, unknown>; after?: Record<string, unknown>; source?: AuditEntry['source'] } = {}
 ): void => {
   const entry: AuditEntry = {
     id: `audit_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     action,
     details,
     entityType,
-    timestamp: nowISO()
+    timestamp: nowISO(),
+    user: options.user,
+    entityId: options.entityId,
+    before: options.before,
+    after: options.after,
+    source: options.source || 'ui'
   };
   db.audit_log.unshift(entry);
   

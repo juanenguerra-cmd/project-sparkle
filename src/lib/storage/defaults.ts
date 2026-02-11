@@ -48,11 +48,23 @@ export const defaultSettings: AppSettings = {
     folderPath: '',
   },
   lineListingRecommendationDismissals: [],
+  requireUniqueMrn: false,
+  extendedDemographicsEnabled: false,
+  residentDaysMethod: 'midnight_census_sum',
+  averageDailyCensus: 0,
+  surveyorRedactionProfile: {
+    hideMRN: true,
+    hideDOB: true,
+    hidePhysician: true,
+    hideNotes: true,
+    initialsOnly: true,
+  },
 };
 
 export const defaultDatabase = (): ICNDatabaseShape => ({
   census: {
     residentsByMrn: {},
+    residentsById: {},
     meta: { imported_at: null }
   },
   records: {
@@ -62,8 +74,10 @@ export const defaultDatabase = (): ICNDatabaseShape => ({
     notes: [],
     line_listings: [],
     outbreaks: [],
-    contacts: []
+    contacts: [],
+    history: []
   },
   audit_log: [],
-  settings: { ...defaultSettings }
+  settings: { ...defaultSettings },
+  meta: { schemaVersion: 1, residentIdByMrn: {} }
 });

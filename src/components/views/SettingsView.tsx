@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, TestTube, FileText, BookOpen, Download, ScrollText, FileEdit } from 'lucide-react';
+import { Save, TestTube, FileText, BookOpen, Download, ScrollText, FileEdit, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,7 @@ import { generateUserGuidePdf, generateTrackerCapabilitiesPdf } from '@/lib/pdf/
 import { generateReleaseNotesPdf } from '@/lib/pdf/releaseNotesPdf';
 import { downloadUserGuideAsWord } from '@/lib/userGuideHtml';
 import type { CustomLineListingConfig } from '@/lib/lineListingTemplates';
+import { REGULATORY_REFERENCES } from '@/lib/regulatory';
 const SettingsView = () => {
   const { toast } = useToast();
   const db = loadDB();
@@ -86,6 +87,26 @@ const SettingsView = () => {
         <div className="bg-muted/50 rounded-lg p-4 font-mono text-sm max-h-48 overflow-auto">
           Click "Run Checks" to scan the database.
         </div>
+      </SectionCard>
+
+
+
+      <SectionCard title="Reference / Regulatory">
+        <Collapsible>
+          <CollapsibleTrigger className="w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+            <span className="flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Regulatory References</span>
+            <ChevronDown className="w-4 h-4" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3 space-y-3 text-sm">
+            {Object.values(REGULATORY_REFERENCES).map((ref) => (
+              <div key={ref.ftag} className="rounded-md border p-3">
+                <p className="font-semibold">{ref.ftag}: {ref.title}</p>
+                <p className="text-muted-foreground">{ref.citation} • {ref.cmsTask}</p>
+                <p>{ref.plainLanguage}</p>
+              </div>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
       </SectionCard>
 
       {/* Application Settings */}
