@@ -18,7 +18,7 @@ interface VAXCaseModalProps {
   editRecord?: VaxRecord | null;
 }
 
-const VACCINE_TYPES = ['FLU', 'COVID', 'PNA', 'RSV', 'Tdap', 'Shingles', 'Hep B', 'Other'];
+const VACCINE_TYPES = ['Flu', 'COVID', 'Pneumo', 'RSV', 'Tdap', 'Shingles', 'Hep B', 'Other'];
 const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');

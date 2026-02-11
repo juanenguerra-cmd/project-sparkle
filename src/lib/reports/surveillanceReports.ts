@@ -13,6 +13,7 @@ import {
   differenceInDays
 } from 'date-fns';
 import { ReportData } from '../reportGenerators';
+import { calculateABTStarts, calculateAUR, calculateDaysOfTherapy, calculateInfectionRatePer1000ResidentDays, calculateResidentDays, type CensusSnapshot } from '../metricsDefinitions';
 
 // Infection categories for classification
 export const INFECTION_CATEGORIES = [
@@ -88,21 +89,20 @@ const classifyABTIndication = (abt: ABTRecord): InfectionCategory => {
   return 'Other';
 };
 
-// Helper to get monthly census average (simplified - uses current census count)
+// Helper to get monthly census average (proxy from active census unless snapshots exist)
 const getMonthlyAverageCensus = (db: ICNDatabase, _month: Date): number => {
-  // In a real implementation, this would query historical census data
-  // For now, we use current active census as a proxy
   return Object.values(db.census.residentsByMrn).filter(r => r.active_on_census).length;
 };
 
-// Helper to calculate resident days for a month
-const calculateResidentDays = (db: ICNDatabase, month: Date): number => {
-  const avgCensus = getMonthlyAverageCensus(db, month);
-  const daysInMonth = differenceInDays(endOfMonth(month), startOfMonth(month)) + 1;
-  return avgCensus * daysInMonth;
+const buildMonthlySnapshots = (db: ICNDatabase, month: Date): CensusSnapshot[] => {
+  const days = differenceInDays(endOfMonth(month), startOfMonth(month)) + 1;
+  const census = getMonthlyAverageCensus(db, month);
+  return Array.from({ length: days }, (_, i) => ({
+    date: format(new Date(month.getFullYear(), month.getMonth(), i + 1), 'yyyy-MM-dd'),
+    censusCount: census,
+  }));
 };
 
-// Get IP cases within a date range
 const getIPCasesInRange = (db: ICNDatabase, startDate: Date, endDate: Date): IPCase[] => {
   return db.records.ip_cases.filter(ipCase => {
     const onsetDate = ipCase.onsetDate || ipCase.onset_date;
@@ -116,7 +116,6 @@ const getIPCasesInRange = (db: ICNDatabase, startDate: Date, endDate: Date): IPC
   });
 };
 
-// Get ABT records started within a date range
 const getABTStartsInRange = (db: ICNDatabase, startDate: Date, endDate: Date): ABTRecord[] => {
   return db.records.abx.filter(abt => {
     const startDateStr = abt.startDate || abt.start_date;
@@ -130,36 +129,9 @@ const getABTStartsInRange = (db: ICNDatabase, startDate: Date, endDate: Date): A
   });
 };
 
-// Calculate days of therapy for ABT records in a month
 const calculateDOTInMonth = (db: ICNDatabase, month: Date): number => {
-  const monthStart = startOfMonth(month);
-  const monthEnd = endOfMonth(month);
-  
-  let totalDOT = 0;
-  
-  db.records.abx.forEach(abt => {
-    const startDateStr = abt.startDate || abt.start_date;
-    const endDateStr = abt.endDate || abt.end_date;
-    
-    if (!startDateStr) return;
-    
-    try {
-      const abtStart = parseISO(startDateStr);
-      const abtEnd = endDateStr ? parseISO(endDateStr) : new Date();
-      
-      // Calculate overlap with the month
-      const overlapStart = abtStart < monthStart ? monthStart : abtStart;
-      const overlapEnd = abtEnd > monthEnd ? monthEnd : abtEnd;
-      
-      if (overlapStart <= overlapEnd) {
-        totalDOT += differenceInDays(overlapEnd, overlapStart) + 1;
-      }
-    } catch {
-      // Skip invalid dates
-    }
-  });
-  
-  return totalDOT;
+  const range = { startDate: format(startOfMonth(month), 'yyyy-MM-dd'), endDate: format(endOfMonth(month), 'yyyy-MM-dd') };
+  return db.records.abx.reduce((sum, record) => sum + calculateDaysOfTherapy(record, range), 0);
 };
 
 export interface SurveillanceReportData extends ReportData {
@@ -199,7 +171,7 @@ export const generateMonthlyMetrics = (
     const monthKey = format(month, 'yyyy-MM');
     
     const avgCensus = getMonthlyAverageCensus(db, month);
-    const residentDays = calculateResidentDays(db, month);
+    const residentDays = calculateResidentDays({ startDate: format(monthStart, 'yyyy-MM-dd'), endDate: format(monthEnd, 'yyyy-MM-dd') }, buildMonthlySnapshots(db, month), db.settings.residentDaysMethod || 'midnight_census_sum', db.settings.averageDailyCensus);
     
     // Get infections for this month
     const ipCases = getIPCasesInRange(db, monthStart, monthEnd);

@@ -2,8 +2,10 @@
 
 export interface Resident {
   id: string;
+  residentId?: string;
   mrn: string;
   name: string;
+  sex?: string;
   unit: string;
   room: string;
   dob?: string;
@@ -20,6 +22,8 @@ export interface Resident {
 
 export interface ABTRecord {
   id: string;
+  residentId?: string;
+  abtCourseId?: string;
   record_id?: string;
   mrn: string;
   residentName?: string;
@@ -35,11 +39,13 @@ export interface ABTRecord {
   indication: string;
   infection_source?: string;
   startDate?: string;
+  orderDate?: string;
   start_date?: string;
   endDate?: string;
   end_date?: string;
   plannedStopDate?: string;
   status: 'active' | 'completed' | 'discontinued';
+  stopReason?: string;
   daysOfTherapy?: number;
   tx_days?: number | null;
   nextReviewDate?: string;
@@ -62,6 +68,8 @@ export interface ABTRecord {
 
 export interface IPCase {
   id: string;
+  residentId?: string;
+  ipCaseId?: string;
   record_id?: string;
   mrn: string;
   residentName?: string;
@@ -69,6 +77,8 @@ export interface IPCase {
   unit: string;
   room: string;
   infectionType?: string;
+  syndromeCategory?: SymptomCategory;
+  suspectedOrConfirmedOrganism?: string;
   infection_type?: string;
   protocol: 'EBP' | 'Isolation' | 'Standard Precautions';
   isolationType?: 'Contact' | 'Droplet' | 'Airborne';
@@ -104,6 +114,7 @@ export interface IPCase {
 
 export interface VaxRecord {
   id: string;
+  residentId?: string;
   record_id?: string;
   mrn: string;
   residentName?: string;
@@ -130,6 +141,8 @@ export interface VaxRecord {
   lotNumber?: string;
   administrationSite?: string;
   declineReason?: string;
+  medicalExemption?: boolean;
+  contraindication?: string;
   consentFormAttached?: boolean;
   nextDueDate?: string;
 }
@@ -178,6 +191,8 @@ export const SYMPTOM_OPTIONS: SymptomEntry[] = [
 
 export interface Note {
   id: string;
+  residentId?: string;
+  noteId?: string;
   mrn: string;
   residentName?: string;
   name?: string;
@@ -197,11 +212,24 @@ export interface Note {
   followUpStatus?: 'pending' | 'completed' | 'escalated';
   followUpNotes?: string;
   linkedLineListingId?: string;
+  linkedEntityIds?: {
+    abtCourseIds?: string[];
+    ipCaseIds?: string[];
+    outbreakIds?: string[];
+    lineListingRowIds?: string[];
+  };
+  providerNotified?: boolean;
+  providerNotifiedAt?: string;
+  providerResponse?: string;
+  familyNotified?: boolean;
+  familyNotifiedAt?: string;
 }
 
 // Line Listing for outbreak tracking
 export interface LineListingEntry {
   id: string;
+  residentId?: string;
+  lineListingRowId?: string;
   mrn: string;
   residentName: string;
   unit: string;
@@ -254,11 +282,14 @@ export interface ContactEntry {
 // Outbreak definition
 export interface Outbreak {
   id: string;
+  outbreakId?: string;
   name: string;
   type: SymptomCategory;
   startDate: string;
   endDate?: string;
-  status: 'active' | 'resolved';
+  status: 'watch' | 'active' | 'resolved';
+  declaredAt?: string;
+  resolvedAt?: string;
   affectedUnits: string[];
   totalCases: number;
   notes?: string;
@@ -273,6 +304,21 @@ export interface AuditEntry {
   entityType: 'census' | 'abt' | 'ip' | 'vax' | 'notes' | 'settings' | 'export' | 'import' | 'abx';
   timestamp: string;
   user?: string;
+  entityId?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
+  source?: 'ui' | 'import' | 'api' | 'migration';
+}
+
+export interface HistoryEvent {
+  id: string;
+  entityType: 'abt' | 'ip' | 'vax';
+  entityId: string;
+  action: 'created' | 'edited' | 'discontinued' | 'completed' | 'status_changed' | 'reviewed' | 'offered' | 'declined' | 'reoffered' | 'administered';
+  occurredAt: string;
+  user?: string;
+  before?: Record<string, unknown>;
+  after?: Record<string, unknown>;
 }
 
 export interface AppSettings {
@@ -294,6 +340,17 @@ export interface AppSettings {
     folderPath: string;
   };
   lineListingRecommendationDismissals?: string[];
+  requireUniqueMrn?: boolean;
+  extendedDemographicsEnabled?: boolean;
+  residentDaysMethod?: 'midnight_census_sum' | 'adc_x_days';
+  averageDailyCensus?: number;
+  surveyorRedactionProfile?: {
+    hideMRN: boolean;
+    hideDOB: boolean;
+    hidePhysician: boolean;
+    hideNotes: boolean;
+    initialsOnly: boolean;
+  };
   // Custom report descriptions
   customReportDescriptions?: Record<string, string>;
   // Line listing form field configurations
@@ -315,6 +372,7 @@ export interface AppSettings {
 export interface AppDatabase {
   census: {
     residentsByMrn: Record<string, Resident>;
+    residentsById?: Record<string, Resident>;
     lastImportAt?: string;
     meta?: {
       imported_at: string | null;
@@ -328,9 +386,14 @@ export interface AppDatabase {
     line_listings: LineListingEntry[];
     outbreaks: Outbreak[];
     contacts: ContactEntry[];
+    history?: HistoryEvent[];
   };
   audit_log: AuditEntry[];
   settings: AppSettings;
+  meta?: {
+    schemaVersion?: number;
+    residentIdByMrn?: Record<string, string>;
+  };
 }
 
 export type ViewType = 

@@ -92,3 +92,35 @@ The CI workflow runs the same check via `npm run d1:health` and fails if:
 - the response JSON `ok` field is not `true`.
 
 If CI fails, rerun the command locally and check the D1 migration status endpoint at `/api/health/d1/schema` for missing migrations.
+
+
+## Regulatory Mapping
+
+Project Sparkle centralizes CMS infection-control mapping via F-tags:
+
+- **F880**: Infection Prevention & Control Program (42 CFR §483.80, CMS Appendix PP; CMS-20054)
+- **F881**: Antibiotic Stewardship Program
+- **F883**: Influenza and Pneumococcal immunization workflows
+- **F887**: COVID-19 immunization workflows
+
+See `src/lib/regulatory.ts` for authoritative constants used by UI/report labels.
+
+## Data Model Backbone
+
+- Canonical resident identity now supports `residentId` while preserving `mrn` as an attribute.
+- A startup migration maps legacy MRN-keyed storage into `residentId`-linked records and writes a migration audit entry.
+- Outbreak, ABT, IP, VAX, notes, and line listing models include canonical IDs and optional linkage fields for cross-entity notes.
+
+## Metrics Definitions
+
+Metrics are centralized in `src/lib/metricsDefinitions.ts` and reused by surveillance reporting:
+
+- Resident-days denominator (midnight census sum default; ADC × days alternative)
+- ABT starts
+- DOT (days of therapy)
+- AUR = (DOT / resident-days) × 1000
+- Infection rate per 1000 resident-days
+
+## Export & Redaction Profiles
+
+`src/lib/security.ts` defines `internal`, `surveyor`, and `qapi` export profiles with configurable surveyor redaction behavior (MRN/DOB/physician/notes and initials-only names).

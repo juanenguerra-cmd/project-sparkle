@@ -16,7 +16,7 @@ interface VAXImportModalProps {
   onImport: () => void;
 }
 
-const VACCINE_TYPES = ['FLU', 'COVID', 'PNA', 'TDAP', 'HEP-B', 'SHINGRIX', 'OTHER'];
+const VACCINE_TYPES = ['Flu', 'COVID', 'Pneumo', 'Tdap', 'Hep-B', 'Shingrix', 'Other'];
 
 const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
   const { toast } = useToast();
