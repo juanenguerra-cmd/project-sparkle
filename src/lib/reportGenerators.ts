@@ -3,6 +3,7 @@ import { ICNDatabase, loadDB, getActiveIPCases, getActiveABT, getVaxDue, getActi
 import { IPCase, ABTRecord, VaxRecord, Resident, Note, SYMPTOM_OPTIONS } from './types';
 import { isoDateFromAny } from './parsers';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
+import { inferMedicationClassFromRecord } from './medicationClass';
 
 export interface ReportSection {
   title: string;
@@ -1174,6 +1175,7 @@ export const generateStandardOfCareReport = (
         record.room,
         residentName,
         medication,
+        record.dose || '',
         frequency,
         indication,
         source,
@@ -1185,7 +1187,7 @@ export const generateStandardOfCareReport = (
   
   sections.push({
     title: 'Antibiotic Review',
-    headers: ['Unit', 'Room', 'Name', 'Medication', 'Frequency', 'Indication', 'Source', 'Route', 'Start', 'End'],
+    headers: ['Unit', 'Room', 'Name', 'Medication', 'Dose', 'Frequency', 'Indication', 'Source', 'Route', 'Start', 'End'],
     rows: abtRows
   });
   
@@ -1395,11 +1397,13 @@ export const generateMonthlyABTReport = (
     const endDate = record.endDate || record.end_date || '';
     const days = record.daysOfTherapy || record.tx_days || 
       (startDate ? differenceInDays(endDate ? new Date(endDate) : new Date(), new Date(startDate)) + 1 : 'N/A');
-    
+    const medicationClass = inferMedicationClassFromRecord(record);
+
     return [
       residentName,
       `${record.unit} / ${record.room}`,
       medication,
+      medicationClass,
       record.dose,
       getABTFrequency(record),
       getABTRoute(record),
@@ -1419,7 +1423,7 @@ export const generateMonthlyABTReport = (
       totalCourses: sorted.length.toString(),
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Resident', 'Unit/Room', 'Medication', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Days'],
+    headers: ['Resident', 'Unit/Room', 'Medication', 'Medication Class', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Days'],
     rows,
     footer: {
       disclaimer: 'Report includes all antibiotic courses that were active at any point during the selected month.'
@@ -1503,6 +1507,7 @@ export const generateMedicareABTComplianceReport = (db: ICNDatabase): ReportData
     return [
       residentName,
       medication,
+      record.dose || '',
       getABTFrequency(record),
       getABTRoute(record),
       record.indication || 'MISSING',
@@ -1524,7 +1529,7 @@ export const generateMedicareABTComplianceReport = (db: ICNDatabase): ReportData
         : '100%',
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Resident', 'Medication', 'Frequency', 'Route', 'Indication', 'Start Date', 'Duration (Days)', 'Compliance Issues'],
+    headers: ['Resident', 'Medication', 'Dose', 'Frequency', 'Route', 'Indication', 'Start Date', 'Duration (Days)', 'Compliance Issues'],
     rows,
     footer: {
       disclaimer: 'This report identifies antibiotic regimens that may not meet Medicare documentation requirements. Issues include missing indications, prophylaxis without bacterial source documentation, and prolonged therapy without documented reassessment.'
@@ -1927,6 +1932,7 @@ export const generateAntibioticDurationReport = (
       residentName,
       abt.mrn,
       medication,
+      abt.dose || '',
       getABTFrequency(abt),
       getABTRoute(abt),
       abt.indication || '',
@@ -1946,7 +1952,7 @@ export const generateAntibioticDurationReport = (
         return sum + differenceInDays(end, start) + 1;
       }, 0) / longCourses.length
     : 0;
-  const highPriorityCount = rows.filter(r => r[10] === '⚠️ HIGH').length;
+  const highPriorityCount = rows.filter(r => r[11] === '⚠️ HIGH').length;
   
   return {
     title: 'ANTIBIOTIC DURATION ANALYSIS',
@@ -1956,7 +1962,7 @@ export const generateAntibioticDurationReport = (
       threshold: `${thresholdDays}+ days`,
       date: format(new Date(), 'MM/dd/yyyy')
     },
-    headers: ['Room', 'Resident', 'MRN', 'Antibiotic', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Duration', 'Priority'],
+    headers: ['Room', 'Resident', 'MRN', 'Antibiotic', 'Dose', 'Frequency', 'Route', 'Indication', 'Start', 'End', 'Duration', 'Priority'],
     rows,
     footer: {
       preparedBy: '',
@@ -2226,7 +2232,7 @@ export const generateIPDailyMorningReport = (db: ICNDatabase): ReportData => {
     const startDate = formatDateValue(record.startDate || record.start_date || '');
     const endDate = formatDateValue(record.endDate || record.end_date || '');
     const indication = record.indication || '';
-    return [unit, room, residentName, medication, frequency, route, startDate, endDate, indication];
+    return [unit, room, residentName, medication, record.dose || '', frequency, route, startDate, endDate, indication];
   });
 
   const vaxDueTodayRows = vaxDue
@@ -2302,7 +2308,7 @@ export const generateIPDailyMorningReport = (db: ICNDatabase): ReportData => {
       },
       {
         title: 'Active Antibiotics (ABT)',
-        headers: ['Unit', 'Room', "Resident's Name", 'Medication', 'Frequency', 'Route', 'Start Date', 'End Date', 'Indication'],
+        headers: ['Unit', 'Room', "Resident's Name", 'Medication', 'Dose', 'Frequency', 'Route', 'Start Date', 'End Date', 'Indication'],
         rows: abtRows
       },
       {
