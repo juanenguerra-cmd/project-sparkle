@@ -415,3 +415,90 @@ export interface NavItem {
   label: string;
   icon: string;
 }
+
+export type ResidentFilterMode =
+  | 'active_only'
+  | 'active_in_period'
+  | 'all';
+
+export interface ResidentFilterConfig {
+  mode: ResidentFilterMode;
+  dateRange?: { fromDate: string; toDate: string };
+  showDischargedLabel: boolean;
+}
+
+export interface ReportFilters {
+  residentFilter?: ResidentFilterConfig;
+  [key: string]: unknown;
+}
+
+export type ReportCategory =
+  | 'daily_operations'
+  | 'compliance'
+  | 'surveillance'
+  | 'vaccination'
+  | 'stewardship'
+  | 'custom';
+
+export type DataSource =
+  | 'census'
+  | 'abt'
+  | 'ip_cases'
+  | 'vaccinations'
+  | 'notes';
+
+export interface ColumnFormat {
+  type: 'date' | 'currency' | 'percentage' | 'duration';
+  pattern?: string;
+}
+
+export type ColumnTransform =
+  | 'uppercase'
+  | 'lowercase'
+  | 'titlecase'
+  | 'calculate_duration'
+  | 'calculate_age';
+
+export interface ColumnDefinition {
+  id: string;
+  fieldPath: string;
+  displayName: string;
+  dataType: 'text' | 'number' | 'date' | 'boolean' | 'status';
+  width?: number;
+  alignment?: 'left' | 'center' | 'right';
+  format?: ColumnFormat;
+  transform?: ColumnTransform;
+  required?: boolean;
+  position: number;
+}
+
+export interface SortConfig {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
+export interface ReportLayoutConfig {
+  orientation: 'portrait' | 'landscape';
+  pageSize: 'letter' | 'legal' | 'a4';
+  fontSize: 'compact' | 'normal' | 'large';
+  includeSummary?: boolean;
+}
+
+export interface ReportFilterConfig {
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface CustomReportTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: ReportCategory;
+  dataSource: DataSource;
+  selectedColumns: ColumnDefinition[];
+  filters: ReportFilterConfig;
+  sorting?: SortConfig;
+  layout: ReportLayoutConfig;
+  createdAt: string;
+  isProtected?: boolean;
+  isPinned?: boolean;
+}
