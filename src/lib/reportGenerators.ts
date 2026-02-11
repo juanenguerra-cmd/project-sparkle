@@ -138,6 +138,28 @@ const getABTFrequency = (record: ABTRecord): string => {
   return record.frequency || '';
 };
 
+const getVaxStartDate = (record: VaxRecord): string | undefined => {
+  const status = (record.status || '').toLowerCase();
+
+  if (status === 'given') {
+    return record.dateGiven || record.date_given;
+  }
+
+  if (status === 'due' || status === 'overdue') {
+    return record.dueDate || record.due_date;
+  }
+
+  if (status === 'declined') {
+    return record.educationDate
+      || record.offerDate
+      || record.dateGiven
+      || record.date_given
+      || record.createdAt;
+  }
+
+  return undefined;
+};
+
 // Daily Precaution List Report
 export const generateDailyPrecautionList = (
   db: ICNDatabase,
@@ -1169,8 +1191,8 @@ export const generateStandardOfCareReport = (
   
   // Section 2: IP cases started within date range
   const ipStarted = db.records.ip_cases.filter(c => {
-    const onset = c.onsetDate || c.onset_date;
-    return isDateInRange(onset, fromDate, toDate);
+    const initiationDate = c.onsetDate || c.onset_date;
+    return isDateInRange(initiationDate, fromDate, toDate);
   });
   
   const ipRows: string[][] = ipStarted.length === 0
@@ -1202,8 +1224,8 @@ export const generateStandardOfCareReport = (
   
   // Section 3: VAX records within date range
   const vaxInRange = db.records.vax.filter(v => {
-    const date = v.dateGiven || v.date_given || v.dueDate || v.due_date;
-    return isDateInRange(date, fromDate, toDate);
+    const startDate = getVaxStartDate(v);
+    return isDateInRange(startDate, fromDate, toDate);
   });
   
   const vaxRows = vaxInRange.length === 0
@@ -1212,15 +1234,7 @@ export const generateStandardOfCareReport = (
       const resident = db.census.residentsByMrn[record.mrn];
       const residentName = record.residentName || record.name || resident?.name || 'Unknown';
       const vaccine = record.vaccine || record.vaccine_type || '';
-      const date = formatDateValue(
-        record.dateGiven
-          || record.date_given
-          || record.offerDate
-          || record.educationDate
-          || record.dueDate
-          || record.due_date
-          || ''
-      );
+      const date = formatDateValue(getVaxStartDate(record) || '');
       
       return [
         record.unit,

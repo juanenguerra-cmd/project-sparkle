@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { loadDB, getActiveIPCases, saveDB, addAudit, normalizeIPStatus } from '@
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
 import { useToast } from '@/hooks/use-toast';
-import { mrnMatchKeys, todayISO } from '@/lib/parsers';
+import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 
@@ -44,6 +44,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [fromDateFilter, setFromDateFilter] = useState('');
+  const [toDateFilter, setToDateFilter] = useState('');
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -98,6 +100,13 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
       if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
       if (protocolFilter !== 'all' && normalizeProtocol(r.protocol) !== protocolFilter) return false;
+
+      if (fromDateFilter || toDateFilter) {
+        const startDate = isoDateFromAny(r.onsetDate || r.onset_date || '');
+        if (!startDate) return false;
+        if (fromDateFilter && startDate < fromDateFilter) return false;
+        if (toDateFilter && startDate > toDateFilter) return false;
+      }
       
       // Normalize status for case-insensitive comparison
       const status = normalizeStatus(r);
@@ -171,7 +180,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
     });
     
     return filtered;
-  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir, unitFilter, protocolFilter]);
+  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir, unitFilter, protocolFilter, fromDateFilter, toDateFilter]);
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
@@ -182,13 +191,57 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, activeFilter, unitFilter, protocolFilter]);
+  }, [searchTerm, activeFilter, unitFilter, protocolFilter, fromDateFilter, toDateFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  const handlePrintFiltered = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>IP Tracker - Filtered Results</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { font-size: 16px; margin-bottom: 5px; }
+            p { font-size: 11px; color: #666; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>IP Tracker - Filtered Results</h1>
+          <p>Status: ${activeFilter} • Unit: ${unitFilter === 'all' ? 'All units' : unitFilter} • Protocol: ${protocolFilter}</p>
+          <p>Date range: ${fromDateFilter || 'Any'} to ${toDateFilter || 'Any'} • ${filteredRecords.length} record(s)</p>
+          <table>
+            <thead><tr><th>Resident</th><th>Unit/Room</th><th>Infection Type</th><th>Protocol</th><th>Onset</th><th>Next Review</th><th>Status</th></tr></thead>
+            <tbody>
+              ${filteredRecords.map(r => `<tr>
+                <td>${r.residentName || r.name || '—'}</td>
+                <td>${r.unit} / ${r.room}</td>
+                <td>${r.infectionType || r.infection_type || '—'}</td>
+                <td>${r.protocol || '—'}</td>
+                <td>${r.onsetDate || r.onset_date || '—'}</td>
+                <td>${r.nextReviewDate || r.next_review_date || '—'}</td>
+                <td>${normalizeStatus(r) || '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(printContent);
+      w.document.close();
+      w.print();
+    }
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -450,6 +503,10 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintFiltered}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print Filtered
+          </Button>
           <Button size="sm" onClick={() => { setEditingCase(null); setShowCaseModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Add IP Case
@@ -562,6 +619,20 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                 <SelectItem value="standard">Standard</SelectItem>
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              value={fromDateFilter}
+              onChange={(e) => setFromDateFilter(e.target.value)}
+              className="w-[150px]"
+              aria-label="From date filter"
+            />
+            <Input
+              type="date"
+              value={toDateFilter}
+              onChange={(e) => setToDateFilter(e.target.value)}
+              className="w-[150px]"
+              aria-label="To date filter"
+            />
             <Badge 
               variant={activeFilter === 'all' ? 'default' : 'outline'} 
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
@@ -612,6 +683,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                 setActiveFilter('active');
                 setUnitFilter('all');
                 setProtocolFilter('all');
+                setFromDateFilter('');
+                setToDateFilter('');
               }}
             >
               Clear filters

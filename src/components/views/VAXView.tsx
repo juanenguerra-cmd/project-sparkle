@@ -17,7 +17,7 @@ import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
-import { mrnMatchKeys, todayISO } from '@/lib/parsers';
+import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -51,6 +51,8 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortKey, setSortKey] = useState<string | null>('_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [fromDateFilter, setFromDateFilter] = useState('');
+  const [toDateFilter, setToDateFilter] = useState('');
 
 
   useEffect(() => {
@@ -80,6 +82,31 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
     const matchKeys = mrnMatchKeys(mrn || '');
     if (matchKeys.length === 0) return true;
     return matchKeys.some(key => activeCensusMrns.has(key));
+  };
+
+  const getVaxStartDate = (record: VaxRecord): string => {
+    const status = (record.status || '').toLowerCase();
+
+    if (status === 'given') {
+      return isoDateFromAny(record.dateGiven || record.date_given || '');
+    }
+
+    if (status === 'due' || status === 'overdue') {
+      return isoDateFromAny(record.dueDate || record.due_date || '');
+    }
+
+    if (status === 'declined') {
+      return isoDateFromAny(
+        record.educationDate
+          || record.offerDate
+          || record.dateGiven
+          || record.date_given
+          || record.createdAt
+          || ''
+      );
+    }
+
+    return '';
   };
 
   const dueRecords = getVaxDue(db);
@@ -125,6 +152,17 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
         vaccine.toLowerCase().includes(searchTerm.toLowerCase());
     });
     
+    // Apply start date filters (requires valid start date whenever date filtering is active)
+    if (fromDateFilter || toDateFilter) {
+      result = result.filter(r => {
+        const startDate = getVaxStartDate(r);
+        if (!startDate) return false;
+        if (fromDateFilter && startDate < fromDateFilter) return false;
+        if (toDateFilter && startDate > toDateFilter) return false;
+        return true;
+      });
+    }
+
     // Apply status filter (except reoffer which is already filtered)
     if (activeFilter !== 'reoffer') {
       result = result.filter(r => {
@@ -156,7 +194,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
       _dateGiven: r.dateGiven || r.date_given || '',
       _dueDate: r.dueDate || r.due_date || ''
     }));
-  }, [activeFilter, reofferCandidates, records, unitFilter, searchTerm, activeCensusMrns]);
+  }, [activeFilter, reofferCandidates, records, unitFilter, searchTerm, activeCensusMrns, fromDateFilter, toDateFilter]);
 
   // Sort the filtered records
   const sortedRecords = useMemo(() => {
@@ -180,6 +218,48 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [filteredRecords, sortKey, sortDirection]);
+
+  const handlePrintFiltered = () => {
+    const rowsToPrint = sortedRecords;
+    const printContent = `
+      <html>
+        <head>
+          <title>VAX Tracker - Filtered Results</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { font-size: 16px; margin-bottom: 5px; }
+            p { font-size: 11px; color: #666; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>VAX Tracker - Filtered Results</h1>
+          <p>Unit: ${unitFilter === 'all' ? 'All Units' : unitFilter} • Status: ${activeFilter} • Date: ${new Date().toLocaleString()}</p>
+          <p>Filters: ${fromDateFilter || 'Any'} to ${toDateFilter || 'Any'} • ${rowsToPrint.length} record(s)</p>
+          <table>
+            <thead><tr><th>Resident</th><th>Unit/Room</th><th>Vaccine</th><th>Status</th><th>Start Date</th></tr></thead>
+            <tbody>
+              ${rowsToPrint.map(r => `<tr>
+                <td>${r.residentName || r.name || '—'}</td>
+                <td>${r.unit} / ${r.room}</td>
+                <td>${r.vaccine || r.vaccine_type || '—'}</td>
+                <td>${r.status}</td>
+                <td>${getVaxStartDate(r) || '—'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.write(printContent);
+      w.document.close();
+      w.print();
+    }
+  };
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -212,6 +292,10 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
     setUnitFilter(unit);
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [fromDateFilter, toDateFilter]);
   
   // Helper to get reoffer info for a record
   const getReofferInfo = (record: VaxRecord): ReofferCandidate | undefined => {
@@ -435,6 +519,10 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintFiltered}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print Filtered
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Import
@@ -553,6 +641,34 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
               ))}
             </SelectContent>
           </Select>
+          <Input
+            type="date"
+            value={fromDateFilter}
+            onChange={(e) => setFromDateFilter(e.target.value)}
+            className="w-[150px]"
+            aria-label="From date filter"
+          />
+          <Input
+            type="date"
+            value={toDateFilter}
+            onChange={(e) => setToDateFilter(e.target.value)}
+            className="w-[150px]"
+            aria-label="To date filter"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchTerm('');
+              setActiveFilter('due');
+              setUnitFilter('all');
+              setFromDateFilter('');
+              setToDateFilter('');
+              setCurrentPage(1);
+            }}
+          >
+            Clear filters
+          </Button>
         </div>
       </div>
 
@@ -865,47 +981,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
               Next
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const printContent = `
-                  <html>
-                    <head>
-                      <title>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter}</title>
-                      <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        h1 { font-size: 16px; margin-bottom: 5px; }
-                        table { width: 100%; border-collapse: collapse; font-size: 10px; }
-                        th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
-                        th { background: #f5f5f5; }
-                      </style>
-                    </head>
-                    <body>
-                      <h1>VAX Tracker - ${unitFilter === 'all' ? 'All Units' : unitFilter} (${activeFilter})</h1>
-                      <p style="font-size:11px;color:#666;">Page ${currentPage} of ${totalPages} • ${new Date().toLocaleString()}</p>
-                      <table>
-                        <thead><tr><th>Resident</th><th>Unit/Room</th><th>Vaccine</th><th>Status</th><th>Date</th></tr></thead>
-                        <tbody>
-                          ${paginatedRecords.map(r => `<tr>
-                            <td>${r.residentName || r.name || '—'}</td>
-                            <td>${r.unit} / ${r.room}</td>
-                            <td>${r.vaccine || r.vaccine_type || '—'}</td>
-                            <td>${r.status}</td>
-                            <td>${r.dateGiven || r.date_given || r.dueDate || r.due_date || '—'}</td>
-                          </tr>`).join('')}
-                        </tbody>
-                      </table>
-                    </body>
-                  </html>
-                `;
-                const w = window.open('', '_blank');
-                if (w) { w.document.write(printContent); w.document.close(); w.print(); }
-              }}
-            >
-              <Printer className="w-4 h-4 mr-1" />
-              Print View
-            </Button>
+
           </div>
         </div>
       )}
