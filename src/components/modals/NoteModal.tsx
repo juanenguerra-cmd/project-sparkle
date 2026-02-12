@@ -103,7 +103,9 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
   };
 
   const handleSave = () => {
-    if (!mrn || !text.trim()) {
+    const trimmedText = text.trim();
+
+    if (!mrn || !trimmedText) {
       toast.error('Please select a resident and enter note text');
       return;
     }
@@ -123,7 +125,7 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
       unit: resident.unit,
       room: resident.room,
       category: selectedSymptoms.length > 0 ? 'Symptoms' : category,
-      text,
+      text: trimmedText,
       symptoms: selectedSymptoms.length > 0 ? selectedSymptoms : undefined,
       symptomCategory: symptomCategory || undefined,
       requiresFollowUp,
@@ -135,15 +137,15 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
     };
 
     const db = loadDB();
-    if (note) {
-      const idx = db.records.notes.findIndex(n => n.id === note.id);
-      if (idx >= 0) {
-        db.records.notes[idx] = noteData;
-      }
+    const existingNoteIndex = note ? db.records.notes.findIndex(n => n.id === note.id) : -1;
+    const isUpdatingExistingNote = existingNoteIndex >= 0;
+
+    if (isUpdatingExistingNote) {
+      db.records.notes[existingNoteIndex] = noteData;
       addAudit(db, 'note_updated', `Updated note for ${resident.name}`, 'notes');
     } else {
       db.records.notes.unshift(noteData);
-      addAudit(db, 'note_created', `Created note for ${resident.name}${selectedSymptoms.length > 0 ? ` with symptoms (${symptomCategory})` : ''}`, 'notes');
+      addAudit(db, note ? 'note_updated' : 'note_created', `${note ? 'Updated' : 'Created'} note for ${resident.name}${selectedSymptoms.length > 0 ? ` with symptoms (${symptomCategory})` : ''}`, 'notes');
     }
 
     saveDB(db);
@@ -164,7 +166,7 @@ const NoteModal = ({ open, onClose, onSave, note, preselectedResident }: NoteMod
         });
       }
     } else {
-      toast.success(note ? 'Note updated' : 'Note created');
+      toast.success(isUpdatingExistingNote ? 'Note updated' : 'Note created');
     }
 
     onSave();
