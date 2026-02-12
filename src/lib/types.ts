@@ -189,6 +189,19 @@ export const SYMPTOM_OPTIONS: SymptomEntry[] = [
   { id: 'other', name: 'Other', category: 'other' },
 ];
 
+export interface ClinicalNote {
+  id: string;
+  type: 'abt_review' | 'ip_assessment' | 'general';
+  mrn: string;
+  residentName: string;
+  related_record_id?: string;
+  note_text: string;
+  note_date: string;
+  author: string;
+  createdAt: string;
+  updated_at?: string;
+}
+
 export interface Note {
   id: string;
   residentId?: string;
@@ -382,7 +395,7 @@ export interface AppDatabase {
     abx: ABTRecord[];
     ip_cases: IPCase[];
     vax: VaxRecord[];
-    notes: Note[];
+    notes: Array<Note | ClinicalNote>;
     line_listings: LineListingEntry[];
     outbreaks: Outbreak[];
     contacts: ContactEntry[];

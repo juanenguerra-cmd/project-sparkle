@@ -63,6 +63,11 @@ const DATA_ENTRY_GUIDE: GuideSection = {
       tip: 'Enable "Requires Follow-up" to add the note to the follow-up worklist.'
     },
     {
+      action: 'Document ABT Stewardship Review Note',
+      description: 'Go to ABT tab → Click the blue "Note" button on an active antibiotic record → Complete the review form (symptoms, adverse reactions, culture status, and stewardship decision). The narrative progress note auto-generates in real time for EMR documentation.',
+      tip: 'Use "Copy Only" to paste into your EMR, or "Save & Update Record" to store the note and update ABT timeout review fields for F881 compliance.'
+    },
+    {
       action: 'Editing Existing Records',
       description: 'Click the Edit (pencil) icon on any row to open the edit modal. Make changes and click Save.',
     },

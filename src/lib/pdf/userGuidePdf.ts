@@ -50,6 +50,11 @@ const TRACKER_CAPABILITIES: Record<string, TrackerCapability[]> = {
       howToUse: 'Set review cadence in Settings → Cases auto-flag when due for review'
     },
     {
+      feature: 'Generate Stewardship Review Note',
+      description: 'Create F881-compliant progress notes with clinical assessment and recommendations',
+      howToUse: 'Go to ABT tab → Click the blue "Note" action on a record → Complete review fields → Copy or Save note'
+    },
+    {
       feature: 'Discontinue ABT',
       description: 'Mark antibiotic therapy as completed',
       howToUse: 'Click the case → Click "Discontinue" → Add end date'
