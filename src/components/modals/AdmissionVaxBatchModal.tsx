@@ -141,26 +141,19 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
 
     let note = `ADMISSION IP SCREENING PROGRESS NOTE\n\n${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted to ${facilityName} from ${admitSource} on ${admitDate}.\n${isolationStatusLine}\n${paperworkReviewLine}\n${antibioticStatusLine}\n\nInitial infection prevention admission screening completed. Per facility protocol and CMS F880/F881/F883/F887 requirements, vaccination status and admission risk factors were reviewed with resident/responsible party. Education was provided regarding benefits, risks, contraindications, and alternatives for each vaccination. Resident/responsible party verbalized understanding.`;
 
+    note += '\n\nIMMUNIZATION STATUS SUMMARY:';
+    note += `\n- Consented: ${consentedVax.length}`;
     if (consentedVax.length > 0) {
-      note += '\n\nIMMUNIZATION STATUS — CONSENTED:';
       consentedVax.forEach((v) => {
-        note += `\n\n- ${v.vaccine_type}`;
-        note += `\n  Date: ${formatDate(v.dateGiven)}`;
-        note += `\n  Lot Number: ${v.lot || 'Not documented'}`;
-        if (v.manufacturer) note += `\n  Manufacturer: ${v.manufacturer}`;
-        note += `\n  Site: ${v.site}`;
-        note += `\n  Administered by: ${v.administered_by || 'Licensed nurse'}`;
-        if (v.dose_number) note += `\n  Dose: ${v.dose_number}`;
-        note += '\n  No immediate adverse reactions observed.';
+        note += `\n  • ${v.vaccine_type}${v.dateGiven ? ` (${formatDate(v.dateGiven)})` : ''}`;
       });
     }
 
+    note += `\n- Declined: ${declinedVax.length}`;
     if (declinedVax.length > 0) {
-      note += '\n\nIMMUNIZATION STATUS — DECLINED:';
       declinedVax.forEach((v) => {
-        note += `\n\n- ${v.vaccine_type}: Resident/responsible party declined at this time.`;
-        if (v.decline_reason) note += `\n  Reason: ${v.decline_reason}`;
-        note += '\n  Education provided. Resident aware of benefits and risks of declining. Will re-offer per facility policy.';
+        note += `\n  • ${v.vaccine_type}`;
+        note += ` — Reason: ${v.decline_reason || 'Not specified'}`;
       });
     }
 
