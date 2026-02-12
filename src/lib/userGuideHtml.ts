@@ -58,6 +58,16 @@ const DATA_ENTRY_GUIDE: GuideSection = {
       tip: 'Use "Mark Given" or "Mark Declined" buttons in the table for quick status updates.'
     },
     {
+      action: 'Admission Vaccination Batch Entry',
+      description: 'Go to Reports → New Admission Screening → Click green "Vax" button on the resident row. Mark each vaccine as Given or Declined and complete required lot/date/site fields for given entries.',
+      tip: 'Use "Copy to Clipboard" to paste the auto-generated progress note directly into your EMR. Records are saved with context "admission_screening".'
+    },
+    {
+      action: 'Customize Admission Progress Note Wording',
+      description: 'Go to Settings → Admission Progress Note Templates and edit the isolation status, paperwork reviewed, and antibiotic status lines used in the generated admission note.',
+      tip: 'Use tokens {isolationStatus} and {antibioticStatus} to auto-insert resident-specific values while keeping your facility wording.'
+    },
+    {
       action: 'Adding a Clinical Note',
       description: 'Go to Notes tab → Click "Add Note" → Select Resident, Category, check relevant Symptoms, write the narrative note.',
       tip: 'Enable "Requires Follow-up" to add the note to the follow-up worklist.'

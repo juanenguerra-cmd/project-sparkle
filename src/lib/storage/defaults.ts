@@ -47,6 +47,11 @@ export const defaultSettings: AppSettings = {
     enabled: false,
     folderPath: '',
   },
+  admissionNoteTemplates: {
+    isolationStatusLine: 'Current admission isolation status: {isolationStatus}.',
+    paperworkReviewLine: 'Resident admission paperwork was reviewed.',
+    antibioticStatusLine: 'On admission, resident antibiotic status: {antibioticStatus}.',
+  },
   lineListingRecommendationDismissals: [],
   requireUniqueMrn: false,
   extendedDemographicsEnabled: false,
