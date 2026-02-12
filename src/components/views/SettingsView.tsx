@@ -3,6 +3,7 @@ import { Save, TestTube, FileText, BookOpen, Download, ScrollText, FileEdit, Shi
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -32,6 +33,15 @@ const SettingsView = () => {
     (db.settings.lineListingConfigs as Record<string, CustomLineListingConfig>) || {}
   );
   const [showLineListingSettings, setShowLineListingSettings] = useState(false);
+  const [isolationStatusLine, setIsolationStatusLine] = useState(
+    db.settings.admissionNoteTemplates?.isolationStatusLine || 'Current admission isolation status: {isolationStatus}.'
+  );
+  const [paperworkReviewLine, setPaperworkReviewLine] = useState(
+    db.settings.admissionNoteTemplates?.paperworkReviewLine || 'Resident admission paperwork was reviewed.'
+  );
+  const [antibioticStatusLine, setAntibioticStatusLine] = useState(
+    db.settings.admissionNoteTemplates?.antibioticStatusLine || 'On admission, resident antibiotic status: {antibioticStatus}.'
+  );
 
   const handleSaveSettings = () => {
     const db = loadDB();
@@ -51,6 +61,11 @@ const SettingsView = () => {
         folderPath: oneDriveFolderPath.trim(),
       },
       lineListingConfigs,
+      admissionNoteTemplates: {
+        isolationStatusLine: isolationStatusLine.trim(),
+        paperworkReviewLine: paperworkReviewLine.trim(),
+        antibioticStatusLine: antibioticStatusLine.trim(),
+      },
     };
     addAudit(db, 'settings_updated', `Facility: ${facilityName}`, 'settings');
     saveDB(db);
@@ -194,6 +209,37 @@ const SettingsView = () => {
               <p className="text-sm text-muted-foreground">
                 This name appears on all generated reports
               </p>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Admission Progress Note Templates">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Isolation Status Line</Label>
+              <Textarea
+                value={isolationStatusLine}
+                onChange={(e) => setIsolationStatusLine(e.target.value)}
+                className="min-h-[70px]"
+              />
+              <p className="text-xs text-muted-foreground">Use <code>{'{isolationStatus}'}</code> token to inject status (e.g., on isolation, on enhanced barrier, or not on isolation).</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Admission Paperwork Review Line</Label>
+              <Textarea
+                value={paperworkReviewLine}
+                onChange={(e) => setPaperworkReviewLine(e.target.value)}
+                className="min-h-[70px]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Antibiotic Status Line</Label>
+              <Textarea
+                value={antibioticStatusLine}
+                onChange={(e) => setAntibioticStatusLine(e.target.value)}
+                className="min-h-[70px]"
+              />
+              <p className="text-xs text-muted-foreground">Use <code>{'{antibioticStatus}'}</code> token to inject admission antibiotic wording.</p>
             </div>
           </div>
         </SectionCard>
