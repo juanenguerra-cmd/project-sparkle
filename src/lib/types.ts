@@ -14,6 +14,7 @@ export interface Resident {
   active_on_census: boolean;
   physician?: string;
   notes?: string;
+  context?: string;
   status?: string;
   payor?: string;
   last_seen_census_at?: string;
@@ -50,6 +51,7 @@ export interface ABTRecord {
   tx_days?: number | null;
   nextReviewDate?: string;
   notes?: string;
+  context?: string;
   createdAt?: string;
   updated_at?: string;
   source?: string;
@@ -94,6 +96,7 @@ export interface IPCase {
   nextReviewDate?: string;
   next_review_date?: string;
   notes?: string;
+  context?: string;
   createdAt?: string;
   _autoClosed?: boolean;
   _autoClosedReason?: string;
@@ -124,12 +127,16 @@ export interface VaxRecord {
   vaccine: string;
   vaccine_type?: string;
   dose?: string;
-  status: 'given' | 'due' | 'overdue' | 'declined';
+  status: 'given' | 'due' | 'overdue' | 'declined' | 'scheduled';
   dateGiven?: string;
   date_given?: string;
+  lot?: string;
+  site?: string;
+  administered_by?: string;
   dueDate?: string;
   due_date?: string;
   notes?: string;
+  context?: string;
   createdAt?: string;
   administrationSource?: 'historical' | 'in_house';
   // F883/F887 Enhanced Fields
@@ -138,9 +145,11 @@ export interface VaxRecord {
   educationDate?: string;
   educationOutcome?: 'accepted' | 'declined' | 'deferred';
   manufacturer?: string;
+  dose_number?: string;
   lotNumber?: string;
   administrationSite?: string;
   declineReason?: string;
+  decline_reason?: string;
   medicalExemption?: boolean;
   contraindication?: string;
   consentFormAttached?: boolean;
@@ -255,6 +264,7 @@ export interface LineListingEntry {
   outcome?: 'active' | 'resolved' | 'hospitalized' | 'deceased';
   resolutionDate?: string;
   notes?: string;
+  context?: string;
   createdAt: string;
   updatedAt?: string;
   linkedNoteIds?: string[];
@@ -288,6 +298,7 @@ export interface ContactEntry {
   exposureDate: string;
   exposureType: string; // e.g., "Roommate", "Dining", "Care provided"
   notes?: string;
+  context?: string;
   followUpStatus?: 'pending' | 'cleared' | 'symptomatic';
   createdAt: string;
 }
@@ -306,6 +317,7 @@ export interface Outbreak {
   affectedUnits: string[];
   totalCases: number;
   notes?: string;
+  context?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -367,6 +379,11 @@ export interface AppSettings {
   // Custom report descriptions
   customReportDescriptions?: Record<string, string>;
   // Line listing form field configurations
+  admissionNoteTemplates?: {
+    isolationStatusLine?: string;
+    paperworkReviewLine?: string;
+    antibioticStatusLine?: string;
+  };
   lineListingConfigs?: Record<string, {
     templateId: string;
     enabledFields: string[];
