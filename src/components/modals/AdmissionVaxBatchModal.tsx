@@ -14,7 +14,7 @@ import { toast as sonnerToast } from 'sonner';
 
 interface VaxEntry {
   vaccine_type: 'Pneumococcal' | 'Influenza' | 'COVID-19' | 'RSV';
-  status: 'given' | 'declined';
+  status: 'consented' | 'declined';
   dateGiven: string;
   lot: string;
   site: string;
@@ -60,22 +60,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     }
   }, [open, resident.mrn]);
 
-  const calculateAge = (dob: string): string => {
-    if (!dob) return '[age]';
-    try {
-      const birth = new Date(dob);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age -= 1;
-      }
-      return age.toString();
-    } catch {
-      return '[age]';
-    }
-  };
-
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return '[date]';
     try {
@@ -103,11 +87,11 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     });
   };
 
-  const handleToggleStatus = (index: number, status: 'given' | 'declined') => {
+  const handleToggleStatus = (index: number, status: 'consented' | 'declined') => {
     setVaccines((prev) => {
       const updated = [...prev];
       const next = { ...updated[index], status };
-      if (status === 'given' && !next.administered_by && customNurse) {
+      if (status === 'consented' && !next.administered_by && customNurse) {
         next.administered_by = customNurse;
       }
       updated[index] = next;
@@ -116,61 +100,30 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
   };
 
   const generated = useMemo(() => {
-    const db = loadDB();
-    const facilityName = db.settings.facilityName || '[Facility Name]';
-    const age = calculateAge(resident.dob || '');
-    const gender = resident.sex || 'resident';
-    const admitSource = resident.notes || '[Hospital/Facility Name]';
-    const admitDate = formatDate(resident.admitDate || todayISO());
-    const activeIpCases = db.records.ip_cases.filter((ip) => ip.mrn === resident.mrn && String(ip.status || '').toLowerCase() === 'active');
-    const activeAbx = db.records.abx.filter((abx) => abx.mrn === resident.mrn && String(abx.status || '').toLowerCase() === 'active');
-    const hasIsolation = activeIpCases.some((ip) => String(ip.protocol || '').toLowerCase().includes('isolation'));
-    const hasEbp = activeIpCases.some((ip) => String(ip.protocol || '').toLowerCase().includes('ebp'));
-    const isolationStatus = hasIsolation ? 'on isolation precautions' : hasEbp ? 'on enhanced barrier precautions' : 'not on isolation precautions';
-    const antibioticStatus = activeAbx.length > 0 ? 'currently on active antibiotic therapy' : 'not currently on antibiotics';
-
-    const templateSettings = db.settings.admissionNoteTemplates || {};
-    const isolationStatusLine = (templateSettings.isolationStatusLine || 'Current admission isolation status: {isolationStatus}.')
-      .replace('{isolationStatus}', isolationStatus);
-    const paperworkReviewLine = templateSettings.paperworkReviewLine || 'Resident admission paperwork was reviewed.';
-    const antibioticStatusLine = (templateSettings.antibioticStatusLine || 'On admission, resident antibiotic status: {antibioticStatus}.')
-      .replace('{antibioticStatus}', antibioticStatus);
-
-    const givenVax = vaccines.filter((v) => v.status === 'given');
+    const consentedVax = vaccines.filter((v) => v.status === 'consented');
     const declinedVax = vaccines.filter((v) => v.status === 'declined');
 
-    let note = `ADMISSION IP SCREENING PROGRESS NOTE\n\n${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted to ${facilityName} from ${admitSource} on ${admitDate}.\n${isolationStatusLine}\n${paperworkReviewLine}\n${antibioticStatusLine}\n\nInitial infection prevention admission screening completed. Per facility protocol and CMS F880/F881/F883/F887 requirements, vaccination status and admission risk factors were reviewed with resident/responsible party. Education was provided regarding benefits, risks, contraindications, and alternatives for each vaccination. Resident/responsible party verbalized understanding.`;
+    let note = `ADMISSION VACCINATION DOCUMENTATION NOTE\n\nResident: ${resident.name}\nMRN: ${resident.mrn}\nDate: ${formatDate(resident.admitDate || todayISO())}`;
 
-    if (givenVax.length > 0) {
-      note += '\n\nIMMUNIZATION STATUS — ADMINISTERED:';
-      givenVax.forEach((v) => {
-        note += `\n\n- ${v.vaccine_type}`;
-        note += `\n  Date: ${formatDate(v.dateGiven)}`;
-        note += `\n  Lot Number: ${v.lot || 'Not documented'}`;
-        if (v.manufacturer) note += `\n  Manufacturer: ${v.manufacturer}`;
-        note += `\n  Site: ${v.site}`;
-        note += `\n  Administered by: ${v.administered_by || 'Licensed nurse'}`;
-        if (v.dose_number) note += `\n  Dose: ${v.dose_number}`;
-        note += '\n  No immediate adverse reactions observed.';
+    note += '\n\nIMMUNIZATION STATUS — CONSENTED:';
+    if (consentedVax.length > 0) {
+      consentedVax.forEach((v) => {
+        note += `\n- ${v.vaccine_type}`;
       });
+    } else {
+      note += '\n- None documented';
     }
 
+    note += '\n\nIMMUNIZATION STATUS — DECLINED:';
     if (declinedVax.length > 0) {
-      note += '\n\nIMMUNIZATION STATUS — DECLINED:';
       declinedVax.forEach((v) => {
-        note += `\n\n- ${v.vaccine_type}: Resident/responsible party declined at this time.`;
-        if (v.decline_reason) note += `\n  Reason: ${v.decline_reason}`;
-        note += '\n  Education provided. Resident aware of benefits and risks of declining. Will re-offer per facility policy.';
+        note += `\n- ${v.vaccine_type}`;
+        note += `\n  Reason: ${v.decline_reason || 'No reason documented'}`;
       });
+    } else {
+      note += '\n- None documented';
     }
 
-    note += '\n\nIP SCREENING SUMMARY:';
-    note += `\n- Isolation status on admission: ${isolationStatus}.`;
-    note += `\n- Antibiotic status on admission: ${antibioticStatus}.`;
-    note += '\n- Admission paperwork reviewed and reconciled.';
-    note += '\n\nResident monitored per facility policy. No adverse reactions noted at time of documentation.';
-    note += '\nWill continue to monitor, reinforce education as appropriate, and notify provider of any change in condition, isolation status, antibiotic therapy, or vaccination decision.';
-    note += '\nDocumentation completed per facility infection prevention protocol and CMS admission screening requirements.';
     note += '\n\nDocumented by: [Your Name/Credentials]';
     note += `\nDate/Time: ${formatDateTime(new Date())}`;
     return note;
@@ -192,9 +145,9 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
   };
 
   const handleSaveAll = () => {
-    const givenVaccines = vaccines.filter((v) => v.status === 'given');
+    const consentedVaccines = vaccines.filter((v) => v.status === 'consented');
 
-    for (const vax of givenVaccines) {
+    for (const vax of consentedVaccines) {
       if (!vax.dateGiven) {
         toast({ title: 'Missing date', description: `Please enter date given for ${vax.vaccine_type}`, variant: 'destructive' });
         return;
@@ -220,14 +173,14 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       room: resident.room,
       vaccine: vax.vaccine_type,
       vaccine_type: vax.vaccine_type,
-      status: vax.status,
-      dateGiven: vax.status === 'given' ? vax.dateGiven : undefined,
-      date_given: vax.status === 'given' ? vax.dateGiven : undefined,
-      lot: vax.status === 'given' ? vax.lot : undefined,
-      site: vax.status === 'given' ? vax.site : undefined,
-      administered_by: vax.status === 'given' ? vax.administered_by : undefined,
-      manufacturer: vax.status === 'given' ? vax.manufacturer : undefined,
-      dose_number: vax.status === 'given' ? vax.dose_number : undefined,
+      status: vax.status === 'consented' ? 'given' : 'declined',
+      dateGiven: vax.status === 'consented' ? vax.dateGiven : undefined,
+      date_given: vax.status === 'consented' ? vax.dateGiven : undefined,
+      lot: vax.status === 'consented' ? vax.lot : undefined,
+      site: vax.status === 'consented' ? vax.site : undefined,
+      administered_by: vax.status === 'consented' ? vax.administered_by : undefined,
+      manufacturer: vax.status === 'consented' ? vax.manufacturer : undefined,
+      dose_number: vax.status === 'consented' ? vax.dose_number : undefined,
       decline_reason: vax.status === 'declined' ? vax.decline_reason : undefined,
       notes: `Admission vaccination entry - ${vax.status}`,
       context: 'admission_screening',
@@ -237,9 +190,9 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
 
     currentDb.records.vax = [...newRecords, ...currentDb.records.vax];
 
-    const givenCount = vaccines.filter((v) => v.status === 'given').length;
+    const consentedCount = vaccines.filter((v) => v.status === 'consented').length;
     const declinedCount = vaccines.filter((v) => v.status === 'declined').length;
-    addAudit(currentDb, 'vax_batch_add', `Admission vax batch for ${resident.name}: ${givenCount} given, ${declinedCount} declined`, 'vax');
+    addAudit(currentDb, 'vax_batch_add', `Admission vax batch for ${resident.name}: ${consentedCount} consented, ${declinedCount} declined`, 'vax');
 
     saveDB(currentDb);
     toast({ title: 'Vaccinations Recorded', description: `${vaccines.length} vaccination entries saved for ${resident.name}` });
@@ -247,7 +200,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     onClose();
   };
 
-  const givenCount = vaccines.filter((v) => v.status === 'given').length;
+  const consentedCount = vaccines.filter((v) => v.status === 'consented').length;
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -267,14 +220,14 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
           </div>
 
           <div className="border rounded-lg p-3 bg-muted/30">
-            <Label className="text-sm font-semibold">Default Nurse/Administrator (applies to all Given vaccines)</Label>
+            <Label className="text-sm font-semibold">Default Nurse/Administrator (applies to all Consented vaccines)</Label>
             <Input
               placeholder="e.g., Jane Doe, RN"
               value={customNurse}
               onChange={(e) => {
                 const nurse = e.target.value;
                 setCustomNurse(nurse);
-                setVaccines((prev) => prev.map((v) => (v.status === 'given' ? { ...v, administered_by: nurse } : v)));
+                setVaccines((prev) => prev.map((v) => (v.status === 'consented' ? { ...v, administered_by: nurse } : v)));
               }}
               className="mt-2"
             />
@@ -296,22 +249,22 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                 </thead>
                 <tbody>
                   {vaccines.map((vax, idx) => (
-                    <tr key={vax.vaccine_type} className={`border-t ${vax.status === 'given' ? 'bg-green-50' : ''}`}>
+                    <tr key={vax.vaccine_type} className={`border-t ${vax.status === 'consented' ? 'bg-green-50' : ''}`}>
                       <td className="p-3 font-medium">{vax.vaccine_type}</td>
                       <td className="p-3">
                         <Label className="sr-only" htmlFor={`vax-status-${idx}`}>{`${vax.vaccine_type} status`}</Label>
-                        <Select value={vax.status} onValueChange={(val: 'given' | 'declined') => handleToggleStatus(idx, val)}>
+                        <Select value={vax.status} onValueChange={(val: 'consented' | 'declined') => handleToggleStatus(idx, val)}>
                           <SelectTrigger id={`vax-status-${idx}`} className="w-32" title={`${vax.vaccine_type} status`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="given">✓ Given</SelectItem>
+                            <SelectItem value="consented">✓ Consented</SelectItem>
                             <SelectItem value="declined">✗ Declined</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
                       <td className="p-3">
-                        {vax.status === 'given' && (
+                        {vax.status === 'consented' && (
                           <Input
                             type="date"
                             aria-label={`${vax.vaccine_type} date given`}
@@ -322,7 +275,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                         )}
                       </td>
                       <td className="p-3">
-                        {vax.status === 'given' && (
+                        {vax.status === 'consented' && (
                           <Input
                             placeholder="Lot #"
                             aria-label={`${vax.vaccine_type} lot number`}
@@ -333,7 +286,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                         )}
                       </td>
                       <td className="p-3">
-                        {vax.status === 'given' && (
+                        {vax.status === 'consented' && (
                           <Select value={vax.site} onValueChange={(val) => updateVaxField(idx, 'site', val)}>
                             <SelectTrigger className="w-32" title={`${vax.vaccine_type} injection site`}>
                               <SelectValue />
@@ -347,7 +300,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                         )}
                       </td>
                       <td className="p-3">
-                        {vax.status === 'given' && (
+                        {vax.status === 'consented' && (
                           <Input
                             placeholder="Optional"
                             aria-label={`${vax.vaccine_type} manufacturer`}
@@ -395,7 +348,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
 
         <div className="flex justify-between items-center pt-4 border-t">
           <p className="text-sm text-muted-foreground">
-            {givenCount} vaccine{givenCount !== 1 ? 's' : ''} marked as given | {vaccines.length} total entries will be saved
+            {consentedCount} vaccine{consentedCount !== 1 ? 's' : ''} marked as consented | {vaccines.length} total entries will be saved
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
