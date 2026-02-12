@@ -15,12 +15,8 @@ import { toast as sonnerToast } from 'sonner';
 interface VaxEntry {
   vaccine_type: 'Pneumococcal' | 'Influenza' | 'COVID-19' | 'RSV';
   status: 'consented' | 'declined';
-  dateGiven: string;
-  lot: string;
-  site: string;
   administered_by: string;
   decline_reason: string;
-  manufacturer: string;
   dose_number: string;
 }
 
@@ -32,18 +28,12 @@ interface AdmissionVaxBatchModalProps {
 }
 
 const VACCINE_TYPES: VaxEntry['vaccine_type'][] = ['Pneumococcal', 'Influenza', 'COVID-19', 'RSV'];
-const INJECTION_SITES = ['L Deltoid', 'R Deltoid', 'L Thigh', 'R Thigh', 'L Gluteal', 'R Gluteal'];
-
 const buildDefaultVaccines = (): VaxEntry[] =>
   VACCINE_TYPES.map((type) => ({
     vaccine_type: type,
     status: 'declined',
-    dateGiven: todayISO(),
-    lot: '',
-    site: 'R Deltoid',
     administered_by: '',
     decline_reason: '',
-    manufacturer: '',
     dose_number: '1',
   }));
 
@@ -145,7 +135,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     note += `\n- Consented: ${consentedVax.length}`;
     if (consentedVax.length > 0) {
       consentedVax.forEach((v) => {
-        note += `\n  • ${v.vaccine_type}${v.dateGiven ? ` (${formatDate(v.dateGiven)})` : ''}`;
+        note += `\n  • ${v.vaccine_type}`;
       });
     }
 
@@ -185,23 +175,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
   };
 
   const handleSaveAll = () => {
-    const consentedVaccines = vaccines.filter((v) => v.status === 'consented');
-
-    for (const vax of consentedVaccines) {
-      if (!vax.dateGiven) {
-        toast({ title: 'Missing date', description: `Please enter date given for ${vax.vaccine_type}`, variant: 'destructive' });
-        return;
-      }
-      if (!vax.lot) {
-        toast({
-          title: 'Missing lot number',
-          description: `Lot number required for ${vax.vaccine_type} per documentation standards`,
-          variant: 'destructive',
-        });
-        return;
-      }
-    }
-
     const currentDb = loadDB();
     const now = nowISO();
     const newRecords: VaxRecord[] = vaccines.map((vax) => ({
@@ -214,12 +187,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       vaccine: vax.vaccine_type,
       vaccine_type: vax.vaccine_type,
       status: vax.status === 'consented' ? 'given' : 'declined',
-      dateGiven: vax.status === 'consented' ? vax.dateGiven : undefined,
-      date_given: vax.status === 'consented' ? vax.dateGiven : undefined,
-      lot: vax.status === 'consented' ? vax.lot : undefined,
-      site: vax.status === 'consented' ? vax.site : undefined,
       administered_by: vax.status === 'consented' ? vax.administered_by : undefined,
-      manufacturer: vax.status === 'consented' ? vax.manufacturer : undefined,
       dose_number: vax.status === 'consented' ? vax.dose_number : undefined,
       decline_reason: vax.status === 'declined' ? vax.decline_reason : undefined,
       notes: `Admission vaccination entry - ${vax.status}`,
@@ -280,10 +248,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                   <tr>
                     <th className="p-3 text-left font-semibold">Vaccine</th>
                     <th className="p-3 text-center font-semibold">Status *</th>
-                    <th className="p-3 text-center font-semibold">Date Given *</th>
-                    <th className="p-3 text-center font-semibold">Lot # *</th>
-                    <th className="p-3 text-center font-semibold">Site *</th>
-                    <th className="p-3 text-center font-semibold">Manufacturer</th>
                     <th className="p-3 text-left font-semibold">Decline Reason</th>
                   </tr>
                 </thead>
@@ -302,53 +266,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
                             <SelectItem value="declined">✗ Declined</SelectItem>
                           </SelectContent>
                         </Select>
-                      </td>
-                      <td className="p-3">
-                        {vax.status === 'consented' && (
-                          <Input
-                            type="date"
-                            aria-label={`${vax.vaccine_type} date given`}
-                            value={vax.dateGiven}
-                            onChange={(e) => updateVaxField(idx, 'dateGiven', e.target.value)}
-                            className="w-40"
-                          />
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {vax.status === 'consented' && (
-                          <Input
-                            placeholder="Lot #"
-                            aria-label={`${vax.vaccine_type} lot number`}
-                            value={vax.lot}
-                            onChange={(e) => updateVaxField(idx, 'lot', e.target.value)}
-                            className="w-32"
-                          />
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {vax.status === 'consented' && (
-                          <Select value={vax.site} onValueChange={(val) => updateVaxField(idx, 'site', val)}>
-                            <SelectTrigger className="w-32" title={`${vax.vaccine_type} injection site`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {INJECTION_SITES.map((site) => (
-                                <SelectItem key={site} value={site}>{site}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {vax.status === 'consented' && (
-                          <Input
-                            placeholder="Optional"
-                            aria-label={`${vax.vaccine_type} manufacturer`}
-                            value={vax.manufacturer}
-                            onChange={(e) => updateVaxField(idx, 'manufacturer', e.target.value)}
-                            className="w-32"
-                          />
-                        )}
                       </td>
                       <td className="p-3">
                         {vax.status === 'declined' && (
