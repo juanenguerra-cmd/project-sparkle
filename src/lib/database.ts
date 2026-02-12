@@ -643,6 +643,7 @@ const mapInfectionSourceToCategory = (source?: string): SymptomCategory | null =
 
   if (normalized === 'respiratory' || normalized.includes('resp')) return 'respiratory';
   if (normalized === 'gi' || normalized.includes('gastro') || normalized.includes('diarr') || normalized.includes('vomit')) return 'gi';
+  if (normalized === 'skin' || normalized.includes('wound') || normalized.includes('cellul')) return 'skin';
   return null;
 };
 
@@ -656,6 +657,19 @@ const mapTextToSymptomCategory = (text?: string): SymptomCategory | null => {
   if (/\b(gi|gastro|diarrhea|diarrhoea|vomit|nausea|abdominal|stool)/.test(normalized)) {
     return 'gi';
   }
+  if (/\b(skin|rash|lesion|wound|cellulitis|ulcer|drainage)/.test(normalized)) {
+    return 'skin';
+  }
+  return null;
+};
+
+const mapNoteCategoryToSymptomCategory = (category?: string): SymptomCategory | null => {
+  const normalized = (category || '').toLowerCase().trim();
+  if (!normalized) return null;
+
+  if (normalized.includes('resp')) return 'respiratory';
+  if (normalized === 'gi' || normalized.includes('gastro') || normalized.includes('diarr')) return 'gi';
+  if (normalized.includes('skin') || normalized.includes('wound') || normalized.includes('rash')) return 'skin';
   return null;
 };
 
@@ -694,7 +708,7 @@ export const getLineListingRecommendations = (db: ICNDatabase): LineListingRecom
   }
 
   for (const note of db.records.notes) {
-    const category = note.symptomCategory || mapTextToSymptomCategory(note.text);
+    const category = note.symptomCategory || mapNoteCategoryToSymptomCategory(note.category) || mapTextToSymptomCategory(note.text);
     const key = `note_${note.id}`;
     if (!category || !note.mrn || dismissals.has(key) || activeLineListingMrns.has(note.mrn)) continue;
 
