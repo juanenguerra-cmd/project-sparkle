@@ -191,7 +191,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     const normalizedStatus = deriveAbtStatus(formData.status, formData.endDate, today);
     
     const recordData: ABTRecord = {
-      id: editRecord?.id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      id: editRecord?.id || editRecord?.record_id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: editRecord?.record_id || editRecord?.id || `abx_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: formData.mrn,
       residentName: formData.residentName,
@@ -230,9 +230,17 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     const currentDb = loadDB();
 
     if (editRecord) {
-      const idx = currentDb.records.abx.findIndex(r => r.id === editRecord.id);
+      const idx = currentDb.records.abx.findIndex((r) => {
+        if (editRecord.id && r.id === editRecord.id) return true;
+        return !!editRecord.record_id && r.record_id === editRecord.record_id;
+      });
       if (idx >= 0) {
         currentDb.records.abx[idx] = recordData;
+        addAudit(currentDb, 'abx_update', `Updated ABT record for ${formData.residentName}: ${formData.medication}`, 'abt');
+      } else {
+        // Some imported rows can be missing `id` and only carry `record_id`.
+        // Fallback to upsert so edits persist across reloads.
+        currentDb.records.abx.unshift(recordData);
         addAudit(currentDb, 'abx_update', `Updated ABT record for ${formData.residentName}: ${formData.medication}`, 'abt');
       }
     } else {

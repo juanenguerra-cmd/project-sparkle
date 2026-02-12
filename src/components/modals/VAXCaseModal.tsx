@@ -180,7 +180,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     const now = nowISO();
     
     const recordData: VaxRecord = {
-      id: editRecord?.id || `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      id: editRecord?.id || editRecord?.record_id || `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: editRecord?.record_id || editRecord?.id || `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: formData.mrn,
       residentName: formData.residentName,
@@ -203,9 +203,16 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     const currentDb = loadDB();
 
     if (editRecord) {
-      const idx = currentDb.records.vax.findIndex(r => r.id === editRecord.id);
+      const idx = currentDb.records.vax.findIndex((r) => {
+        if (editRecord.id && r.id === editRecord.id) return true;
+        return !!editRecord.record_id && r.record_id === editRecord.record_id;
+      });
       if (idx >= 0) {
         currentDb.records.vax[idx] = recordData;
+        addAudit(currentDb, 'vax_update', `Updated VAX record for ${formData.residentName}: ${formData.vaccine}`, 'vax');
+      } else {
+        // Imported rows may only have `record_id`; ensure updates persist by upserting.
+        currentDb.records.vax.unshift(recordData);
         addAudit(currentDb, 'vax_update', `Updated VAX record for ${formData.residentName}: ${formData.vaccine}`, 'vax');
       }
     } else {
