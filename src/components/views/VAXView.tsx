@@ -11,6 +11,7 @@ import { VaxRecord } from '@/lib/types';
 import VAXImportModal from '@/components/modals/VAXImportModal';
 import VAXCaseModal from '@/components/modals/VAXCaseModal';
 import VaxEducationModal from '@/components/modals/VaxEducationModal';
+import ReofferActionModal, { ReofferActionValues } from '@/components/modals/ReofferActionModal';
 import SwipeableVaxRow from '@/components/vax/SwipeableVaxRow';
 import { useToast } from '@/hooks/use-toast';
 import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib/vaccineReofferLogic';
@@ -47,6 +48,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [showEducationModal, setShowEducationModal] = useState(false);
+  const [showReofferActionModal, setShowReofferActionModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<VaxRecord | null>(null);
   const [unitFilter, setUnitFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -443,31 +445,70 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
     }
   };
 
-  const handleCopyReofferProgressNote = async (record: VaxRecord) => {
-    const decisionByFamily = window.confirm('Decision made by family/responsible party? Click OK for Family, Cancel for Resident.');
-    const consented = window.confirm('Outcome: Click OK if consented to vaccination, or Cancel if declined.');
-
+  const handleSaveReofferAction = async (record: VaxRecord, values: ReofferActionValues) => {
     const note = generateReofferProgressNote(
       record.vaccine || record.vaccine_type || 'Vaccine',
       record.residentName || record.name || 'Resident',
-      todayISO(),
-      decisionByFamily ? 'family' : 'resident',
-      consented ? 'consented' : 'declined'
+      values.encounterDate,
+      values.decisionMaker,
+      values.outcome
     );
+
+    const updatedDb = loadDB();
+    const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
+
+    if (idx !== -1) {
+      const updatedRecord = updatedDb.records.vax[idx];
+      updatedRecord.educationProvided = true;
+      updatedRecord.educationDate = values.encounterDate;
+      updatedRecord.educationOutcome = values.outcome === 'consented' ? 'accepted' : 'declined';
+      updatedRecord.offerDate = values.encounterDate;
+
+      if (values.outcome === 'consented') {
+        updatedRecord.status = 'given';
+        updatedRecord.dateGiven = values.encounterDate;
+        addAudit(updatedDb, 'vax_reoffer_consented', `Re-offer consented for ${updatedRecord.vaccine} - ${updatedRecord.residentName || updatedRecord.name}`, 'vax');
+      } else {
+        updatedRecord.status = 'declined';
+        addAudit(updatedDb, 'vax_reoffer_declined', `Re-offer declined for ${updatedRecord.vaccine} - ${updatedRecord.residentName || updatedRecord.name}`, 'vax');
+      }
+
+      updatedDb.records.notes.push({
+        id: `note_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        mrn: updatedRecord.mrn,
+        residentName: updatedRecord.residentName || updatedRecord.name,
+        name: updatedRecord.residentName || updatedRecord.name,
+        unit: updatedRecord.unit,
+        room: updatedRecord.room,
+        category: 'Vaccination',
+        text: note,
+        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      });
+      addAudit(updatedDb, 'note_add', `Re-offer note generated for ${updatedRecord.residentName || updatedRecord.name}`, 'notes');
+
+      saveDB(updatedDb);
+      setDb(updatedDb);
+    }
 
     try {
       await navigator.clipboard.writeText(note);
       toast({
-        title: 'Progress note copied',
-        description: 'Re-offer nursing note is ready to paste into your charting system.',
+        title: 'Re-offer documented',
+        description: 'Education note generated and copied to clipboard.',
       });
     } catch (error) {
       toast({
-        title: 'Copy failed',
-        description: 'Unable to copy note. Please copy manually.',
+        title: 'Re-offer documented',
+        description: 'Note was generated and saved, but clipboard copy failed.',
         variant: 'destructive',
       });
     }
+  };
+
+  const handleOpenReofferAction = (record: VaxRecord) => {
+    setEditingRecord(record);
+    setShowReofferActionModal(true);
   };
 
   const handleClearReoffer = (record: VaxRecord) => {
@@ -875,13 +916,13 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                                   <button
                                     type="button"
                                     className="row-action-btn text-primary"
-                                    title="Copy Re-offer Progress Note"
-                                    onClick={() => void handleCopyReofferProgressNote(record)}
+                                    title="Re-offer Action"
+                                    onClick={() => handleOpenReofferAction(record)}
                                   >
                                     <ClipboardCopy className="w-4 h-4" />
                                   </button>
                                 </TooltipTrigger>
-                                <TooltipContent>Copy Re-offer Progress Note</TooltipContent>
+                                <TooltipContent>Re-offer Action & Note</TooltipContent>
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1045,6 +1086,17 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
         onClose={() => { setShowEducationModal(false); setEditingRecord(null); }}
         record={editingRecord}
         onSave={() => setDb(loadDB())}
+      />
+
+      <ReofferActionModal
+        open={showReofferActionModal}
+        record={editingRecord}
+        onClose={() => { setShowReofferActionModal(false); setEditingRecord(null); }}
+        onSubmit={(values) => {
+          if (editingRecord) {
+            void handleSaveReofferAction(editingRecord, values);
+          }
+        }}
       />
     </div>
   );

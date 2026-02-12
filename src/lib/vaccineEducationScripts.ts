@@ -199,6 +199,9 @@ export const generateReofferProgressNote = (
 
   return `Vaccine re-offer completed on ${encounterDate} for ${residentName} (${script.vaccineType}). Vaccine Information Statement/education reviewed with ${decisionMakerLabel}, including benefits and risks.
 
+Vaccine education provided:
+${script.keyPoints.map(p => `- ${p}`).join('\n')}
+
 Education provided: ${script.benefitsStatement}
 Potential side effects discussed: ${script.riskStatement}
 
