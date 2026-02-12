@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { CustomReportTemplate } from '@/lib/types';
 import Step1_ReportType from './Step1_ReportType';
@@ -7,13 +7,21 @@ import Step3_ColumnSelector from './Step3_ColumnSelector';
 import Step4_PreviewSave from './Step4_PreviewSave';
 
 interface ReportBuilderWizardProps {
+  template?: CustomReportTemplate;
   onClose: () => void;
   onSave: (template: CustomReportTemplate) => void;
 }
 
-export const ReportBuilderWizard = ({ onClose, onSave }: ReportBuilderWizardProps) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [template, setTemplate] = useState<Partial<CustomReportTemplate>>({});
+export const ReportBuilderWizard = ({ template: initialTemplate, onClose, onSave }: ReportBuilderWizardProps) => {
+  const [currentStep, setCurrentStep] = useState(initialTemplate ? 4 : 1);
+  const [template, setTemplate] = useState<Partial<CustomReportTemplate>>(initialTemplate ?? {});
+
+  useEffect(() => {
+    if (initialTemplate) {
+      setTemplate(initialTemplate);
+      setCurrentStep(4);
+    }
+  }, [initialTemplate]);
 
   const handleNext = () => setCurrentStep((step) => Math.min(4, step + 1));
   const handleBack = () => setCurrentStep((step) => Math.max(1, step - 1));
