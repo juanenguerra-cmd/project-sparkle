@@ -1,4 +1,4 @@
-import { Download, Upload, Shield, Plus, Database, Info } from 'lucide-react';
+import { Shield, Plus, Database, Info, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -8,9 +8,16 @@ interface AppHeaderProps {
   onToggleSurveyorMode: () => void;
   onAddResident: () => void;
   onOpenDataModal?: () => void;
+  onOpenResidentSearch?: () => void;
 }
 
-const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDataModal }: AppHeaderProps) => {
+const AppHeader = ({
+  surveyorMode,
+  onToggleSurveyorMode,
+  onAddResident,
+  onOpenDataModal,
+  onOpenResidentSearch,
+}: AppHeaderProps) => {
   return (
     <header className="app-header sticky top-0 z-50 px-4 py-3 md:py-4">
       <div className="container mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
@@ -29,10 +36,15 @@ const AppHeader = ({ surveyorMode, onToggleSurveyorMode, onAddResident, onOpenDa
 
         <div className="flex items-center gap-2 flex-wrap md:flex-nowrap md:justify-end">
           <NotificationCenter />
-          <div className="hidden sm:flex items-center gap-2 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-50">
-            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.9)]" aria-hidden="true" />
-            <span>DB Sync: Updated</span>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onOpenResidentSearch}
+            className="bg-white/10 hover:bg-white/20 text-white border-white/20 px-2.5"
+          >
+            <Search className="w-4 h-4 mr-1.5" />
+            <span className="text-xs sm:text-sm">Search</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
