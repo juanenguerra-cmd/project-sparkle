@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import { loadDB, getActiveIPCases, saveDB, addAudit, normalizeIPStatus } from '@/lib/database';
 import { IPCase, ViewType } from '@/lib/types';
 import IPCaseModal from '@/components/modals/IPCaseModal';
+import IPReviewNoteModal from '@/components/modals/IPReviewNoteModal';
 import { useToast } from '@/hooks/use-toast';
 import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,6 +42,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const [protocolFilter, setProtocolFilter] = useState('all');
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingCase, setEditingCase] = useState<IPCase | null>(null);
+  const [showReviewNoteModal, setShowReviewNoteModal] = useState(false);
+  const [reviewingCase, setReviewingCase] = useState<IPCase | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -307,6 +310,22 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
   const handleDataChange = () => {
     setDb(loadDB());
+  };
+
+  const handleOpenReviewNote = (ipCase: IPCase) => {
+    setReviewingCase(ipCase);
+    setShowReviewNoteModal(true);
+  };
+
+  const handleReviewNoteClose = () => {
+    setShowReviewNoteModal(false);
+    setReviewingCase(null);
+  };
+
+  const handleReviewNoteSave = () => {
+    setDb(loadDB());
+    setShowReviewNoteModal(false);
+    setReviewingCase(null);
   };
 
   const handleDeleteCase = (record: IPCase) => {
@@ -767,6 +786,16 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                           >
                             <Edit className="w-4 h-4" />
                           </button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Generate IP Review Progress Note"
+                            onClick={() => handleOpenReviewNote(record)}
+                            className="h-8 border-purple-600 text-purple-600 hover:bg-purple-50"
+                          >
+                            <FileText className="w-3 h-3 mr-1" />
+                            Review
+                          </Button>
                           <button 
                             type="button"
                             className="row-action-btn" 
@@ -811,6 +840,15 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
         onSave={handleDataChange}
         editCase={editingCase}
       />
+
+      {reviewingCase && (
+        <IPReviewNoteModal
+          open={showReviewNoteModal}
+          onClose={handleReviewNoteClose}
+          onSave={handleReviewNoteSave}
+          ipCase={reviewingCase}
+        />
+      )}
 
       {onNavigate && (
         <SectionCard title="Next Steps">
