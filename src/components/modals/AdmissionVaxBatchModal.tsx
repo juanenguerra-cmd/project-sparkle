@@ -139,10 +139,10 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     const givenVax = vaccines.filter((v) => v.status === 'given');
     const declinedVax = vaccines.filter((v) => v.status === 'declined');
 
-    let note = `ADMISSION VACCINATION DOCUMENTATION\n\n${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted to ${facilityName} from ${admitSource} on ${admitDate}.\n${isolationStatusLine}\n${paperworkReviewLine}\n${antibioticStatusLine}\n\nPer facility protocol and CMS F883/F887 requirements, resident was offered recommended vaccinations appropriate for long-term care admission. Education was provided regarding benefits, risks, contraindications, and alternatives for each vaccination. Resident/responsible party verbalized understanding.`;
+    let note = `ADMISSION IP SCREENING PROGRESS NOTE\n\n${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted to ${facilityName} from ${admitSource} on ${admitDate}.\n${isolationStatusLine}\n${paperworkReviewLine}\n${antibioticStatusLine}\n\nInitial infection prevention admission screening completed. Per facility protocol and CMS F880/F881/F883/F887 requirements, vaccination status and admission risk factors were reviewed with resident/responsible party. Education was provided regarding benefits, risks, contraindications, and alternatives for each vaccination. Resident/responsible party verbalized understanding.`;
 
     if (givenVax.length > 0) {
-      note += '\n\nVACCINATIONS ADMINISTERED:';
+      note += '\n\nIMMUNIZATION STATUS — ADMINISTERED:';
       givenVax.forEach((v) => {
         note += `\n\n- ${v.vaccine_type}`;
         note += `\n  Date: ${formatDate(v.dateGiven)}`;
@@ -156,7 +156,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     }
 
     if (declinedVax.length > 0) {
-      note += '\n\nVACCINATIONS DECLINED:';
+      note += '\n\nIMMUNIZATION STATUS — DECLINED:';
       declinedVax.forEach((v) => {
         note += `\n\n- ${v.vaccine_type}: Resident/responsible party declined at this time.`;
         if (v.decline_reason) note += `\n  Reason: ${v.decline_reason}`;
@@ -164,8 +164,13 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       });
     }
 
+    note += '\n\nIP SCREENING SUMMARY:';
+    note += `\n- Isolation status on admission: ${isolationStatus}.`;
+    note += `\n- Antibiotic status on admission: ${antibioticStatus}.`;
+    note += '\n- Admission paperwork reviewed and reconciled.';
     note += '\n\nResident monitored per facility policy. No adverse reactions noted at time of documentation.';
-    note += '\nDocumentation completed per F887 immunization requirements and facility infection prevention protocols.';
+    note += '\nWill continue to monitor, reinforce education as appropriate, and notify provider of any change in condition, isolation status, antibiotic therapy, or vaccination decision.';
+    note += '\nDocumentation completed per facility infection prevention protocol and CMS admission screening requirements.';
     note += '\n\nDocumented by: [Your Name/Credentials]';
     note += `\nDate/Time: ${formatDateTime(new Date())}`;
     return note;
@@ -250,7 +255,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Syringe className="w-5 h-5" />
-            Admission Vaccination Batch Entry
+            Admission IP Screening & Vaccination Entry
           </DialogTitle>
         </DialogHeader>
 
@@ -372,7 +377,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
 
           <div className="border rounded-lg p-4 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">Auto-Generated Progress Note for EMR</h3>
+              <h3 className="font-semibold">Auto-Generated Admission IP Screening Progress Note</h3>
               <Button variant="outline" size="sm" onClick={handleCopyNote} title="Copy note to clipboard">
                 <Copy className="w-4 h-4 mr-2" />
                 Copy to Clipboard
@@ -383,7 +388,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
               onChange={(e) => setGeneratedNote(e.target.value)}
               className="font-mono text-xs min-h-[350px] bg-white"
               placeholder="Progress note will generate automatically as you enter vaccination data..."
-              aria-label="Generated admission vaccination progress note"
+              aria-label="Generated admission IP screening progress note"
             />
           </div>
         </div>
