@@ -12,6 +12,7 @@ import {
   IPCase, 
   VaxRecord, 
   Note, 
+  ClinicalNote,
   AuditEntry,
   AppSettings,
   LineListingEntry,
@@ -38,7 +39,7 @@ export interface ICNDatabase {
     abx: ABTRecord[];
     ip_cases: IPCase[];
     vax: VaxRecord[];
-    notes: Note[];
+    notes: Array<Note | ClinicalNote>;
     line_listings: LineListingEntry[];
     outbreaks: Outbreak[];
     contacts: ContactEntry[];

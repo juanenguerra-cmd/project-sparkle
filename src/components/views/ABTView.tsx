@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter, Printer } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter, Printer, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import SectionCard from '@/components/dashboard/SectionCard';
 import TrackerSummary from '@/components/dashboard/TrackerSummary';
 import ABTImportModal from '@/components/modals/ABTImportModal';
 import ABTCaseModal from '@/components/modals/ABTCaseModal';
+import ABTReviewNoteModal from '@/components/modals/ABTReviewNoteModal';
 import { loadDB, getActiveABT, saveDB, addAudit } from '@/lib/database';
 import { ABTRecord, ViewType } from '@/lib/types';
 import { isoDateFromAny, computeTxDays, mrnMatchKeys, todayISO } from '@/lib/parsers';
@@ -49,7 +50,9 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
   const [endDateFilter, setEndDateFilter] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCaseModal, setShowCaseModal] = useState(false);
+  const [showReviewNoteModal, setShowReviewNoteModal] = useState(false);
   const [editingRecord, setEditingRecord] = useState<ABTRecord | null>(null);
+  const [reviewingRecord, setReviewingRecord] = useState<ABTRecord | null>(null);
   const [db, setDb] = useState(() => loadDB());
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -105,6 +108,22 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
       setDb(currentDb);
       toast({ title: 'ABT Record Discharged', description: `${record.residentName || record.name} marked as discharged` });
     }
+  };
+
+  const handleOpenReviewNote = (record: ABTRecord) => {
+    setReviewingRecord(record);
+    setShowReviewNoteModal(true);
+  };
+
+  const handleReviewNoteClose = () => {
+    setShowReviewNoteModal(false);
+    setReviewingRecord(null);
+  };
+
+  const handleReviewNoteSave = () => {
+    setDb(loadDB());
+    setShowReviewNoteModal(false);
+    setReviewingRecord(null);
   };
 
   // Get active resident MRNs from census
@@ -586,6 +605,16 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
                         >
                           <Edit className="w-4 h-4" />
                         </button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenReviewNote(record)}
+                          title="Generate Review Progress Note"
+                          className="h-8 border-blue-600 text-blue-600 hover:bg-blue-50"
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          Note
+                        </Button>
                         <button 
                           type="button"
                           className="row-action-btn" 
@@ -635,6 +664,15 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
         onSave={() => setDb(loadDB())}
         editRecord={editingRecord}
       />
+
+      {reviewingRecord && (
+        <ABTReviewNoteModal
+          open={showReviewNoteModal}
+          onClose={handleReviewNoteClose}
+          onSave={handleReviewNoteSave}
+          abtRecord={reviewingRecord}
+        />
+      )}
 
       {onNavigate && (
         <SectionCard title="Next Steps">
