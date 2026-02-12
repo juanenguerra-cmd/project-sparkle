@@ -445,7 +445,10 @@ export type DataSource =
   | 'abt'
   | 'ip_cases'
   | 'vaccinations'
-  | 'notes';
+  | 'notes'
+  | 'line_listings'
+  | 'outbreaks'
+  | 'contacts';
 
 export interface ColumnFormat {
   type: 'date' | 'currency' | 'percentage' | 'duration';
@@ -457,7 +460,8 @@ export type ColumnTransform =
   | 'lowercase'
   | 'titlecase'
   | 'calculate_duration'
-  | 'calculate_age';
+  | 'calculate_age'
+  | 'infer_class';
 
 export interface ColumnDefinition {
   id: string;

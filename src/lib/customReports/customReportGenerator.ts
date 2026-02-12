@@ -43,6 +43,12 @@ const fetchDataFromSource = (source: DataSource, db: ICNDatabase): Record<string
       return db.records.vax;
     case 'notes':
       return db.records.notes;
+    case 'line_listings':
+      return db.records.line_listings;
+    case 'outbreaks':
+      return db.records.outbreaks;
+    case 'contacts':
+      return db.records.contacts;
     default:
       return [];
   }
@@ -79,6 +85,17 @@ const applyTransform = (value: unknown, transform: ColumnTransform, fullRecord: 
       const dob = String(fullRecord.dob || '');
       if (!dob) return 'N/A';
       return Math.floor((Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+    }
+
+    case 'infer_class': {
+      const med = String(fullRecord.medication || fullRecord.med_name || value || '').toLowerCase();
+      if (!med) return '';
+      if (/(cillin|penem|cef|ceph|amoxicillin|piperacillin)/.test(med)) return 'Beta-lactam';
+      if (/(floxacin)/.test(med)) return 'Fluoroquinolone';
+      if (/(mycin|micin)/.test(med)) return 'Macrolide/Aminoglycoside';
+      if (/(cycline)/.test(med)) return 'Tetracycline';
+      if (/(azole)/.test(med)) return 'Nitroimidazole';
+      return 'Other';
     }
     default:
       return value;
