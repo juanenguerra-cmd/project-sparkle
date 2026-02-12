@@ -276,6 +276,7 @@ export interface LineListingEntry {
 export interface LineListingRecommendation {
   id: string;
   abtRecordId: string;
+  sourceType?: 'abt' | 'note';
   mrn: string;
   residentName: string;
   unit: string;

@@ -639,8 +639,23 @@ const getLineListingRecommendationKey = (record: ABTRecord): string => {
 
 const mapInfectionSourceToCategory = (source?: string): SymptomCategory | null => {
   const normalized = normalizeInfectionSource(source);
-  if (normalized === 'respiratory') return 'respiratory';
-  if (normalized === 'gi') return 'gi';
+  if (!normalized) return null;
+
+  if (normalized === 'respiratory' || normalized.includes('resp')) return 'respiratory';
+  if (normalized === 'gi' || normalized.includes('gastro') || normalized.includes('diarr') || normalized.includes('vomit')) return 'gi';
+  return null;
+};
+
+const mapTextToSymptomCategory = (text?: string): SymptomCategory | null => {
+  const normalized = (text || '').toLowerCase();
+  if (!normalized) return null;
+
+  if (/\b(respiratory|cough|sob|shortness of breath|congestion|runny nose|sore throat|influenza|flu|pneumo|bronch)/.test(normalized)) {
+    return 'respiratory';
+  }
+  if (/\b(gi|gastro|diarrhea|diarrhoea|vomit|nausea|abdominal|stool)/.test(normalized)) {
+    return 'gi';
+  }
   return null;
 };
 
@@ -651,29 +666,75 @@ export const getLineListingRecommendations = (db: ICNDatabase): LineListingRecom
       .filter(entry => entry.outcome === 'active')
       .map(entry => entry.mrn)
   );
-  const activeABT = getActiveABT(db);
 
-  return activeABT
-    .map(record => {
-      const category = mapInfectionSourceToCategory(record.infection_source);
-      if (!category) return null;
-      const key = getLineListingRecommendationKey(record);
-      if (!record.mrn || dismissals.has(key) || activeLineListingMrns.has(record.mrn)) return null;
-      const resident = db.census.residentsByMrn[record.mrn];
-      return {
-        id: key,
-        abtRecordId: key,
-        mrn: record.mrn,
-        residentName: record.residentName || record.name || resident?.name || 'Unknown',
-        unit: record.unit || resident?.unit || '',
-        room: record.room || resident?.room || '',
-        infectionSource: record.infection_source || 'Other',
-        category,
-        startDate: record.startDate || record.start_date || '',
-        createdAt: record.createdAt || nowISO()
-      } satisfies LineListingRecommendation;
-    })
-    .filter((rec): rec is LineListingRecommendation => Boolean(rec));
+  const recommendations: LineListingRecommendation[] = [];
+
+  const activeABT = getActiveABT(db);
+  for (const record of activeABT) {
+    const category = mapInfectionSourceToCategory(record.infection_source);
+    if (!category) continue;
+
+    const key = getLineListingRecommendationKey(record);
+    if (!record.mrn || dismissals.has(key) || activeLineListingMrns.has(record.mrn)) continue;
+
+    const resident = db.census.residentsByMrn[record.mrn];
+    recommendations.push({
+      id: key,
+      abtRecordId: key,
+      sourceType: 'abt',
+      mrn: record.mrn,
+      residentName: record.residentName || record.name || resident?.name || 'Unknown',
+      unit: record.unit || resident?.unit || '',
+      room: record.room || resident?.room || '',
+      infectionSource: record.infection_source || 'Other',
+      category,
+      startDate: record.startDate || record.start_date || '',
+      createdAt: record.createdAt || nowISO()
+    });
+  }
+
+  for (const note of db.records.notes) {
+    const category = note.symptomCategory || mapTextToSymptomCategory(note.text);
+    const key = `note_${note.id}`;
+    if (!category || !note.mrn || dismissals.has(key) || activeLineListingMrns.has(note.mrn)) continue;
+
+    const resident = db.census.residentsByMrn[note.mrn];
+    recommendations.push({
+      id: key,
+      abtRecordId: key,
+      sourceType: 'note',
+      mrn: note.mrn,
+      residentName: note.residentName || note.name || resident?.name || 'Unknown',
+      unit: note.unit || resident?.unit || '',
+      room: note.room || resident?.room || '',
+      infectionSource: `Note${note.category ? ` (${note.category})` : ''}`,
+      category,
+      startDate: note.createdAt,
+      createdAt: note.createdAt || nowISO()
+    });
+  }
+
+  const byMrnCategory = new Map<string, LineListingRecommendation>();
+  for (const recommendation of recommendations) {
+    const dedupeKey = `${recommendation.mrn}_${recommendation.category}`;
+    const existing = byMrnCategory.get(dedupeKey);
+    if (!existing) {
+      byMrnCategory.set(dedupeKey, recommendation);
+      continue;
+    }
+
+    const existingDate = new Date(existing.createdAt || 0).getTime();
+    const currentDate = new Date(recommendation.createdAt || 0).getTime();
+    if (currentDate > existingDate) {
+      byMrnCategory.set(dedupeKey, recommendation);
+    }
+  }
+
+  return Array.from(byMrnCategory.values()).sort((a, b) => {
+    const aTime = new Date(a.createdAt || 0).getTime();
+    const bTime = new Date(b.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
 };
 
 export const dismissLineListingRecommendation = (db: ICNDatabase, recommendationId: string): void => {
