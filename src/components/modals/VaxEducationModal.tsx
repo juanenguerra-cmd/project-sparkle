@@ -43,10 +43,10 @@ const VaxEducationModal = ({ open, onClose, record, onSave }: VaxEducationModalP
       db.records.vax[idx].educationDate = today;
       db.records.vax[idx].educationOutcome = outcome;
       
-      // If accepted, mark as given
+      // If accepted, document consent and keep administration as a separate workflow
       if (outcome === 'accepted') {
-        db.records.vax[idx].status = 'given';
-        db.records.vax[idx].dateGiven = today;
+        db.records.vax[idx].status = 'scheduled';
+        db.records.vax[idx].dateGiven = '';
       }
       
       addAudit(db, 'vax_education', `Education provided for ${vaccineType} to ${residentName} - ${outcome}`, 'vax');
@@ -77,7 +77,7 @@ const VaxEducationModal = ({ open, onClose, record, onSave }: VaxEducationModalP
     toast({
       title: 'Education Documented',
       description: outcome === 'accepted' 
-        ? 'Vaccine marked as given' 
+        ? 'Consent documented; administration should be charted separately' 
         : 'Education recorded, resident ' + outcome
     });
     onSave();
