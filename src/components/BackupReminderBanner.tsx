@@ -20,6 +20,8 @@ interface BackupSettings {
   lastReminderDismissedAt: string | null;
   showOnStartup: boolean;
   warnBeforeClose: boolean;
+  autoExportDaily: boolean;
+  lastAutoExportOn: string | null;
 }
 
 const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
@@ -30,6 +32,8 @@ const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
   lastReminderDismissedAt: null,
   showOnStartup: true,
   warnBeforeClose: true,
+  autoExportDaily: true,
+  lastAutoExportOn: null,
 };
 
 const BACKUP_SETTINGS_KEY = 'icn_hub_backup_settings';
@@ -129,6 +133,38 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
     return () => clearInterval(interval);
   }, [shouldShowReminder, settings.showOnStartup]);
 
+  useEffect(() => {
+    if (!settings.autoExportDaily) return;
+
+    const today = todayISO();
+    if (settings.lastAutoExportOn === today) return;
+
+    const db = loadDB();
+    const hasData =
+      Object.keys(db.census.residentsByMrn).length > 0 ||
+      db.records.abx.length > 0 ||
+      db.records.ip_cases.length > 0 ||
+      db.records.vax.length > 0 ||
+      db.records.notes.length > 0;
+
+    if (!hasData) return;
+
+    exportBackupFile('icn_hub_auto_backup');
+    const now = new Date().toISOString();
+    const nextSettings = {
+      ...settings,
+      lastAutoExportOn: today,
+      lastBackupAt: now,
+    };
+    setSettings(nextSettings);
+    saveBackupSettings(nextSettings);
+
+    toast({
+      title: 'Daily backup exported',
+      description: 'An automatic daily JSON backup was downloaded to your default Downloads folder.',
+    });
+  }, [settings, toast]);
+
   // Browser close warning
   useEffect(() => {
     if (!settings.warnBeforeClose) return;
@@ -150,24 +186,28 @@ const BackupReminderBanner = ({ onDataChange }: BackupReminderBannerProps) => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [settings.warnBeforeClose, settings.lastBackupAt]);
 
-  const handleBackupNow = () => {
+  const exportBackupFile = (filenamePrefix = 'icn_hub_backup') => {
     const json = exportDBToJSON();
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `icn_hub_backup_${todayISO()}.json`;
+    a.download = `${filenamePrefix}_${todayISO()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
-    
+  };
+
+  const handleBackupNow = () => {
+    exportBackupFile();
+
     // Update last backup time
     const newSettings = { ...settings, lastBackupAt: new Date().toISOString() };
     setSettings(newSettings);
     saveBackupSettings(newSettings);
     setShowBanner(false);
-    
+
     toast({
       title: 'Backup Downloaded',
       description: 'Your data backup has been downloaded. Save it in a secure location.',
@@ -488,6 +528,22 @@ const BackupSettingsForm = ({ settings, onSave, onCancel }: BackupSettingsFormPr
               checked={localSettings.warnBeforeClose}
               onCheckedChange={(checked) =>
                 setLocalSettings({ ...localSettings, warnBeforeClose: checked })
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="autoExportDaily">Automatic Daily Export</Label>
+              <p className="text-xs text-muted-foreground">
+                Download one backup JSON automatically each day when app data exists
+              </p>
+            </div>
+            <Switch
+              id="autoExportDaily"
+              checked={localSettings.autoExportDaily}
+              onCheckedChange={(checked) =>
+                setLocalSettings({ ...localSettings, autoExportDaily: checked })
               }
             />
           </div>

@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { parseCensusRaw, ParsedCensusRow, canonicalMRN, nowISO, isValidUnit } from '@/lib/parsers';
+import { z } from 'zod';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { autoDischargeDroppedResidents } from '@/lib/autoDischarge';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,35 @@ interface CensusImportModalProps {
 
 type ValidationStatus = 'valid' | 'warning' | 'error';
 
+
+const censusRowSchema = z.object({
+  mrn: z.string().min(1, 'Missing MRN'),
+  name: z.string().min(1, 'Missing name'),
+  unit: z.string().min(1, 'Missing unit'),
+  room: z.string().min(1, 'Missing room'),
+  dob_raw: z.string().min(1, 'Missing DOB'),
+  status: z.string(),
+  payor: z.string(),
+});
+
+const findDuplicateMrns = (raw: string): Set<string> => {
+  const duplicates = new Set<string>();
+  const seen = new Set<string>();
+  const mrnRe = /\(([^)]+)\)/g;
+
+  for (const line of String(raw || '').split(/\r?\n/)) {
+    const match = mrnRe.exec(line);
+    mrnRe.lastIndex = 0;
+    if (!match?.[1]) continue;
+    const canonical = canonicalMRN(match[1]);
+    if (!canonical) continue;
+    if (seen.has(canonical)) duplicates.add(canonical);
+    seen.add(canonical);
+  }
+
+  return duplicates;
+};
+
 interface ValidatedRow extends ParsedCensusRow {
   validation: {
     status: ValidationStatus;
@@ -28,34 +58,36 @@ interface ValidatedRow extends ParsedCensusRow {
   };
 }
 
-const validateRow = (row: ParsedCensusRow): ValidatedRow['validation'] => {
+const validateRow = (
+  row: ParsedCensusRow,
+  duplicateMrns: Set<string>
+): ValidatedRow['validation'] => {
   const issues: string[] = [];
-  
-  if (!row.unit) {
-    issues.push('Missing unit');
-  } else if (!isValidUnit(row.unit)) {
+
+  const schema = censusRowSchema.safeParse(row);
+  if (!schema.success) {
+    schema.error.issues.forEach(issue => {
+      if (issue.message && !issues.includes(issue.message)) {
+        issues.push(issue.message);
+      }
+    });
+  }
+
+  if (row.unit && !isValidUnit(row.unit)) {
     issues.push(`Invalid unit: ${row.unit}`);
   }
-  
-  if (!row.room || !row.room.trim()) {
-    issues.push('Missing room');
+
+  if (duplicateMrns.has(canonicalMRN(row.mrn))) {
+    issues.push('Duplicate MRN detected in pasted census input');
   }
-  
-  if (!row.name || !row.name.trim()) {
-    issues.push('Missing name');
-  }
-  
-  if (!row.dob_raw || !row.dob_raw.trim()) {
-    issues.push('Missing DOB');
-  }
-  
+
   let status: ValidationStatus = 'valid';
-  if (issues.some(i => i.includes('Invalid unit') || i.includes('Missing unit'))) {
+  if (issues.some(i => i.includes('Invalid unit') || i.includes('Missing unit') || i.includes('Missing MRN'))) {
     status = 'error';
   } else if (issues.length > 0) {
     status = 'warning';
   }
-  
+
   return { status, issues };
 };
 
@@ -65,15 +97,17 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
   const [rawText, setRawText] = useState('');
   const [parsed, setParsed] = useState<ParsedCensusRow[]>([]);
   const [included, setIncluded] = useState<Set<string>>(new Set());
+  const [allowErrorOverride, setAllowErrorOverride] = useState(false);
+  const [duplicateMrns, setDuplicateMrns] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Validate all parsed rows
   const validatedRows = useMemo((): ValidatedRow[] => {
     return parsed.map(row => ({
       ...row,
-      validation: validateRow(row)
+      validation: validateRow(row, duplicateMrns)
     }));
-  }, [parsed]);
+  }, [parsed, duplicateMrns]);
 
   // Summary counts
   const validationSummary = useMemo(() => {
@@ -85,11 +119,14 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
 
   const handleParse = useCallback(() => {
     const rows = parseCensusRaw(rawText);
+    const duplicates = findDuplicateMrns(rawText);
+    setDuplicateMrns(duplicates);
     setParsed(rows);
+    setAllowErrorOverride(false);
     
     const defaultIncluded = new Set<string>();
     rows.forEach(r => {
-      const validation = validateRow(r);
+      const validation = validateRow(r, duplicates);
       if (validation.status !== 'error' && (r.room.trim() || r.dob_raw.trim())) {
         defaultIncluded.add(r.mrn);
       }
@@ -98,7 +135,9 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
     
     toast({
       title: `Parsed ${rows.length} rows`,
-      description: 'Review and edit rows before importing.'
+      description: duplicates.size > 0
+        ? `Review and edit rows before importing. Found ${duplicates.size} duplicate MRN(s) in pasted text.`
+        : 'Review and edit rows before importing.'
     });
   }, [rawText, toast]);
 
@@ -122,6 +161,7 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
 
   const handleSelectNone = () => {
     setIncluded(new Set());
+    setAllowErrorOverride(false);
   };
 
   const toggleInclude = (mrn: string) => {
@@ -135,9 +175,20 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
   };
 
   const handleApply = () => {
+    const rowsToImport = parsed.filter(r => included.has(r.mrn));
+    const hasSelectedErrors = rowsToImport.some((row) => validateRow(row, duplicateMrns).status === 'error');
+
+    if (hasSelectedErrors && !allowErrorOverride) {
+      toast({
+        title: 'Validation override required',
+        description: 'Selected rows include errors. Enable override to continue import.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const db = loadDB();
     const now = nowISO();
-    const rowsToImport = parsed.filter(r => included.has(r.mrn));
     
     // Build set of canonical MRNs that are in the new census
     const seenCanonicalMRNs = new Set<string>();
@@ -247,6 +298,8 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
     setParsed([]);
     setRawText('');
     setIncluded(new Set());
+    setAllowErrorOverride(false);
+    setDuplicateMrns(new Set());
   };
 
   const handleClose = () => {
@@ -254,6 +307,8 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
     setParsed([]);
     setRawText('');
     setIncluded(new Set());
+    setAllowErrorOverride(false);
+    setDuplicateMrns(new Set());
   };
 
   const getRowClassName = (validation: ValidatedRow['validation']) => {
@@ -343,6 +398,29 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
             </div>
           )}
           
+          {duplicateMrns.size > 0 && (
+            <div className="rounded-lg border border-warning/50 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
+              Duplicate MRN warning: {duplicateMrns.size} MRN(s) appeared multiple times in the pasted census. The latest row per MRN will be imported.
+            </div>
+          )}
+
+          {parsed.length > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+              <div>
+                <p className="font-medium">Validation override</p>
+                <p className="text-xs text-muted-foreground">Allow importing selected rows that still have validation errors.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={allowErrorOverride}
+                  onCheckedChange={(checked) => setAllowErrorOverride(Boolean(checked))}
+                  id="allow-error-override"
+                />
+                <label htmlFor="allow-error-override" className="text-xs">Enable override</label>
+              </div>
+            </div>
+          )}
+
           {/* Editable Preview Table */}
           {parsed.length > 0 && (
             <div className="flex-1 min-h-0">
@@ -464,7 +542,10 @@ const CensusImportModal = ({ open, onClose, onImportComplete }: CensusImportModa
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button onClick={handleApply} disabled={included.size === 0}>
+          <Button
+            onClick={handleApply}
+            disabled={included.size === 0 || (validatedRows.some((row) => included.has(row.mrn) && row.validation.status === 'error') && !allowErrorOverride)}
+          >
             Apply Update ({included.size} residents)
           </Button>
         </DialogFooter>

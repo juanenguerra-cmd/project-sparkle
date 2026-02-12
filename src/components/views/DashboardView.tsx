@@ -39,6 +39,17 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
   
   const activeResidents = getActiveResidents(db).length;
   const activeABT = getActiveABT(db).length;
+  const overdueAbtReviews = db.records.abx.filter((record) => {
+    if (record.status !== 'active') return false;
+    const reviewDate = (record.nextReviewDate || record.next_review_date || '').trim();
+    if (!reviewDate) return false;
+    const parsed = new Date(reviewDate);
+    if (Number.isNaN(parsed.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    parsed.setHours(0, 0, 0, 0);
+    return parsed < today;
+  });
   const activeIP = getActiveIPCases(db).length;
   const pendingNotes = getRecentNotes(db, 3).length;
   const dueVaxCount = getVaxDue(db).length;
@@ -343,7 +354,7 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
         )}
       </SectionCard>
 
-      <SectionCard title="Start-of-Shift Workflow">
+      <SectionCard title="Quick Actions · Start-of-Shift Workflow">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-lg border border-border bg-background p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm font-medium">
@@ -397,6 +408,21 @@ const DashboardView = ({ onNavigate }: DashboardViewProps) => {
           </Button>
         </div>
       </SectionCard>
+
+      {overdueAbtReviews.length > 0 && (
+        <Alert className="border-destructive/40 bg-destructive/5">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Overdue ABT reviews: {overdueAbtReviews.length}</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>
+              {overdueAbtReviews.length} active antibiotic case{overdueAbtReviews.length === 1 ? '' : 's'} are past next review date.
+            </span>
+            <Button size="sm" variant="outline" onClick={() => onNavigate('abt', { abtStatus: 'active' })}>
+              Review ABT Worklist
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Worklist Summary */}
       <SectionCard title="Worklist Summary">

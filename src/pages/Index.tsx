@@ -138,6 +138,7 @@ const Index = () => {
           onToggleSurveyorMode={() => setSurveyorMode(!surveyorMode)}
           onAddResident={handleAddResident}
           onOpenDataModal={() => setShowDataModal(true)}
+          onOpenResidentSearch={() => handleNavigate('resident_overview')}
         />
         
         <div className="flex flex-1 overflow-hidden">
