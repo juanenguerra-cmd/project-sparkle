@@ -27,6 +27,9 @@ const Step2_DataSource = ({ template, onUpdate, onNext, onBack }: Props) => {
             <SelectItem value="ip_cases">IP Cases</SelectItem>
             <SelectItem value="vaccinations">Vaccinations</SelectItem>
             <SelectItem value="notes">Notes</SelectItem>
+            <SelectItem value="line_listings">Line Listings</SelectItem>
+            <SelectItem value="outbreaks">Outbreaks</SelectItem>
+            <SelectItem value="contacts">Contact Tracing</SelectItem>
           </SelectContent>
         </Select>
       </div>

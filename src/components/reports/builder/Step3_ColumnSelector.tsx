@@ -2,44 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ColumnDefinition, CustomReportTemplate, DataSource } from '@/lib/types';
-
-interface AvailableColumn {
-  id: string;
-  name: string;
-  type: ColumnDefinition['dataType'];
-  required?: boolean;
-  transform?: ColumnDefinition['transform'];
-}
-
-const DATA_SOURCE_COLUMNS: Record<DataSource, AvailableColumn[]> = {
-  census: [
-    { id: 'mrn', name: 'MRN', type: 'text', required: true },
-    { id: 'name', name: 'Resident Name', type: 'text', required: true },
-    { id: 'room', name: 'Room', type: 'text' },
-    { id: 'unit', name: 'Unit', type: 'text' },
-    { id: 'dob', name: 'Date of Birth', type: 'date' },
-  ],
-  abt: [
-    { id: 'residentName', name: 'Resident', type: 'text', required: true },
-    { id: 'medication', name: 'Medication', type: 'text', required: true },
-    { id: 'startDate', name: 'Start Date', type: 'date' },
-  ],
-  ip_cases: [
-    { id: 'residentName', name: 'Resident', type: 'text', required: true },
-    { id: 'protocol', name: 'Protocol', type: 'status', required: true },
-    { id: 'onsetDate', name: 'Onset Date', type: 'date' },
-  ],
-  vaccinations: [
-    { id: 'residentName', name: 'Resident', type: 'text', required: true },
-    { id: 'vaccine', name: 'Vaccine Type', type: 'text' },
-    { id: 'status', name: 'Status', type: 'status' },
-  ],
-  notes: [
-    { id: 'residentName', name: 'Resident', type: 'text', required: true },
-    { id: 'category', name: 'Note Type', type: 'text' },
-    { id: 'createdAt', name: 'Note Date', type: 'date' },
-  ],
-};
+import { DATA_SOURCE_COLUMNS, type AvailableColumn } from './availableColumns';
 
 interface Props {
   template: Partial<CustomReportTemplate>;
