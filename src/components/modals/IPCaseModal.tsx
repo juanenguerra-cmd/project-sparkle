@@ -221,7 +221,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     const protocol = formData.precautionType || 'Standard Precautions';
     
     const caseData: IPCase = {
-      id: editCase?.id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      id: editCase?.id || editCase?.record_id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      record_id: editCase?.record_id || editCase?.id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: formData.mrn,
       residentName: formData.residentName,
       name: formData.residentName,
@@ -256,9 +257,16 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     caseData.next_review_date = caseData.nextReviewDate;
 
     if (editCase) {
-      const idx = db.records.ip_cases.findIndex(c => c.id === editCase.id);
+      const idx = db.records.ip_cases.findIndex((c) => {
+        if (editCase.id && c.id === editCase.id) return true;
+        return !!editCase.record_id && c.record_id === editCase.record_id;
+      });
       if (idx >= 0) {
         db.records.ip_cases[idx] = caseData;
+        addAudit(db, 'ip_update', `Updated IP case for ${formData.residentName}`, 'ip');
+      } else {
+        // Imported rows may only have `record_id`; ensure updates persist by upserting.
+        db.records.ip_cases.push(caseData);
         addAudit(db, 'ip_update', `Updated IP case for ${formData.residentName}`, 'ip');
       }
     } else {
