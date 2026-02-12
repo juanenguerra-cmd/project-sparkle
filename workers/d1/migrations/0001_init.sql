@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS __ping (
-  ts TEXT NOT NULL,
-  note TEXT
-);
