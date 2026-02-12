@@ -19,7 +19,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
 import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
-import { generateReofferProgressNote } from '@/lib/vaccineEducationScripts';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -446,13 +445,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   };
 
   const handleSaveReofferAction = async (record: VaxRecord, values: ReofferActionValues) => {
-    const note = generateReofferProgressNote(
-      record.vaccine || record.vaccine_type || 'Vaccine',
-      record.residentName || record.name || 'Resident',
-      values.encounterDate,
-      values.decisionMaker,
-      values.outcome
-    );
+    const note = values.generatedNote;
 
     const updatedDb = loadDB();
     const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
