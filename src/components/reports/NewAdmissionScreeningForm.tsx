@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { format, parseISO, differenceInDays, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Printer, AlertTriangle, CheckCircle, Clock, X, Edit, XCircle } from 'lucide-react';
+import { Printer, AlertTriangle, CheckCircle, Clock, Edit, XCircle, Syringe } from 'lucide-react';
 import { loadDB } from '@/lib/database';
 import { Resident } from '@/lib/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
+import AdmissionVaxBatchModal from '@/components/modals/AdmissionVaxBatchModal';
 
 interface ScreeningFormData {
   mrn: string;
@@ -35,6 +36,8 @@ interface ScreeningFormData {
   hasAntibiotics: boolean;
   hasEBP: boolean;
   hasIsolation: boolean;
+  ebpSourceOfInfection?: string;
+  isolationPrecautionType?: string;
   hasMDROHistory: boolean;
   hasWoundCare: boolean;
   hasIndwellingDevice: boolean;
@@ -43,6 +46,9 @@ interface ScreeningFormData {
   screeningDate?: string;
   screenedBy?: string;
   notes?: string;
+  historicalVaccinations: string[];
+  historicalInfections: string[];
+  historicalAntibiotics: string[];
 }
 
 interface NewAdmissionScreeningFormProps {
@@ -80,16 +86,31 @@ const saveDateOverrides = (overrides: Record<string, string>) => {
   localStorage.setItem(DATE_OVERRIDES_KEY, JSON.stringify(overrides));
 };
 
-const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionScreeningFormProps) => {
+const parseDateSafe = (value?: string): Date | null => {
+  if (!value) return null;
+  try {
+    return parseISO(value);
+  } catch {
+    return null;
+  }
+};
+
+const formatHistoryDate = (value?: string): string => {
+  const parsed = parseDateSafe(value);
+  return parsed ? format(parsed, 'MM/dd/yyyy') : 'Unknown date';
+};
+
+const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormProps) => {
+  const [db, setDb] = useState(() => loadDB());
   const [selectedMrn, setSelectedMrn] = useState<string | null>(null);
   const [excludedMrns, setExcludedMrns] = useState<Set<string>>(() => getExcludedMrns());
   const [dateOverrides, setDateOverrides] = useState<Record<string, string>>(() => getDateOverrides());
   const [editingDate, setEditingDate] = useState<{ mrn: string; date: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showVaxModal, setShowVaxModal] = useState(false);
+  const [selectedResidentForVax, setSelectedResidentForVax] = useState<Resident | null>(null);
   const pageSize = 20;
-  
-  const db = loadDB();
   const today = new Date();
   const cutoffDate = subDays(today, daysBack);
   const existingScreeningMrns = useMemo(() => {
@@ -163,22 +184,38 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       // Determine screening status
       const screeningStatus: 'pending' | 'complete' | 'overdue' = daysSinceAdmit > 3 ? 'overdue' : 'pending';
       
+      const admitDateObj = parseDateSafe(admitDate || undefined);
+      const isBeforeAdmission = (dateValue?: string): boolean => {
+        const recordDate = parseDateSafe(dateValue);
+        if (!recordDate) return false;
+        if (!admitDateObj) return true;
+        return recordDate < admitDateObj;
+      };
+
       // Check vaccination records
       const vaxRecords = db.records.vax.filter(v => v.mrn === resident.mrn);
-      const hasVax = (type: string): { given: boolean; declined: boolean } => {
-        const record = vaxRecords.find(v => 
-          (v.vaccine || v.vaccine_type || '').toLowerCase().includes(type)
-        );
-        return {
-          given: record?.status === 'given',
-          declined: record?.status === 'declined'
-        };
-      };
-      
-      const pneumonia = hasVax('pneumo');
-      const influenza = hasVax('flu') || hasVax('influenza');
-      const covid = hasVax('covid');
-      const rsv = hasVax('rsv');
+      const historicalVaccinations = vaxRecords
+        .filter(v => v.status === 'given' && isBeforeAdmission(v.dateGiven || v.date_given || v.createdAt))
+        .map(v => `${v.vaccine || v.vaccine_type || 'Vaccine'} (${formatHistoryDate(v.dateGiven || v.date_given || v.createdAt)})`);
+
+      const ipRecords = db.records.ip_cases.filter(ip => ip.mrn === resident.mrn);
+      const historicalInfections = ipRecords
+        .filter(ip => isBeforeAdmission(ip.onsetDate || ip.onset_date || ip.createdAt))
+        .map(ip => {
+          const infection = ip.infectionType || ip.infection_type || 'Infection';
+          const status = ip.status || ip.case_status || 'Unknown status';
+          const date = formatHistoryDate(ip.onsetDate || ip.onset_date || ip.createdAt);
+          return `${infection} - ${status} (${date})`;
+        });
+
+      const historicalAntibiotics = abtRecords
+        .filter(abt => isBeforeAdmission(abt.startDate || abt.start_date || abt.orderDate || abt.createdAt))
+        .map(abt => {
+          const med = abt.medication || abt.med_name || 'Antibiotic';
+          const indication = abt.indication || abt.infection_source || 'No indication';
+          const date = formatHistoryDate(abt.startDate || abt.start_date || abt.orderDate || abt.createdAt);
+          return `${med} (${indication}) - ${abt.status} (${date})`;
+        });
       
       recentAdmissions.push({
         mrn: resident.mrn,
@@ -188,27 +225,32 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
         admitDate: admitDate || '',
         daysSinceAdmit,
         // Vaccination status from records
-        pneumoniaOffered: pneumonia.given || pneumonia.declined,
-        pneumoniaGiven: pneumonia.given,
-        pneumoniaDeclined: pneumonia.declined,
-        influenzaOffered: influenza.given || influenza.declined,
-        influenzaGiven: influenza.given,
-        influenzaDeclined: influenza.declined,
-        covidOffered: covid.given || covid.declined,
-        covidGiven: covid.given,
-        covidDeclined: covid.declined,
-        rsvOffered: rsv.given || rsv.declined,
-        rsvGiven: rsv.given,
-        rsvDeclined: rsv.declined,
+        pneumoniaOffered: false,
+        pneumoniaGiven: false,
+        pneumoniaDeclined: false,
+        influenzaOffered: false,
+        influenzaGiven: false,
+        influenzaDeclined: false,
+        covidOffered: false,
+        covidGiven: false,
+        covidDeclined: false,
+        rsvOffered: false,
+        rsvGiven: false,
+        rsvDeclined: false,
         // Clinical status
         hasPsychMeds: false, // Not tracked in current schema
         hasAntibiotics: hasActiveABT,
         hasEBP,
         hasIsolation,
+        ebpSourceOfInfection: '',
+        isolationPrecautionType: '',
         hasMDROHistory: false,
         hasWoundCare: false,
         hasIndwellingDevice: false,
         screeningStatus,
+        historicalVaccinations,
+        historicalInfections,
+        historicalAntibiotics,
       });
     });
     
@@ -360,8 +402,14 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
       if (item.checked) doc.text('X', 105.5, itemY);
       doc.text(item.label, 112, itemY);
     });
+
+    y += 26;
+    doc.setFontSize(10);
+    doc.text('If EBP checked, source of infection: __________________________________________', 15, y);
+    y += 7;
+    doc.text('If Isolation checked, type (Contact/Droplet/Airborne/Other): _____________________', 15, y);
     
-    y += 35;
+    y += 8;
     
     // Notes section
     doc.setFontSize(11);
@@ -371,7 +419,43 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     y += 5;
     doc.rect(15, y, 180, 30);
     
-    y += 40;
+    y += 36;
+
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('HISTORICAL DATA PRIOR TO ADMISSION', 15, y);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(9);
+    y += 6;
+
+    const addHistorySection = (title: string, items: string[]) => {
+      doc.setFont(undefined, 'bold');
+      doc.text(title, 15, y);
+      y += 5;
+      doc.setFont(undefined, 'normal');
+
+      if (items.length === 0) {
+        doc.text('• None documented', 18, y);
+        y += 5;
+        return;
+      }
+
+      items.slice(0, 4).forEach((entry) => {
+        doc.text(`• ${entry}`, 18, y);
+        y += 5;
+      });
+    };
+
+    addHistorySection('Vaccinations given prior to admission:', formData.historicalVaccinations);
+    addHistorySection('Infection/IP tracker history:', formData.historicalInfections);
+    addHistorySection('Antibiotic history:', formData.historicalAntibiotics);
+
+    y += 3;
+
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
     
     // Signature section
     doc.text('Screened By: _____________________________', 15, y);
@@ -380,7 +464,57 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     y += 10;
     doc.text('Title: _____________________________', 15, y);
     doc.text('Signature: _____________________________', 110, y);
-    
+
+    doc.addPage();
+    y = 20;
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('ADMISSION DEVICE / TREATMENT CHECKLIST', 15, y);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+
+    const drawChecklistItem = (label: string) => {
+      y += 7;
+      doc.rect(15, y - 3.5, 4, 4);
+      doc.text(label, 22, y);
+    };
+
+    y += 3;
+    doc.setFont(undefined, 'bold');
+    doc.text('Oxygen', 15, y);
+    doc.setFont(undefined, 'normal');
+    drawChecklistItem('Resident on oxygen');
+    drawChecklistItem('Liters per minute documented: __________ L/min');
+    drawChecklistItem('Order verified/correct');
+    drawChecklistItem('Care plan updated and initiated');
+    drawChecklistItem('Oxygen signage posted outside room');
+    drawChecklistItem('Mode:  ☐ PRN    ☐ Continuous');
+
+    y += 6;
+    doc.setFont(undefined, 'bold');
+    doc.text('Urinary Catheter', 15, y);
+    doc.setFont(undefined, 'normal');
+    drawChecklistItem('Resident has urinary catheter');
+    drawChecklistItem('Catheter labeled with size/date');
+    drawChecklistItem('Catheter order present and current');
+    drawChecklistItem('Care plan updated and active');
+    drawChecklistItem('Privacy bag in place when indicated');
+
+    y += 6;
+    doc.setFont(undefined, 'bold');
+    doc.text('Feeding Tube', 15, y);
+    doc.setFont(undefined, 'normal');
+    drawChecklistItem('Resident has feeding tube');
+    drawChecklistItem('Tube type/size documented');
+    drawChecklistItem('Feeding order present and correct');
+    drawChecklistItem('Care plan updated and active');
+    drawChecklistItem('Tube site care/check completed');
+
+    y += 8;
+    doc.text('Additional device/treatment checklist notes: ______________________________________', 15, y);
+    y += 7;
+    doc.text('_______________________________________________________________________________', 15, y);
+
     // Footer
     doc.setFontSize(8);
     doc.text('Per CMS F880/F881/F883: New admissions must be screened for infection status, MDRO history, and vaccination status within 72 hours.', 15, 280);
@@ -391,6 +525,27 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
     window.open(blobUrl.toString(), '_blank');
   };
   
+  const handleOpenVaxEntry = (screeningItem: ScreeningFormData) => {
+    const resident = db.census.residentsByMrn[screeningItem.mrn];
+    if (resident) {
+      setSelectedResidentForVax(resident);
+      setShowVaxModal(true);
+    } else {
+      toast.error('Resident not found in census');
+    }
+  };
+
+  const handleVaxModalClose = () => {
+    setShowVaxModal(false);
+    setSelectedResidentForVax(null);
+  };
+
+  const handleVaxModalSave = () => {
+    setDb(loadDB());
+    setShowVaxModal(false);
+    setSelectedResidentForVax(null);
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'complete':
@@ -511,8 +666,26 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
                       <Button 
                         variant="outline" 
                         size="sm"
+                        onClick={() => setSelectedMrn(item.mrn)}
+                        title="View Historical Data"
+                      >
+                        History
+                      </Button>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => handleOpenVaxEntry(item)}
+                        title="Enter Vaccinations"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Syringe className="w-3 h-3 mr-1" />
+                        Vax
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
                         onClick={() => generatePDF(item)}
-                        title="Print Form"
+                        title="Print Screening Form"
                       >
                         <Printer className="w-3 h-3" />
                       </Button>
@@ -594,6 +767,56 @@ const NewAdmissionScreeningForm = ({ daysBack = 14, onPrintForm }: NewAdmissionS
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!selectedMrn} onOpenChange={(open) => !open && setSelectedMrn(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Historical Data Prior to Admission</DialogTitle>
+          </DialogHeader>
+          {selectedMrn && (() => {
+            const selectedResident = screeningList.find((item) => item.mrn === selectedMrn);
+            if (!selectedResident) return <p className="text-sm text-muted-foreground">No resident data found.</p>;
+
+            const renderHistoryList = (title: string, entries: string[]) => (
+              <div className="space-y-2">
+                <h4 className="font-medium">{title}</h4>
+                {entries.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">None documented prior to admission.</p>
+                ) : (
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {entries.map((entry) => (
+                      <li key={`${title}-${entry}`}>{entry}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+
+            return (
+              <div className="space-y-4 py-2">
+                <div>
+                  <p className="font-medium">{selectedResident.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    MRN: {selectedResident.mrn} • Room {selectedResident.room} • {selectedResident.unit}
+                  </p>
+                </div>
+                {renderHistoryList('Vaccinations Given', selectedResident.historicalVaccinations)}
+                {renderHistoryList('Infection / IP Tracker History', selectedResident.historicalInfections)}
+                {renderHistoryList('Antibiotic History', selectedResident.historicalAntibiotics)}
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {selectedResidentForVax && (
+        <AdmissionVaxBatchModal
+          open={showVaxModal}
+          onClose={handleVaxModalClose}
+          onSave={handleVaxModalSave}
+          resident={selectedResidentForVax}
+        />
+      )}
     </div>
   );
 };
