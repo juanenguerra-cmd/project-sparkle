@@ -1,11 +1,11 @@
-import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle, Filter, ClipboardCheck, Wand2, FolderOpen } from 'lucide-react';
+import { RefreshCw, Zap, ChevronDown, Printer, Copy, Download, Trash, FileText, FileDown, Calendar, TrendingUp, BarChart3, Map, AlertTriangle, Filter, ClipboardCheck, Wand2, FolderOpen, Search, Pin, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import SectionCard from '@/components/dashboard/SectionCard';
 import DataFlowVisual from '@/components/dashboard/DataFlowVisual';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { loadDB, getActiveResidents, getActiveABT, getActiveIPCases, getVaxDue, getActiveOutbreaks, getLineListingsByOutbreak } from '@/lib/database';
 import { 
   ReportData,
@@ -88,8 +88,10 @@ import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ViewType, type CustomReportTemplate, type ResidentFilterConfig } from '@/lib/types';
 import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
+import { generateCustomReport as generateCustomReportFromTemplate } from '@/lib/customReports/customReportGenerator';
 
 interface ReportsViewProps {
   surveyorMode?: boolean;
@@ -117,7 +119,28 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [lastActionAt, setLastActionAt] = useState<Date | null>(null);
   const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [showMyReportsDialog, setShowMyReportsDialog] = useState(false);
+  const [searchTemplatesQuery, setSearchTemplatesQuery] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState<CustomReportTemplate | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomReportTemplate[]>([]);
+
+  useEffect(() => {
+    const storedTemplates = localStorage.getItem('icn_hub_custom_report_templates');
+    if (!storedTemplates) return;
+
+    try {
+      const parsedTemplates = JSON.parse(storedTemplates) as CustomReportTemplate[];
+      if (Array.isArray(parsedTemplates)) {
+        setCustomTemplates(parsedTemplates);
+      }
+    } catch {
+      toast.error('Unable to load saved custom reports.');
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('icn_hub_custom_report_templates', JSON.stringify(customTemplates));
+  }, [customTemplates]);
   
   // New filter states for extended reports
   const [selectedVaccineType, setSelectedVaccineType] = useState('all');
@@ -333,9 +356,70 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   };
 
   const handleSaveCustomReport = (template: CustomReportTemplate) => {
-    setCustomTemplates((prev) => [template, ...prev]);
+    setCustomTemplates((prev) => {
+      const existingIndex = prev.findIndex((savedTemplate) => savedTemplate.id === template.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = template;
+        return updated;
+      }
+      return [template, ...prev];
+    });
     toast.success(`Saved custom report template: ${template.name}`);
   };
+
+  const openMyReports = () => setShowMyReportsDialog(true);
+
+  const generateCustomReport = (template: CustomReportTemplate) => {
+    const report = generateCustomReportFromTemplate(template, db);
+    setCurrentReport(report);
+    applyExportDefaults(report);
+    recordAction(`Generated custom report: ${template.name}`);
+    toast.success(`Generated custom report: ${template.name}`);
+  };
+
+  const handleEditCustomTemplate = (template: CustomReportTemplate) => {
+    setEditingTemplate(template);
+    setShowReportBuilder(true);
+    setShowMyReportsDialog(false);
+  };
+
+  const handleDeleteCustomTemplate = (template: CustomReportTemplate) => {
+    const confirmed = window.confirm(`Delete saved report template "${template.name}"?`);
+    if (!confirmed) return;
+
+    setCustomTemplates((prev) => prev.filter((savedTemplate) => savedTemplate.id !== template.id));
+    toast.success(`Deleted template: ${template.name}`);
+  };
+
+  const togglePinnedTemplate = (template: CustomReportTemplate) => {
+    setCustomTemplates((prev) => prev.map((savedTemplate) => (
+      savedTemplate.id === template.id
+        ? { ...savedTemplate, isPinned: !savedTemplate.isPinned }
+        : savedTemplate
+    )));
+  };
+
+  const filteredCustomTemplates = useMemo(() => {
+    const normalizedQuery = searchTemplatesQuery.trim().toLowerCase();
+    const templates = [...customTemplates].sort((a, b) => {
+      if (a.isPinned === b.isPinned) {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      return a.isPinned ? -1 : 1;
+    });
+
+    if (!normalizedQuery) {
+      return templates;
+    }
+
+    return templates.filter((template) => (
+      template.name.toLowerCase().includes(normalizedQuery)
+      || template.description?.toLowerCase().includes(normalizedQuery)
+      || template.category.toLowerCase().includes(normalizedQuery)
+      || template.dataSource.toLowerCase().includes(normalizedQuery)
+    ));
+  }, [customTemplates, searchTemplatesQuery]);
 
   const handleGenerateReport = async (reportId: string) => {
     const db = loadDB();
@@ -1015,7 +1099,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
             <Wand2 className="w-4 h-4 mr-2" />
             Create Custom Report
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={openMyReports}>
             <FolderOpen className="w-4 h-4 mr-2" />
             My Reports ({customTemplates.length})
           </Button>
@@ -1926,10 +2010,75 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       )}
       {showReportBuilder && (
         <ReportBuilderWizard
-          onClose={() => setShowReportBuilder(false)}
+          template={editingTemplate ?? undefined}
+          onClose={() => {
+            setShowReportBuilder(false);
+            setEditingTemplate(null);
+          }}
           onSave={handleSaveCustomReport}
         />
       )}
+      <Dialog open={showMyReportsDialog} onOpenChange={setShowMyReportsDialog}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>My Reports</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {customTemplates.length > 5 && (
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchTemplatesQuery}
+                  onChange={(event) => setSearchTemplatesQuery(event.target.value)}
+                  placeholder="Search saved reports"
+                  className="pl-9"
+                />
+              </div>
+            )}
+            {filteredCustomTemplates.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                {customTemplates.length === 0 ? 'No saved reports' : 'No reports match your search'}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredCustomTemplates.map((template) => (
+                  <div key={template.id} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{template.name}</h4>
+                          {template.isPinned && <Pin className="w-3.5 h-3.5 text-primary" />}
+                        </div>
+                        <p className="text-sm text-muted-foreground">{template.description || 'No description provided'}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="secondary">{template.category}</Badge>
+                          <Badge variant="outline">{template.dataSource}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => generateCustomReport(template)}>
+                        Generate
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleEditCustomTemplate(template)}>
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => togglePinnedTemplate(template)}>
+                        <Pin className="w-3.5 h-3.5 mr-1.5" />
+                        {template.isPinned ? 'Unpin' : 'Pin'}
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDeleteCustomTemplate(template)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
