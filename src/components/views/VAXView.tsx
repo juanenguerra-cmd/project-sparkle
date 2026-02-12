@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight, ClipboardCopy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
 import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
+import { generateReofferProgressNote } from '@/lib/vaccineEducationScripts';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -442,6 +443,33 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
     }
   };
 
+  const handleCopyReofferProgressNote = async (record: VaxRecord) => {
+    const decisionByFamily = window.confirm('Decision made by family/responsible party? Click OK for Family, Cancel for Resident.');
+    const consented = window.confirm('Outcome: Click OK if consented to vaccination, or Cancel if declined.');
+
+    const note = generateReofferProgressNote(
+      record.vaccine || record.vaccine_type || 'Vaccine',
+      record.residentName || record.name || 'Resident',
+      todayISO(),
+      decisionByFamily ? 'family' : 'resident',
+      consented ? 'consented' : 'declined'
+    );
+
+    try {
+      await navigator.clipboard.writeText(note);
+      toast({
+        title: 'Progress note copied',
+        description: 'Re-offer nursing note is ready to paste into your charting system.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy note. Please copy manually.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleClearReoffer = (record: VaxRecord) => {
     // Create a new 'due' record to clear the declined status
     const updatedDb = loadDB();
@@ -841,6 +869,19 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>Provide Education</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="row-action-btn text-primary"
+                                    title="Copy Re-offer Progress Note"
+                                    onClick={() => void handleCopyReofferProgressNote(record)}
+                                  >
+                                    <ClipboardCopy className="w-4 h-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy Re-offer Progress Note</TooltipContent>
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
