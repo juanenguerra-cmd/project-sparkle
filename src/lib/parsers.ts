@@ -241,7 +241,7 @@ export const parseCensusRaw = (raw: string): ParsedCensusRow[] => {
   const lines = String(raw || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const out: ParsedCensusRow[] = [];
   const mrnRe = /\(([^)]+)\)/;
-  const dobRe = /(\b\d{1,2}\/\d{1,2}\/\d{2,4}\b)/;
+  const dobRe = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{4}[\/-]\d{1,2}[\/-]\d{1,2}\b)/;
 
   for (const ln of lines) {
     if (/EMPTY/i.test(ln)) continue;
@@ -329,7 +329,9 @@ export const parseCensusRaw = (raw: string): ParsedCensusRow[] => {
     }
 
     const after = ln.slice((mrnM.index || 0) + mrnM[0].length).trim();
-    const dobM = after.match(dobRe);
+    const before = ln.slice(0, mrnM.index || 0);
+    // DOB may appear before or after the MRN depending on source export format.
+    const dobM = after.match(dobRe) || before.match(dobRe);
     const dob_raw = dobM ? dobM[1] : "";
     
     // Exclude known non-resident rows when they have NO room and NO DOB

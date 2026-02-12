@@ -114,6 +114,23 @@ describe("parseCensusRaw", () => {
     expect(result[0].dob_raw).toBe("01/15/1945");
   });
 
+  it("parses DOB when date appears before MRN", () => {
+    const input = "301-A SMITH, JOHN 01/15/1945 (123456) Active Medicare";
+    const result = parseCensusRaw(input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].dob_raw).toBe("01/15/1945");
+  });
+
+  it("parses DOB with dash-separated format", () => {
+    const input = "301-A SMITH, JOHN (123456) 1945-01-15 Active Medicare";
+    const result = parseCensusRaw(input);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].dob_raw).toBe("1945-01-15");
+  });
+
+
   it("keeps alphanumeric MRNs from parentheses", () => {
     const input = "305 DOE, JANE (LON202238) 02/20/1950 Active";
     const result = parseCensusRaw(input);
