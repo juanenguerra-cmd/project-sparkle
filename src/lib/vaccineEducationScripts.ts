@@ -176,3 +176,37 @@ ${script.keyPoints.map(p => `• ${p}`).join('\n')}
 ---
 Education documented per F883/F887 requirements.`;
 };
+
+export type ReofferDecisionMaker = 'resident' | 'family';
+export type ReofferOutcome = 'consented' | 'declined';
+
+/**
+ * Generate a copy/paste ready nursing progress note for vaccine re-offer attempts.
+ */
+export const generateReofferProgressNote = (
+  vaccineType: string,
+  residentName: string,
+  encounterDate: string,
+  decisionMaker: ReofferDecisionMaker,
+  outcome: ReofferOutcome
+): string => {
+  const script = getEducationScript(vaccineType);
+  const decisionMakerLabel = decisionMaker === 'resident' ? 'resident' : 'resident family/responsible party';
+  const decisionLabel = outcome === 'consented' ? 'consented to vaccination' : 'declined vaccination';
+  const followUpPlan = outcome === 'consented'
+    ? 'Order/administration plan reviewed with nursing and provider notification completed per facility process.'
+    : 'Declination documented in immunization record; vaccine will be re-offered per facility schedule and CDC guidance.';
+
+  return `Vaccine re-offer completed on ${encounterDate} for ${residentName} (${script.vaccineType}). Vaccine Information Statement/education reviewed with ${decisionMakerLabel}, including benefits and risks.
+
+Education provided: ${script.benefitsStatement}
+Potential side effects discussed: ${script.riskStatement}
+
+Outcome: ${decisionMakerLabel} ${decisionLabel}. Questions answered, understanding verbalized.
+
+Compliance documentation:
+- Re-offer attempt documented in EHR/immunization tracker
+- Education provided prior to decision
+- Decision and decision-maker recorded (${decisionMakerLabel})
+- ${followUpPlan}`;
+};
