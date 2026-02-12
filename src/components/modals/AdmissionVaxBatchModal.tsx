@@ -177,6 +177,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
   const handleSaveAll = () => {
     const currentDb = loadDB();
     const now = nowISO();
+    const vaccinationDate = todayISO();
     const newRecords: VaxRecord[] = vaccines.map((vax) => ({
       id: `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: resident.mrn,
@@ -187,6 +188,8 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       vaccine: vax.vaccine_type,
       vaccine_type: vax.vaccine_type,
       status: vax.status === 'consented' ? 'given' : 'declined',
+      dateGiven: vax.status === 'consented' ? vaccinationDate : undefined,
+      date_given: vax.status === 'consented' ? vaccinationDate : undefined,
       administered_by: vax.status === 'consented' ? vax.administered_by : undefined,
       dose_number: vax.status === 'consented' ? vax.dose_number : undefined,
       decline_reason: vax.status === 'declined' ? vax.decline_reason : undefined,
