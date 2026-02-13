@@ -525,9 +525,6 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
       const today = todayISO();
       updatedDb.records.vax[idx].seasonOverrideCurrent = true;
       updatedDb.records.vax[idx].seasonOverrideAt = today;
-      updatedDb.records.vax[idx].status = 'given';
-      updatedDb.records.vax[idx].dateGiven = today;
-      updatedDb.records.vax[idx].date_given = today;
       addAudit(
         updatedDb,
         'vax_season_override',
@@ -536,7 +533,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
       );
       saveDB(updatedDb);
       setDb(updatedDb);
-      toast({ title: 'Updated with current season', description: 'Record removed from outdated/re-offer detection.' });
+      toast({ title: 'Updated with current season', description: 'Season override saved without changing administration date.' });
     }
   };
 

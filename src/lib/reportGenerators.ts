@@ -875,7 +875,7 @@ export const generateVaxSnapshotReport = (
     const residentName = record.residentName || record.name || resident?.name || 'Unknown';
     const vaccine = record.vaccine || record.vaccine_type || '';
     const dateGiven = record.dateGiven || record.date_given || '';
-    const isOutdated = vaccine.toLowerCase().includes('flu') && isInfluenzaOutdated(dateGiven);
+    const isOutdated = vaccine.toLowerCase().includes('flu') && !record.seasonOverrideCurrent && isInfluenzaOutdated(dateGiven);
     const seasonInfo = vaccine.toLowerCase().includes('flu') ? getFluSeasonDisplay(dateGiven) : '';
     
     return [
@@ -894,7 +894,7 @@ export const generateVaxSnapshotReport = (
     v.status === 'given' &&
     activeResidentMrns.has(v.mrn)
   );
-  const outdatedFlu = fluVax.filter(v => isInfluenzaOutdated(v.dateGiven || v.date_given || ''));
+  const outdatedFlu = fluVax.filter(v => !v.seasonOverrideCurrent && isInfluenzaOutdated(v.dateGiven || v.date_given || ''));
   
   // Build summary string
   const summaryParts = Object.entries(vaccineCounts).map(([type, count]) => `${type}: ${count}`);
