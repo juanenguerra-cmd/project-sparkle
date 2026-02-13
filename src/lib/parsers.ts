@@ -218,7 +218,7 @@ export const computeTxDays = (startISO: string, endISO: string): number | null =
   const endMs = new Date(e + "T00:00:00").getTime();
   
   if (!isFinite(startMs) || !isFinite(endMs)) return null;
-  return Math.max(1, Math.ceil((endMs - startMs) / (24 * 60 * 60 * 1000)) + 1);
+  return Math.max(0, Math.ceil((endMs - startMs) / (24 * 60 * 60 * 1000)));
 };
 
 // Non-resident name tokens to exclude
