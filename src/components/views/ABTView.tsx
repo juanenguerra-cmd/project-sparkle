@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-table-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 
 // Helper to escape CSV values
 const escapeCSV = (val: string | number | boolean | null | undefined): string => {
@@ -294,6 +295,12 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
       escapeCSV(r.source)
     ].join(','));
     
+    recordWorkflowMetric({
+      eventName: 'workflow_report_quick_run',
+      view: 'abt',
+      metadata: { caseType: 'abt', reportType: 'abt_export_csv', resultCount: rows.length },
+    });
+
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

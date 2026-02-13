@@ -83,6 +83,7 @@ export const defaultDatabase = (): ICNDatabaseShape => ({
     history: []
   },
   audit_log: [],
+  workflow_metrics: [],
   settings: { ...defaultSettings },
   meta: { schemaVersion: 1, residentIdByMrn: {} }
 });

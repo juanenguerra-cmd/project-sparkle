@@ -24,7 +24,7 @@ import {
 } from './types';
 import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
-import { migrateResidentIds } from './migrations';
+import { migrateResidentIds, migrateWorkflowMetrics } from './migrations';
 import { deriveAbtStatus } from './abtStatus';
 
 export interface ICNDatabase {
@@ -46,6 +46,7 @@ export interface ICNDatabase {
     history?: import('./types').HistoryEvent[];
   };
   audit_log: AuditEntry[];
+  workflow_metrics?: import('./analytics/workflowMetrics').WorkflowMetric[];
   settings: AppSettings & {
     last_import_at?: string;
     census_exclude_names?: string[];
@@ -110,6 +111,12 @@ const mergeDatabases = (remoteDb: ICNDatabase, localDb: ICNDatabase): ICNDatabas
     .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
     .slice(0, 1000);
 
+  const remoteWorkflowMetrics = Array.isArray(remoteDb.workflow_metrics) ? remoteDb.workflow_metrics : [];
+  const localWorkflowMetrics = Array.isArray(localDb.workflow_metrics) ? localDb.workflow_metrics : [];
+  const mergedWorkflowMetrics = mergeEntityList(remoteWorkflowMetrics, localWorkflowMetrics)
+    .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
+    .slice(0, 5000);
+
   return {
     ...remoteDb,
     ...localDb,
@@ -134,6 +141,7 @@ const mergeDatabases = (remoteDb: ICNDatabase, localDb: ICNDatabase): ICNDatabas
       contacts: mergeEntityList(remoteDb.records.contacts, localDb.records.contacts),
     },
     audit_log: mergedAudit,
+    workflow_metrics: mergedWorkflowMetrics,
     settings: {
       ...remoteDb.settings,
       ...localDb.settings,
@@ -174,12 +182,15 @@ export const loadDB = (): ICNDatabase => {
         history: Array.isArray(parsed.records?.history) ? parsed.records.history : []
       },
       audit_log: Array.isArray(parsed.audit_log) ? parsed.audit_log : [],
+      workflow_metrics: Array.isArray(parsed.workflow_metrics) ? parsed.workflow_metrics : [],
       settings: { ...defaultSettings, ...parsed.settings },
       meta: parsed.meta || { schemaVersion: 1, residentIdByMrn: {} }
     };
     const migrated = migrateResidentIds(dbCache as unknown as import('./types').AppDatabase);
     dbCache = migrated.db as unknown as ICNDatabase;
-    if (migrated.migrated) {
+    const workflowMigrated = migrateWorkflowMetrics(dbCache as unknown as import('./types').AppDatabase);
+    dbCache = workflowMigrated.db as unknown as ICNDatabase;
+    if (migrated.migrated || workflowMigrated.migrated) {
       localStorage.setItem('icn_hub_db', JSON.stringify(dbCache));
     }
     return dbCache;
@@ -199,7 +210,9 @@ export const initDB = async (): Promise<ICNDatabase> => {
     dbCache = await storage.load() as ICNDatabase;
     const migrated = migrateResidentIds(dbCache as unknown as import('./types').AppDatabase);
     dbCache = migrated.db as unknown as ICNDatabase;
-    if (migrated.migrated) {
+    const workflowMigrated = migrateWorkflowMetrics(dbCache as unknown as import('./types').AppDatabase);
+    dbCache = workflowMigrated.db as unknown as ICNDatabase;
+    if (migrated.migrated || workflowMigrated.migrated) {
       await storage.save(dbCache);
     }
     return dbCache;

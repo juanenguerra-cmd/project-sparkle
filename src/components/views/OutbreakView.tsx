@@ -34,6 +34,7 @@ import {
   ViewType 
 } from '@/lib/types';
 import { generateLineListingPdf } from '@/lib/pdf/lineListingPdf';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 import { isoDateFromAny, todayISO } from '@/lib/parsers';
 import { toast } from 'sonner';
 
@@ -273,6 +274,11 @@ const OutbreakView = ({ onNavigate }: OutbreakViewProps) => {
     });
     
     doc.save(`${outbreak.name.replace(/\s+/g, '_')}_Line_List.pdf`);
+    recordWorkflowMetric({
+      eventName: 'workflow_report_quick_run',
+      view: 'outbreak',
+      metadata: { reportType: 'line_listing_pdf', outbreakId: outbreak.id, outbreakName: outbreak.name, resultCount: entries.length },
+    });
     toast.success('Line listing PDF generated');
   };
 

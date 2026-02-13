@@ -10,6 +10,7 @@ import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { ABTRecord, Resident } from '@/lib/types';
 import { computeTxDays, nowISO, todayISO } from '@/lib/parsers';
 import { deriveAbtStatus } from '@/lib/abtStatus';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 
 interface ABTCaseModalProps {
   open: boolean;
@@ -67,6 +68,17 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.mrn.includes(searchTerm)
   );
+
+
+  useEffect(() => {
+    if (!open) return;
+    recordWorkflowMetric({
+      eventName: 'workflow_modal_open',
+      view: 'abt',
+      mrn: editRecord?.mrn,
+      metadata: { caseType: 'abt', mode: editRecord ? 'edit' : 'create' },
+    });
+  }, [open, editRecord?.mrn]);
 
   useEffect(() => {
     if (editRecord) {
@@ -135,6 +147,13 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
   };
 
   const handleResidentSelect = (resident: Resident) => {
+    recordWorkflowMetric({
+      eventName: 'workflow_resident_selected',
+      view: 'abt',
+      residentId: resident.residentId || resident.id,
+      mrn: resident.mrn,
+      metadata: { caseType: 'abt' },
+    });
     setSelectedResident(resident);
     setSearchTerm(resident.name);
     setFormData(prev => ({
@@ -250,6 +269,14 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     
     saveDB(currentDb);
 
+    recordWorkflowMetric({
+      eventName: 'workflow_save_success',
+      view: 'abt',
+      residentId: selectedResident?.residentId || selectedResident?.id,
+      mrn: formData.mrn,
+      metadata: { caseType: 'abt', mode: editRecord ? 'edit' : 'create' },
+    });
+
     toast({
       title: editRecord ? 'ABT Record Updated' : 'ABT Record Added',
       description: `${formData.medication} for ${formData.residentName}`
@@ -271,7 +298,8 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       currentDb.records.abx.splice(idx, 1);
       addAudit(currentDb, 'abx_delete', `Deleted ABT record for ${editRecord.residentName || editRecord.name}`, 'abt');
       saveDB(currentDb);
-      
+
+
       toast({ title: 'ABT Record Deleted' });
       onSave();
       onClose();
