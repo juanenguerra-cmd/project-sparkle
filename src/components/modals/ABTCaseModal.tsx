@@ -69,6 +69,13 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     r.mrn.includes(searchTerm)
   );
 
+  const normalizedFrequency = (value?: string) => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return '';
+    const upper = trimmed.toUpperCase();
+    return FREQUENCIES.includes(upper) ? upper : trimmed;
+  };
+
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +100,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
         medication: editRecord.medication || editRecord.med_name || '',
         dose: editRecord.dose,
         route: editRecord.route || 'PO',
-        frequency: editRecord.frequency || '',
+        frequency: normalizedFrequency(editRecord.frequency),
         indication: editRecord.indication,
         infectionSource: editRecord.infection_source || 'Other',
         startDate: editRecord.startDate || editRecord.start_date || '',
@@ -221,7 +228,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
       med_name: formData.medication,
       dose: formData.dose,
       route: formData.route,
-      frequency: formData.frequency,
+      frequency: normalizedFrequency(formData.frequency),
       indication: formData.indication,
       infection_source: formData.infectionSource,
       startDate: formData.startDate,
@@ -416,6 +423,9 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
                     <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
+                    {formData.frequency && !FREQUENCIES.includes(formData.frequency.toUpperCase()) && (
+                      <SelectItem value={formData.frequency}>{formData.frequency}</SelectItem>
+                    )}
                     {FREQUENCIES.map(f => (
                       <SelectItem key={f} value={f}>{f}</SelectItem>
                     ))}
