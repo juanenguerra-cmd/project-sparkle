@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight, ClipboardCopy } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight, ClipboardCopy, CalendarCheck2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -518,6 +518,25 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
     }
   };
 
+  const handleMarkCurrentSeason = (record: VaxRecord) => {
+    const updatedDb = loadDB();
+    const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
+    if (idx !== -1) {
+      const today = todayISO();
+      updatedDb.records.vax[idx].seasonOverrideCurrent = true;
+      updatedDb.records.vax[idx].seasonOverrideAt = today;
+      addAudit(
+        updatedDb,
+        'vax_season_override',
+        `Marked ${record.vaccine || record.vaccine_type} updated with current season for ${record.residentName || record.name}`,
+        'vax'
+      );
+      saveDB(updatedDb);
+      setDb(updatedDb);
+      toast({ title: 'Updated with current season', description: 'Season override saved without changing administration date.' });
+    }
+  };
+
   const handleMarkGiven = (record: VaxRecord) => {
     const updatedDb = loadDB();
     const idx = updatedDb.records.vax.findIndex(r => r.id === record.id);
@@ -814,6 +833,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                   <SortableTableHeader label="Vaccine" sortKey="_vaccine" currentSortKey={sortKey} currentSortDirection={sortDirection} onSort={handleSort} />
                   {activeFilter === 'reoffer' ? (
                     <>
+                      <th>Last Dose</th>
                       <th>Days Since Decline</th>
                       <th>Priority</th>
                       <th>Reason</th>
@@ -862,6 +882,9 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                       </td>
                       {activeFilter === 'reoffer' && reofferInfo ? (
                         <>
+                          <td>
+                            {record.dateGiven || record.date_given || record.dose || 'No documented dose'}
+                          </td>
                           <td>{reofferInfo.daysSinceDecline} days</td>
                           <td>
                             <Badge 
@@ -929,6 +952,19 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent>Mark as Given</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="row-action-btn text-success"
+                                    title="Updated with current Season"
+                                    onClick={() => handleMarkCurrentSeason(record)}
+                                  >
+                                    <CalendarCheck2 className="w-4 h-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>Updated with current Season</TooltipContent>
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -1012,6 +1048,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
                         key={record.id}
                         onMarkGiven={() => handleMarkGiven(record)}
                         onClearReoffer={() => handleClearReoffer(record)}
+                        onMarkCurrentSeason={() => handleMarkCurrentSeason(record)}
                         onEdit={() => { setEditingRecord(record); setShowCaseModal(true); }}
                         onEducation={() => handleOpenEducation(record)}
                       >

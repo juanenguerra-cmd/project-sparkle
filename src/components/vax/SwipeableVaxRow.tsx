@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, ReactNode, forwardRef } from 'react';
-import { Check, RotateCcw, Edit, BookOpen, ChevronLeft } from 'lucide-react';
+import { Check, RotateCcw, Edit, BookOpen, ChevronLeft, CalendarCheck2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SwipeAction {
@@ -17,6 +17,7 @@ interface SwipeableVaxRowProps {
   onClearReoffer: () => void;
   onEdit: () => void;
   onEducation: () => void;
+  onMarkCurrentSeason: () => void;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ const SwipeableVaxRow = ({
   onClearReoffer,
   onEdit,
   onEducation,
+  onMarkCurrentSeason,
   className
 }: SwipeableVaxRowProps) => {
   const [translateX, setTranslateX] = useState(0);
@@ -56,6 +58,14 @@ const SwipeableVaxRow = ({
   ];
 
   const rightActions: SwipeAction[] = [
+    {
+      id: 'current-season',
+      icon: <CalendarCheck2 className="w-5 h-5" />,
+      label: 'Season',
+      bgColor: 'bg-success',
+      textColor: 'text-white',
+      onClick: onMarkCurrentSeason
+    },
     {
       id: 'clear',
       icon: <RotateCcw className="w-5 h-5" />,

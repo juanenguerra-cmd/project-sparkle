@@ -115,6 +115,8 @@ export const getReofferCandidates = (
     if (r.status !== 'declined') return false;
     // Must be active on census
     if (r.mrn && !activeMrns.has(r.mrn)) return false;
+    // Manual override: treat as current season and suppress re-offer
+    if (r.seasonOverrideCurrent) return false;
     return true;
   });
   

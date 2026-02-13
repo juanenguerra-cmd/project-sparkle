@@ -161,6 +161,8 @@ export interface VaxRecord {
   contraindication?: string;
   consentFormAttached?: boolean;
   nextDueDate?: string;
+  seasonOverrideCurrent?: boolean;
+  seasonOverrideAt?: string;
 }
 
 // Symptom types for auto-classification
