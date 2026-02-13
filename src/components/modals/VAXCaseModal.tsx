@@ -11,6 +11,7 @@ import { VaxRecord, Resident } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
 import { getEducationScript } from '@/lib/vaccineEducationScripts';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import { normalizeVaccineName } from '@/lib/regulatory';
 
 interface VAXCaseModalProps {
   open: boolean;
@@ -30,7 +31,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     residentName: '',
     unit: '',
     room: '',
-    vaccine: 'FLU',
+    vaccine: 'Flu',
     dose: '',
     dateGiven: '',
     dueDate: '',
@@ -68,7 +69,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
         residentName: editRecord.residentName || editRecord.name || '',
         unit: editRecord.unit,
         room: editRecord.room,
-        vaccine: editRecord.vaccine || editRecord.vaccine_type || 'FLU',
+        vaccine: normalizeVaccineName(editRecord.vaccine || editRecord.vaccine_type || 'Flu'),
         dose: editRecord.dose || '',
         dateGiven: editRecord.dateGiven || editRecord.date_given || '',
         dueDate: editRecord.dueDate || editRecord.due_date || '',
@@ -90,7 +91,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       residentName: '',
       unit: '',
       room: '',
-      vaccine: 'FLU',
+      vaccine: 'Flu',
       dose: '',
       dateGiven: '',
       dueDate: '',
@@ -206,8 +207,8 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       name: formData.residentName,
       unit: formData.unit,
       room: formData.room,
-      vaccine: formData.vaccine,
-      vaccine_type: formData.vaccine,
+      vaccine: normalizeVaccineName(formData.vaccine),
+      vaccine_type: normalizeVaccineName(formData.vaccine),
       dose: formData.dose,
       dateGiven: isVaccinated || isDeclined ? formData.dateGiven : '',
       date_given: isVaccinated || isDeclined ? formData.dateGiven : '',

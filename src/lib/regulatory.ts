@@ -55,3 +55,28 @@ export const getVaccineFTag = (vaccine: string): RegulatoryFTag | undefined => {
   if (normalized.includes('pneumo') || normalized.includes('pneumococcal') || normalized.includes('pna')) return 'F883';
   return undefined;
 };
+
+export const normalizeVaccineName = (vaccine: string): string => {
+  const value = (vaccine || '').trim();
+  if (!value) return '';
+
+  const normalized = value
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (normalized.includes('covid')) return 'COVID';
+  if (normalized.includes('influenza') || normalized === 'flu') return 'Flu';
+  if (normalized.includes('pneumo') || normalized.includes('pna')) return 'Pneumo';
+  if (normalized === 'rsv' || normalized.includes('respiratory syncytial')) return 'RSV';
+  if (normalized.includes('tdap')) return 'Tdap';
+  if (normalized.includes('shing')) return 'Shingles';
+  if (normalized === 'hep b' || normalized === 'hepb' || normalized === 'hepatitis b') return 'Hep B';
+
+  return value
+    .split(' ')
+    .map(token => token ? `${token[0].toUpperCase()}${token.slice(1).toLowerCase()}` : token)
+    .join(' ');
+};
+

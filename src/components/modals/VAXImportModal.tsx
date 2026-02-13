@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
 import { todayISO } from '@/lib/parsers';
+import { normalizeVaccineName } from '@/lib/regulatory';
 
 interface VAXImportModalProps {
   open: boolean;
@@ -22,7 +23,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     mrn: '',
-    vaccine: 'FLU',
+    vaccine: 'Flu',
     dose: '',
     status: 'due' as 'given' | 'due' | 'declined',
     dateGiven: '',
@@ -61,8 +62,8 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
       name: resident.name,
       unit: resident.unit,
       room: resident.room,
-      vaccine: formData.vaccine,
-      vaccine_type: formData.vaccine,
+      vaccine: normalizeVaccineName(formData.vaccine),
+      vaccine_type: normalizeVaccineName(formData.vaccine),
       dose: formData.dose,
       status: formData.status,
       dateGiven: formData.status === 'given' ? formData.dateGiven || todayISO() : undefined,
@@ -85,7 +86,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
     // Reset form
     setFormData({
       mrn: '',
-      vaccine: 'FLU',
+      vaccine: 'Flu',
       dose: '',
       status: 'due',
       dateGiven: '',
