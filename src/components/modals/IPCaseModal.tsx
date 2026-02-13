@@ -57,10 +57,26 @@ const VACCINE_STATUS_OPTIONS = [
 const COMMON_AREAS = ['Dining', 'Rehab gym', 'Beauty shop'];
 const SHARED_EQUIPMENT = ['Lift', 'Shower chair', 'Therapy gym'];
 
+const getRecommendedPPE = (
+  precaution: '' | 'Standard Precautions' | 'EBP' | 'Isolation',
+  isolation: '' | 'Contact' | 'Droplet' | 'Airborne' | 'Contact+Droplet',
+): string => {
+  if (precaution === 'Standard Precautions') return 'Gloves, Gown (as needed)';
+  if (precaution === 'EBP') return 'Gloves, Gown for high-contact activities';
+  if (precaution === 'Isolation') {
+    if (isolation === 'Contact') return 'Gloves, Gown';
+    if (isolation === 'Droplet') return 'Gloves, Gown, Mask';
+    if (isolation === 'Airborne') return 'Gloves, Gown, N95 Respirator';
+    if (isolation === 'Contact+Droplet') return 'Gloves, Gown, Mask, Eye Protection';
+  }
+  return '';
+};
+
 const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [ppeManuallyEdited, setPpeManuallyEdited] = useState(false);
   
   const [formData, setFormData] = useState({
     residentName: '',
@@ -102,6 +118,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       if (resident) setSelectedResident(resident);
       setSearchTerm(editCase.residentName || editCase.name || resident?.name || '');
       
+      setPpeManuallyEdited(false);
       setFormData({
         residentName: editCase.residentName || editCase.name || '',
         mrn: editCase.mrn,
@@ -116,14 +133,14 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
         status: editCase.status,
         sourceConditions: (editCase.sourceOfInfection || editCase.source_of_infection || '').split(',').map(v => v.trim()).filter(Boolean),
         pathogenResistances: (editCase.infectionType || editCase.infection_type || '').split(',').map(v => v.trim()).filter(Boolean),
-        nhsnPathogenCode: '',
-        vaccineStatus: '',
+        nhsnPathogenCode: editCase.nhsnPathogenCode || '',
+        vaccineStatus: editCase.vaccineStatus || '',
         requiredPPE: editCase.requiredPPE || '',
-        staffAssignments: '',
-        closeContacts: '',
-        commonAreasVisited: [],
-        sharedEquipment: [],
-        otherEquipment: '',
+        staffAssignments: editCase.staffAssignments || '',
+        closeContacts: editCase.closeContacts || '',
+        commonAreasVisited: editCase.commonAreasVisited || [],
+        sharedEquipment: editCase.sharedEquipment || [],
+        otherEquipment: editCase.otherEquipment || '',
         notes: editCase.notes || '',
       });
     } else {
@@ -134,6 +151,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   const resetForm = () => {
     setSelectedResident(null);
     setSearchTerm('');
+    setPpeManuallyEdited(false);
     setFormData({
       residentName: '',
       mrn: '',
@@ -184,29 +202,17 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   };
 
   const applyPPERules = () => {
-    let ppe = '';
-    const precaution = formData.precautionType;
-    const isolation = formData.isolationType;
-    
-    if (precaution === 'Standard Precautions') {
-      ppe = 'Gloves, Gown (as needed)';
-    } else if (precaution === 'EBP') {
-      ppe = 'Gloves, Gown for high-contact activities';
-    } else if (precaution === 'Isolation') {
-      if (isolation === 'Contact') {
-        ppe = 'Gloves, Gown';
-      } else if (isolation === 'Droplet') {
-        ppe = 'Gloves, Gown, Mask';
-      } else if (isolation === 'Airborne') {
-        ppe = 'Gloves, Gown, N95 Respirator';
-      } else if (isolation === 'Contact+Droplet') {
-        ppe = 'Gloves, Gown, Mask, Eye Protection';
-      }
-    }
-    
+    const ppe = getRecommendedPPE(formData.precautionType, formData.isolationType);
+    setPpeManuallyEdited(false);
     setFormData(prev => ({ ...prev, requiredPPE: ppe }));
     toast({ title: 'PPE Rules Applied', description: ppe || 'No specific PPE requirements' });
   };
+
+  useEffect(() => {
+    if (!open || ppeManuallyEdited) return;
+    const ppe = getRecommendedPPE(formData.precautionType, formData.isolationType);
+    setFormData(prev => (prev.requiredPPE === ppe ? prev : { ...prev, requiredPPE: ppe }));
+  }, [formData.precautionType, formData.isolationType, open, ppeManuallyEdited]);
 
   const handleSubmit = () => {
     if (!formData.mrn) {
@@ -243,6 +249,13 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       status: formData.status,
       notes: formData.notes,
       requiredPPE: formData.requiredPPE,
+      staffAssignments: formData.staffAssignments,
+      closeContacts: formData.closeContacts,
+      commonAreasVisited: formData.commonAreasVisited,
+      sharedEquipment: formData.sharedEquipment,
+      otherEquipment: formData.otherEquipment,
+      nhsnPathogenCode: formData.nhsnPathogenCode,
+      vaccineStatus: formData.vaccineStatus,
       createdAt: editCase?.createdAt || new Date().toISOString(),
     };
 
@@ -519,7 +532,10 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
                 <Input 
                   placeholder="Auto-filled based on precaution rules"
                   value={formData.requiredPPE}
-                  onChange={(e) => setFormData(p => ({ ...p, requiredPPE: e.target.value }))}
+                  onChange={(e) => {
+                    setPpeManuallyEdited(true);
+                    setFormData(p => ({ ...p, requiredPPE: e.target.value }));
+                  }}
                   className="text-sm flex-1"
                 />
                 <Button type="button" variant="outline" onClick={applyPPERules}>

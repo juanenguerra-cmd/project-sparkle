@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer, FileText } from 'lucide-react';
+import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer, FileText, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const [activeFilter, setActiveFilter] = useState<IPFilter>('active');
   const [unitFilter, setUnitFilter] = useState('all');
   const [protocolFilter, setProtocolFilter] = useState('all');
+  const [isolationTypeFilter, setIsolationTypeFilter] = useState('all');
+  const [outbreakFilter, setOutbreakFilter] = useState('all');
   const [showCaseModal, setShowCaseModal] = useState(false);
   const [editingCase, setEditingCase] = useState<IPCase | null>(null);
   const [showReviewNoteModal, setShowReviewNoteModal] = useState(false);
@@ -70,6 +72,14 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const units = useMemo(
     () => [...new Set(records.map(r => r.unit).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
     [records],
+  );
+  const isolationTypes = useMemo(
+    () => [...new Set(records.map(r => (r.isolationType || r.isolation_type || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [records],
+  );
+  const outbreaks = useMemo(
+    () => db.records.outbreaks.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [db.records.outbreaks],
   );
 
   // Get active resident MRNs from census
@@ -103,6 +113,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
       if (unitFilter !== 'all' && r.unit !== unitFilter) return false;
       if (protocolFilter !== 'all' && normalizeProtocol(r.protocol) !== protocolFilter) return false;
+      if (isolationTypeFilter !== 'all' && (r.isolationType || r.isolation_type || '') !== isolationTypeFilter) return false;
+      if (outbreakFilter !== 'all' && (r.outbreakId || '') !== outbreakFilter) return false;
 
       if (fromDateFilter || toDateFilter) {
         const startDate = isoDateFromAny(r.onsetDate || r.onset_date || '');
@@ -183,7 +195,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
     });
     
     return filtered;
-  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir, unitFilter, protocolFilter, fromDateFilter, toDateFilter]);
+  }, [records, searchTerm, activeFilter, activeCensusMrns, sortField, sortDir, unitFilter, protocolFilter, isolationTypeFilter, outbreakFilter, fromDateFilter, toDateFilter]);
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
@@ -194,7 +206,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, activeFilter, unitFilter, protocolFilter, fromDateFilter, toDateFilter]);
+  }, [searchTerm, activeFilter, unitFilter, protocolFilter, isolationTypeFilter, outbreakFilter, fromDateFilter, toDateFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -362,6 +374,34 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
     }
   };
 
+  const handleReopenCase = (record: IPCase) => {
+    const reason = window.prompt(`Reopen case for ${record.residentName || record.name}. Enter required reason:`)?.trim() || '';
+    if (!reason) {
+      toast({ title: 'Reason required', description: 'Please provide a reason to reopen the case.', variant: 'destructive' });
+      return;
+    }
+
+    const currentDb = loadDB();
+    const idx = currentDb.records.ip_cases.findIndex(c => c.id === record.id);
+    if (idx < 0) return;
+
+    const today = todayISO();
+    const current = currentDb.records.ip_cases[idx];
+    currentDb.records.ip_cases[idx] = {
+      ...current,
+      status: 'Active',
+      resolutionDate: '',
+      resolution_date: '',
+      _autoClosed: false,
+      _autoClosedReason: '',
+      notes: `${current.notes || ''} [Reopened ${today}: ${reason}]`.trim(),
+    };
+    addAudit(currentDb, 'ip_reopen', `Reopened IP case for ${record.residentName || record.name}: ${reason}`, 'ip');
+    saveDB(currentDb);
+    setDb(currentDb);
+    toast({ title: 'IP Case Reopened', description: `${record.residentName || record.name} marked as active` });
+  };
+
   const handleExport = () => {
     const headers = [
       'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Infection Type', 'Protocol',
@@ -369,6 +409,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
       'Status', 'Next Review Date', 'Last Review Date', 'Review Notes',
       'Trigger Reason', 'High Contact Care', 'Signage Posted', 'Supplies Stocked',
       'Room Check Date', 'Exposure Linked', 'Outbreak ID', 'Required PPE',
+      'NHSN Pathogen Code', 'Vaccine Status', 'Staff Assignments', 'Close Contacts',
+      'Common Areas Visited', 'Shared Equipment', 'Other Equipment',
       'Auto Closed', 'Auto Closed Reason', 'Notes', 'Created At'
     ];
     
@@ -396,6 +438,13 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
       escapeCSV(r.exposureLinked),
       escapeCSV(r.outbreakId),
       escapeCSV(r.requiredPPE),
+      escapeCSV(r.nhsnPathogenCode),
+      escapeCSV(r.vaccineStatus),
+      escapeCSV(r.staffAssignments),
+      escapeCSV(r.closeContacts),
+      escapeCSV(r.commonAreasVisited?.join('; ')),
+      escapeCSV(r.sharedEquipment?.join('; ')),
+      escapeCSV(r.otherEquipment),
       escapeCSV(r._autoClosed),
       escapeCSV(r._autoClosedReason),
       escapeCSV(r.notes),
@@ -638,6 +687,28 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                 <SelectItem value="standard">Standard</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={isolationTypeFilter} onValueChange={setIsolationTypeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Isolation type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All isolation types</SelectItem>
+                {isolationTypes.map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={outbreakFilter} onValueChange={setOutbreakFilter}>
+              <SelectTrigger className="w-[190px]">
+                <SelectValue placeholder="Outbreak" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All outbreaks</SelectItem>
+                {outbreaks.map(outbreak => (
+                  <SelectItem key={outbreak.id} value={outbreak.id}>{outbreak.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               type="date"
               value={fromDateFilter}
@@ -702,6 +773,8 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                 setActiveFilter('active');
                 setUnitFilter('all');
                 setProtocolFilter('all');
+                setIsolationTypeFilter('all');
+                setOutbreakFilter('all');
                 setFromDateFilter('');
                 setToDateFilter('');
               }}
@@ -804,7 +877,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
-                          {normalizeStatus(record) === 'active' && (
+                          {normalizeStatus(record) === 'active' ? (
                             <button 
                               type="button"
                               className="row-action-btn text-warning hover:text-warning" 
@@ -812,6 +885,15 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
                               onClick={() => handleDischargeCase(record)}
                             >
                               <UserX className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="row-action-btn text-info hover:text-info"
+                              title="Reopen Case"
+                              onClick={() => handleReopenCase(record)}
+                            >
+                              <RotateCcw className="w-4 h-4" />
                             </button>
                           )}
                         </div>
