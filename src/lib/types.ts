@@ -112,6 +112,13 @@ export interface IPCase {
   exposureLinked?: boolean;
   outbreakId?: string;
   requiredPPE?: string;
+  staffAssignments?: string;
+  closeContacts?: string;
+  commonAreasVisited?: string[];
+  sharedEquipment?: string[];
+  otherEquipment?: string;
+  nhsnPathogenCode?: string;
+  vaccineStatus?: string;
   dob?: string;
 }
 
