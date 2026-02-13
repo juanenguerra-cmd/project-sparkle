@@ -5,7 +5,20 @@ import {
   deriveUnitFromRoom,
   isValidUnit,
   canonicalMRN,
+  computeTxDays,
 } from "@/lib/parsers";
+
+
+describe("computeTxDays", () => {
+  it("excludes the end date from the treatment day count", () => {
+    expect(computeTxDays("2026-02-12", "2026-02-19")).toBe(7);
+    expect(computeTxDays("2026-02-11", "2026-02-18")).toBe(7);
+  });
+
+  it("returns 0 when start and end are the same day", () => {
+    expect(computeTxDays("2026-02-12", "2026-02-12")).toBe(0);
+  });
+});
 
 describe("canonicalMRN", () => {
   it("keeps alphanumeric MRNs and strips punctuation", () => {
