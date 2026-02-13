@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
 type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol' | 'status';
@@ -487,6 +488,12 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
       toast({ title: 'No matching cases', description: `No IP cases found for ${reportValue}.` });
       return;
     }
+
+    recordWorkflowMetric({
+      eventName: 'workflow_report_quick_run',
+      view: 'ip',
+      metadata: { caseType: 'ip', reportType, reportValue, resultCount: rows.length },
+    });
 
     const csv = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

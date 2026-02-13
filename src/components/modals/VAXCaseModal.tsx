@@ -10,6 +10,7 @@ import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord, Resident } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
 import { getEducationScript } from '@/lib/vaccineEducationScripts';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 
 interface VAXCaseModalProps {
   open: boolean;
@@ -45,6 +46,17 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     r.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.mrn.includes(searchTerm)
   );
+
+
+  useEffect(() => {
+    if (!open) return;
+    recordWorkflowMetric({
+      eventName: 'workflow_modal_open',
+      view: 'vax',
+      mrn: editRecord?.mrn,
+      metadata: { caseType: 'vax', mode: editRecord ? 'edit' : 'create' },
+    });
+  }, [open, editRecord?.mrn]);
 
   useEffect(() => {
     if (editRecord) {
@@ -129,6 +141,13 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
   }, [isDeclined]);
 
   const handleResidentSelect = (resident: Resident) => {
+    recordWorkflowMetric({
+      eventName: 'workflow_resident_selected',
+      view: 'vax',
+      residentId: resident.residentId || resident.id,
+      mrn: resident.mrn,
+      metadata: { caseType: 'vax' },
+    });
     setSelectedResident(resident);
     setSearchTerm(resident.name);
     setFormData(prev => ({
@@ -222,6 +241,14 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     
     saveDB(currentDb);
 
+    recordWorkflowMetric({
+      eventName: 'workflow_save_success',
+      view: 'vax',
+      residentId: selectedResident?.residentId || selectedResident?.id,
+      mrn: formData.mrn,
+      metadata: { caseType: 'vax', mode: editRecord ? 'edit' : 'create' },
+    });
+
     toast({
       title: editRecord ? 'VAX Record Updated' : 'VAX Record Added',
       description: `${formData.vaccine} for ${formData.residentName}`
@@ -243,7 +270,8 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       currentDb.records.vax.splice(idx, 1);
       addAudit(currentDb, 'vax_delete', `Deleted VAX record for ${editRecord.residentName || editRecord.name}`, 'vax');
       saveDB(currentDb);
-      
+
+
       toast({ title: 'VAX Record Deleted' });
       onSave();
       onClose();

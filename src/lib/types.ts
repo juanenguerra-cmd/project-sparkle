@@ -429,6 +429,15 @@ export interface AppDatabase {
     history?: HistoryEvent[];
   };
   audit_log: AuditEntry[];
+  workflow_metrics?: Array<{
+    id: string;
+    eventName: string;
+    view: string;
+    residentId?: string;
+    mrn?: string;
+    timestamp: string;
+    metadata?: Record<string, string | number | boolean | null | undefined>;
+  }>;
   settings: AppSettings;
   meta?: {
     schemaVersion?: number;

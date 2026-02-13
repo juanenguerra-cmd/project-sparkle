@@ -12,6 +12,7 @@ import { IPCase, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
 import PillInput from '@/components/ui/pill-input';
+import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 
 interface IPCaseModalProps {
   open: boolean;
@@ -112,6 +113,17 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     r.mrn.includes(searchTerm)
   );
 
+
+  useEffect(() => {
+    if (!open) return;
+    recordWorkflowMetric({
+      eventName: 'workflow_modal_open',
+      view: 'ip',
+      mrn: editCase?.mrn,
+      metadata: { caseType: 'ip', mode: editCase ? 'edit' : 'create' },
+    });
+  }, [open, editCase?.mrn]);
+
   useEffect(() => {
     if (editCase) {
       const resident = db.census.residentsByMrn[editCase.mrn];
@@ -179,6 +191,13 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
   };
 
   const handleResidentSelect = (resident: Resident) => {
+    recordWorkflowMetric({
+      eventName: 'workflow_resident_selected',
+      view: 'ip',
+      residentId: resident.residentId || resident.id,
+      mrn: resident.mrn,
+      metadata: { caseType: 'ip' },
+    });
     setSelectedResident(resident);
     setSearchTerm(resident.name);
     
@@ -289,6 +308,14 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     
     saveDB(db);
 
+    recordWorkflowMetric({
+      eventName: 'workflow_save_success',
+      view: 'ip',
+      residentId: selectedResident?.residentId || selectedResident?.id,
+      mrn: formData.mrn,
+      metadata: { caseType: 'ip', mode: editCase ? 'edit' : 'create' },
+    });
+
     toast({
       title: editCase ? 'IP Case Updated' : 'IP Case Added',
       description: `Case ${editCase ? 'updated' : 'added'} for ${formData.residentName}`
@@ -309,7 +336,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       db.records.ip_cases.splice(idx, 1);
       addAudit(db, 'ip_delete', `Deleted IP case for ${editCase.residentName || editCase.name}`, 'ip');
       saveDB(db);
-      
+
+
       toast({ title: 'IP Case Deleted' });
       onSave();
       onClose();

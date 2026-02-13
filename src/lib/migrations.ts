@@ -61,3 +61,34 @@ export const migrateResidentIds = (db: AppDatabase): { db: AppDatabase; migrated
 
   return { db: migratedDb, migrated: true };
 };
+
+
+export const migrateWorkflowMetrics = (db: AppDatabase): { db: AppDatabase; migrated: boolean } => {
+  const hasMetrics = Array.isArray((db as AppDatabase & { workflow_metrics?: unknown[] }).workflow_metrics);
+  if (hasMetrics) {
+    return { db, migrated: false };
+  }
+
+  const migratedDb = {
+    ...db,
+    workflow_metrics: [],
+    meta: {
+      ...(db.meta || {}),
+      schemaVersion: Math.max(db.meta?.schemaVersion || 0, 3),
+    },
+  } as AppDatabase;
+
+  migratedDb.audit_log = [
+    {
+      id: genId('audit'),
+      action: 'migration_workflow_metrics',
+      details: 'Initialized workflow metrics telemetry store.',
+      entityType: 'settings',
+      timestamp: nowISO(),
+      source: 'migration',
+    },
+    ...migratedDb.audit_log,
+  ];
+
+  return { db: migratedDb, migrated: true };
+};
