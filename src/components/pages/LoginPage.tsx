@@ -45,7 +45,7 @@ const LoginPage = () => {
               <Lock className="w-8 h-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Project Sparkle</CardTitle>
+          <CardTitle className="text-2xl text-center">ICN Hub</CardTitle>
           <CardDescription className="text-center">Infection Control & Clinical Compliance System</CardDescription>
         </CardHeader>
         <CardContent>
@@ -77,6 +77,7 @@ const LoginPage = () => {
           <div className="mt-6 text-center text-xs text-gray-500">
             <p>Default: admin / admin123</p>
             <p className="mt-1">⚠️ Change password after first login</p>
+            <p className="mt-3">Developed and built by Juan Enguerra all rights reserved 2025</p>
           </div>
         </CardContent>
       </Card>
