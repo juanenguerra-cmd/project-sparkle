@@ -1,225 +1,200 @@
-// Automatic Backup System
-// Exports database to JSON file daily
+import { loadDB, saveDB, type ICNDatabase } from './database';
+import { encryptObject, decryptObject } from './encryption';
+import { requirePermission, getCurrentUser } from './auth';
+import { toast as sonnerToast } from 'sonner';
 
-import type { AppDatabase } from './types';
-import { format } from 'date-fns';
-
-const BACKUP_KEY_PREFIX = 'icn_backup_';
-const LAST_BACKUP_KEY = 'icn_last_backup_date';
-const MAX_BACKUP_AGE_DAYS = 30;
-
-export interface BackupMetadata {
+export interface Backup {
+  id: string;
   timestamp: string;
-  facilityName: string;
-  recordCounts: {
-    residents: number;
-    abt: number;
-    ipCases: number;
-    vaccinations: number;
-    notes: number;
-    outbreaks: number;
-  };
+  createdBy: string;
+  type: 'automatic' | 'manual' | 'pre-import' | 'pre-archive';
   version: string;
+  recordCount: {
+    residents: number;
+    ip_cases: number;
+    abx: number;
+    vax: number;
+    notes: number;
+  };
+  size: number;
+  data: ICNDatabase;
 }
 
-export interface BackupFile {
-  metadata: BackupMetadata;
-  data: AppDatabase;
-}
+const MAX_BACKUPS = 10;
+const AUTO_BACKUP_INTERVAL = 10;
 
-// Check if backup is due (once per day)
-export function isBackupDue(): boolean {
-  const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
-  if (!lastBackup) return true;
-  
-  const today = format(new Date(), 'yyyy-MM-dd');
-  return lastBackup !== today;
-}
+const getResidentCount = (db: ICNDatabase): number => Object.keys(db.census.residentsByMrn || {}).length;
 
-// Create backup metadata
-function createMetadata(db: AppDatabase): BackupMetadata {
+const buildBackup = (type: Backup['type'], createdBy: string): Backup => {
+  const db = loadDB();
   return {
+    id: `backup_${type}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     timestamp: new Date().toISOString(),
-    facilityName: db.settings?.facilityName || 'Unknown Facility',
-    recordCounts: {
-      residents: Object.keys(db.census?.residentsByMrn || {}).length,
-      abt: db.records?.abx?.length || 0,
-      ipCases: db.records?.ip_cases?.length || 0,
-      vaccinations: db.records?.vax?.length || 0,
-      notes: db.records?.notes?.length || 0,
-      outbreaks: db.records?.outbreaks?.length || 0,
+    createdBy,
+    type,
+    version: String(db.meta?.schemaVersion || '1.0.0'),
+    recordCount: {
+      residents: getResidentCount(db),
+      ip_cases: db.records.ip_cases.length,
+      abx: db.records.abx.length,
+      vax: db.records.vax.length,
+      notes: db.records.notes.length,
     },
-    version: '1.0',
+    size: JSON.stringify(db).length,
+    data: db,
   };
-}
+};
 
-// Generate backup filename
-function getBackupFilename(facilityName: string): string {
-  const timestamp = format(new Date(), 'yyyy-MM-dd_HHmmss');
-  const safeName = facilityName.replace(/[^a-zA-Z0-9]/g, '_');
-  return `sparkle_backup_${safeName}_${timestamp}.json`;
-}
+const saveBackup = (backup: Backup): void => {
+  const backups = getBackups();
+  backups.unshift(backup);
+  if (backups.length > MAX_BACKUPS) backups.splice(MAX_BACKUPS);
+  localStorage.setItem('icn_backups', encryptObject(backups));
+};
 
-// Export database to JSON file
-export function exportBackup(db: AppDatabase): void {
-  try {
-    const backup: BackupFile = {
-      metadata: createMetadata(db),
-      data: db,
-    };
-    
-    const json = JSON.stringify(backup, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = getBackupFilename(db.settings?.facilityName || 'facility');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    // Update last backup date
-    const today = format(new Date(), 'yyyy-MM-dd');
-    localStorage.setItem(LAST_BACKUP_KEY, today);
-    
-    console.log('[Backup] Daily backup exported successfully');
-  } catch (error) {
-    console.error('[Backup] Failed to export backup:', error);
-    throw error;
-  }
-}
-
-// Import backup from JSON file
-export async function importBackup(file: File): Promise<BackupFile> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        const backup = JSON.parse(content) as BackupFile;
-        
-        // Validate backup structure
-        if (!backup.metadata || !backup.data) {
-          throw new Error('Invalid backup file structure');
-        }
-        
-        console.log('[Backup] Imported backup from', backup.metadata.timestamp);
-        resolve(backup);
-      } catch (error) {
-        reject(new Error(`Failed to parse backup file: ${error}`));
-      }
-    };
-    
-    reader.onerror = () => reject(new Error('Failed to read backup file'));
-    reader.readAsText(file);
+export const createManualBackup = (): string => {
+  requirePermission('manage_settings');
+  const user = getCurrentUser();
+  const backup = buildBackup('manual', user?.displayName || 'Unknown');
+  saveBackup(backup);
+  sonnerToast.success('Backup Created', {
+    description: `Backup created at ${new Date(backup.timestamp).toLocaleString()}`,
   });
-}
+  return backup.id;
+};
 
-// Store backup in localStorage (for quick restore)
-export function storeLocalBackup(db: AppDatabase): void {
+export const createAutomaticBackup = (type: Backup['type'] = 'automatic'): void => {
   try {
-    const backup: BackupFile = {
-      metadata: createMetadata(db),
-      data: db,
-    };
-    
-    const key = `${BACKUP_KEY_PREFIX}${format(new Date(), 'yyyy-MM-dd')}`;
-    localStorage.setItem(key, JSON.stringify(backup));
-    
-    // Clean old backups
-    cleanOldBackups();
+    const user = getCurrentUser();
+    saveBackup(buildBackup(type, user?.displayName || 'System'));
   } catch (error) {
-    console.error('[Backup] Failed to store local backup:', error);
+    console.error('Failed to create automatic backup:', error);
   }
-}
+};
 
-// Retrieve local backups
-export function getLocalBackups(): BackupFile[] {
-  const backups: BackupFile[] = [];
-  
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(BACKUP_KEY_PREFIX)) {
-      try {
-        const value = localStorage.getItem(key);
-        if (value) {
-          backups.push(JSON.parse(value));
-        }
-      } catch (error) {
-        console.error(`[Backup] Failed to parse backup ${key}:`, error);
-      }
-    }
+export const getBackups = (): Backup[] => {
+  try {
+    const encrypted = localStorage.getItem('icn_backups');
+    if (!encrypted) return [];
+    return decryptObject<Backup[]>(encrypted);
+  } catch (error) {
+    console.error('Failed to load backups:', error);
+    return [];
   }
-  
-  return backups.sort((a, b) => 
-    new Date(b.metadata.timestamp).getTime() - new Date(a.metadata.timestamp).getTime()
+};
+
+export const getBackupById = (backupId: string): Backup | null =>
+  getBackups().find((backup) => backup.id === backupId) || null;
+
+export const listBackups = (): Array<{
+  id: string;
+  timestamp: string;
+  createdBy: string;
+  type: string;
+  totalRecords: number;
+  sizeMB: number;
+}> => getBackups().map((backup) => ({
+  id: backup.id,
+  timestamp: backup.timestamp,
+  createdBy: backup.createdBy,
+  type: backup.type,
+  totalRecords: Object.values(backup.recordCount).reduce((a, b) => a + b, 0),
+  sizeMB: backup.size / 1024 / 1024,
+}));
+
+export const restoreFromBackup = (backupId: string): void => {
+  requirePermission('manage_settings');
+  const backup = getBackupById(backupId);
+  if (!backup) throw new Error('Backup not found');
+
+  createAutomaticBackup('pre-import');
+  saveDB(backup.data);
+
+  sonnerToast.success('Backup Restored', {
+    description: `Restored from ${new Date(backup.timestamp).toLocaleString()}`,
+    duration: 5000,
+  });
+
+  setTimeout(() => window.location.reload(), 1000);
+};
+
+export const deleteBackup = (backupId: string): void => {
+  requirePermission('manage_settings');
+  const backups = getBackups();
+  const filtered = backups.filter((backup) => backup.id !== backupId);
+  if (filtered.length === backups.length) throw new Error('Backup not found');
+  localStorage.setItem('icn_backups', encryptObject(filtered));
+  sonnerToast.success('Backup Deleted');
+};
+
+export const exportBackupToFile = (backupId: string): void => {
+  requirePermission('manage_settings');
+  const backup = getBackupById(backupId);
+  if (!backup) throw new Error('Backup not found');
+
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sparkle_backup_${new Date(backup.timestamp).toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  sonnerToast.success('Backup Exported', { description: 'Backup file downloaded' });
+};
+
+export const importBackupFromFile = (fileContent: string): void => {
+  requirePermission('manage_settings');
+
+  try {
+    const backup: Backup = JSON.parse(fileContent);
+    if (!backup.data || !backup.timestamp || !backup.recordCount) {
+      throw new Error('Invalid backup file format');
+    }
+    saveBackup(backup);
+    sonnerToast.success('Backup Imported', {
+      description: 'Backup added to backup list',
+      action: { label: 'Restore Now', onClick: () => restoreFromBackup(backup.id) },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to import backup: ${message}`);
+  }
+};
+
+let saveCounter = 0;
+
+export const checkAutoBackup = (): void => {
+  saveCounter += 1;
+  if (saveCounter >= AUTO_BACKUP_INTERVAL) {
+    createAutomaticBackup();
+    saveCounter = 0;
+  }
+};
+
+export const getBackupStats = (): {
+  totalBackups: number;
+  totalSizeMB: number;
+  oldestBackup: string;
+  newestBackup: string;
+} => {
+  const backups = getBackups();
+  if (backups.length === 0) {
+    return { totalBackups: 0, totalSizeMB: 0, oldestBackup: 'N/A', newestBackup: 'N/A' };
+  }
+
+  const totalSizeMB = backups.reduce((sum, backup) => sum + backup.size / 1024 / 1024, 0);
+  const sorted = [...backups].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
-}
 
-// Clean backups older than MAX_BACKUP_AGE_DAYS
-function cleanOldBackups(): void {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - MAX_BACKUP_AGE_DAYS);
-  
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(BACKUP_KEY_PREFIX)) {
-      try {
-        const value = localStorage.getItem(key);
-        if (value) {
-          const backup = JSON.parse(value) as BackupFile;
-          const backupDate = new Date(backup.metadata.timestamp);
-          
-          if (backupDate < cutoffDate) {
-            localStorage.removeItem(key);
-            console.log(`[Backup] Removed old backup from ${backup.metadata.timestamp}`);
-          }
-        }
-      } catch (error) {
-        console.error(`[Backup] Error cleaning backup ${key}:`, error);
-      }
-    }
-  }
-}
-
-// Auto-backup on app load (if due)
-export function initializeAutoBackup(db: AppDatabase): void {
-  if (isBackupDue()) {
-    console.log('[Backup] Daily backup is due, triggering export...');
-    
-    // Store local backup immediately
-    storeLocalBackup(db);
-    
-    // Prompt user to download backup
-    if (confirm('Daily backup is due. Download backup file now?')) {
-      exportBackup(db);
-    }
-  } else {
-    console.log('[Backup] Backup already performed today');
-  }
-}
-
-// Manual backup trigger
-export function triggerManualBackup(db: AppDatabase): void {
-  storeLocalBackup(db);
-  exportBackup(db);
-}
-
-// Get backup summary for display
-export function getBackupSummary(): {
-  lastBackupDate: string | null;
-  localBackupCount: number;
-  isDue: boolean;
-} {
-  const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
-  const localBackups = getLocalBackups();
-  
   return {
-    lastBackupDate: lastBackup,
-    localBackupCount: localBackups.length,
-    isDue: isBackupDue(),
+    totalBackups: backups.length,
+    totalSizeMB: Number(totalSizeMB.toFixed(2)),
+    oldestBackup: new Date(sorted[0].timestamp).toLocaleString(),
+    newestBackup: new Date(sorted[sorted.length - 1].timestamp).toLocaleString(),
   };
-}
+};

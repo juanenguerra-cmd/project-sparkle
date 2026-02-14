@@ -9,6 +9,8 @@ import NotFound from './pages/NotFound';
 import LoginPage from './components/pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { cleanupSessionMonitoring, initSessionMonitoring, isAuthenticated } from './lib/auth';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { OfflineBanner } from './components/OfflineBanner';
 
 const queryClient = new QueryClient();
 
@@ -23,8 +25,9 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-
-        <BrowserRouter>
+        <ErrorBoundary>
+          <OfflineBanner />
+          <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
@@ -40,7 +43,8 @@ const App = () => {
               element={isAuthenticated() ? <NotFound /> : <Navigate to="/login" replace />}
             />
           </Routes>
-        </BrowserRouter>
+          </BrowserRouter>
+        </ErrorBoundary>
       </TooltipProvider>
     </QueryClientProvider>
   );

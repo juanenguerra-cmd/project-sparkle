@@ -27,6 +27,7 @@ import { storage, defaultSettings, defaultDatabase } from './storage';
 import { migrateResidentIds, migrateWorkflowMetrics } from './migrations';
 import { deriveAbtStatus } from './abtStatus';
 import { encryptObject, decryptObject } from './encryption';
+import { checkAutoBackup } from './backup';
 
 export interface ICNDatabase {
   census: {
@@ -258,6 +259,7 @@ export const saveDBAsync = async (
 };
 
 export const saveDB = (db: ICNDatabase): void => {
+  checkAutoBackup();
   // Async save - fire and forget for now
   // When migrating to D1, consider adding error handling UI
   saveDBAsync(db, { optimistic: true }).catch(e => {
