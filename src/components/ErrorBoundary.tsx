@@ -2,7 +2,7 @@
  * Error Boundary Component
  * 
  * Catches React errors and displays fallback UI
- * Optionally integrates with Sentry for error reporting if available
+ * Logs errors to console for debugging
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
@@ -38,29 +38,27 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  async componentDidCatch(error: Error, errorInfo: ErrorInfo): Promise<void> {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     this.setState({
       errorInfo,
     });
 
-    // Try to log to Sentry if available
-    try {
-      const Sentry = await import('@sentry/react');
-      Sentry.captureException(error, {
-        extra: {
-          componentStack: errorInfo.componentStack,
-        },
-      });
-    } catch (sentryError) {
-      // Sentry not available or not configured, log to console instead
-      console.error('Error caught by boundary:', error);
-      console.error('Component stack:', errorInfo.componentStack);
-    }
-
-    // Always log to console in development
-    if (import.meta.env.DEV) {
-      console.error('Error caught by boundary:', error);
-      console.error('Component stack:', errorInfo.componentStack);
+    // Log to console for debugging
+    console.error('Error caught by boundary:', error);
+    console.error('Component stack:', errorInfo.componentStack);
+    
+    // In production, you could send this to an error tracking service
+    // Example: Send to your backend API endpoint
+    if (!import.meta.env.DEV) {
+      // TODO: Implement production error logging
+      // fetch('/api/errors', {
+      //   method: 'POST',
+      //   body: JSON.stringify({
+      //     error: error.toString(),
+      //     stack: error.stack,
+      //     componentStack: errorInfo.componentStack,
+      //   })
+      // });
     }
   }
 
