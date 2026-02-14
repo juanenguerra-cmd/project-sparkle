@@ -17,6 +17,7 @@ import {
 import { SYMPTOM_OPTIONS, type Outbreak, type Resident, type LineListingEntry, type SymptomCategory } from '@/lib/types';
 import { loadDB } from '@/lib/database';
 import { todayISO } from '@/lib/parsers';
+import { filterTemplateManagedFields, stripCoreFieldsFromTemplateData } from '@/lib/lineListingFieldFlow';
 
 interface LineListingCaseModalProps {
   open: boolean;
@@ -84,10 +85,10 @@ const LineListingCaseModal = ({
     if (savedConfig?.enabledFields) {
       const baseFields = template.fields.filter(f => savedConfig.enabledFields.includes(f.id));
       const customFields = savedConfig.customFields || [];
-      return [...baseFields, ...customFields];
+      return filterTemplateManagedFields([...baseFields, ...customFields]);
     }
     
-    return template.fields.filter(f => f.defaultEnabled);
+    return filterTemplateManagedFields(template.fields.filter(f => f.defaultEnabled));
   }, [template, savedConfig]);
 
   // Form state
@@ -180,7 +181,7 @@ const LineListingCaseModal = ({
       symptoms: caseSymptoms,
       labResults: caseLabResults,
       notes: caseNotes,
-      templateData,
+      templateData: stripCoreFieldsFromTemplateData(templateData),
     });
   };
 
