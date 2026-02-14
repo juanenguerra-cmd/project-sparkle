@@ -468,7 +468,8 @@ export type ViewType =
   | 'outbreak'
   | 'reference_library'
   | 'reports' 
-  | 'audit' 
+  | 'audit'
+  | 'user_management'
   | 'settings';
 
 export interface NavItem {
