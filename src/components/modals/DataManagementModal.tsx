@@ -51,30 +51,18 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
     }
   }, [toast]);
 
-  const handleImportClick = useCallback(() => {
-    console.log('Import button clicked, triggering file input');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  }, []);
-
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('File input changed');
     const file = e.target.files?.[0];
     if (!file) {
-      console.log('No file selected');
       return;
     }
     
-    console.log('File selected:', file.name);
     setPendingFile(file);
     setPreviewLoading(true);
     setShowPreview(true);
     
     try {
       const backupPreview = await parseBackupPreview(file);
-      console.log('Preview parsed:', backupPreview);
       setPreview(backupPreview);
     } catch (err) {
       console.error('Preview parse error:', err);
