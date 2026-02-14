@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Copy, FileText } from 'lucide-react';
-import { toast as sonnerToast } from 'sonner';
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { VaxRecord } from '@/lib/types';
 import { todayISO } from '@/lib/parsers';
 import { generateReofferProgressNote } from '@/lib/vaccineEducationScripts';
+import { useClinicalNote } from '@/hooks/useClinicalNote';
 
 export type ReofferActionOutcome = 'consented' | 'declined';
 export type ReofferActionDecisionMaker = 'resident' | 'family';
@@ -33,7 +33,6 @@ const ReofferActionModal = ({ open, record, onClose, onSubmit }: ReofferActionMo
   const [outcome, setOutcome] = useState<ReofferActionOutcome>('declined');
   const [decisionMaker, setDecisionMaker] = useState<ReofferActionDecisionMaker>('resident');
   const [administerDate, setAdministerDate] = useState(todayISO());
-  const [generatedNote, setGeneratedNote] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -45,28 +44,23 @@ const ReofferActionModal = ({ open, record, onClose, onSubmit }: ReofferActionMo
   const residentName = record?.residentName || record?.name || 'Resident';
   const vaccineType = record?.vaccine || record?.vaccine_type || 'Vaccine';
 
-  useEffect(() => {
-    if (!open || !record) return;
+  const encounterDate = useMemo(
+    () => (outcome === 'consented' ? administerDate : todayISO()),
+    [administerDate, outcome],
+  );
 
-    const encounterDate = outcome === 'consented' ? administerDate : todayISO();
-    setGeneratedNote(
-      generateReofferProgressNote(vaccineType, residentName, encounterDate, decisionMaker, outcome),
-    );
-  }, [administerDate, decisionMaker, open, outcome, record, residentName, vaccineType]);
+  const { generatedNote, setGeneratedNote, handleCopyNote } = useClinicalNote({
+    generateNote: () => generateReofferProgressNote(vaccineType, residentName, encounterDate, decisionMaker, outcome),
+    dependencies: [vaccineType, residentName, encounterDate, decisionMaker, outcome, open],
+    autoGenerate: open && !!record,
+  });
+
 
   if (!record) return null;
 
   const handleSubmit = () => {
-    const encounterDate = outcome === 'consented' ? administerDate : todayISO();
     onSubmit({ outcome, decisionMaker, encounterDate, generatedNote });
     onClose();
-  };
-
-  const handleCopyNote = async () => {
-    await navigator.clipboard.writeText(generatedNote);
-    sonnerToast.success('Progress note copied to clipboard.', {
-      description: 'Review and paste into your EMR if needed.',
-    });
   };
 
   return (
@@ -130,7 +124,7 @@ const ReofferActionModal = ({ open, record, onClose, onSubmit }: ReofferActionMo
                   <FileText className="w-4 h-4" />
                   Generated Progress Note
                 </h3>
-                <Button variant="outline" size="sm" onClick={handleCopyNote}>
+                <Button variant="outline" size="sm" onClick={() => void handleCopyNote()}>
                   <Copy className="w-4 h-4 mr-2" />
                   Copy
                 </Button>
@@ -147,7 +141,7 @@ const ReofferActionModal = ({ open, record, onClose, onSubmit }: ReofferActionMo
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="outline" onClick={handleCopyNote}>Copy Only</Button>
+          <Button variant="outline" onClick={() => void handleCopyNote()}>Copy Only</Button>
           <Button onClick={handleSubmit}>Generate Note & Apply</Button>
         </DialogFooter>
       </DialogContent>

@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy, FileText, Save } from 'lucide-react';
-import { addAudit, loadDB, saveDB } from '@/lib/database';
+import { loadDB, saveDB } from '@/lib/database';
 import { ABTRecord } from '@/lib/types';
 import { isoDateFromAny, nowISO, todayISO } from '@/lib/parsers';
+import { saveClinicalNoteWithAudit } from '@/lib/clinicalNoteHelpers';
 import { copyToClipboardWithToast, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
 
@@ -231,20 +232,18 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
       const currentDb = loadDB();
       const now = nowISO();
 
-      const noteRecord = {
-        id: `note_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        type: 'abt_review' as const,
-        mrn: abtRecord.mrn,
-        residentName: abtRecord.residentName || abtRecord.name || '',
-        related_record_id: abtRecord.id,
-        note_text: generatedNote,
-        note_date: formData.reviewDate,
-        author: formData.reviewedBy,
-        createdAt: now,
-        updated_at: now,
-      };
-
-      currentDb.records.notes.unshift(noteRecord);
+      saveClinicalNoteWithAudit(
+        'abt_review',
+        abtRecord.mrn,
+        abtRecord.residentName || abtRecord.name || '',
+        generatedNote,
+        formData.reviewDate,
+        formData.reviewedBy,
+        'abt_review',
+        `Stewardship review completed for ${abtRecord.residentName || abtRecord.name}: ${abtRecord.medication || abtRecord.med_name} - ${formData.stewardshipDecision}`,
+        'abt',
+        abtRecord.id,
+      );
 
       const abtIdx = currentDb.records.abx.findIndex(r => r.id === abtRecord.id);
       if (abtIdx >= 0) {
@@ -262,13 +261,6 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
           updated_at: now,
         };
       }
-
-      addAudit(
-        currentDb,
-        'abt_review',
-        `Stewardship review completed for ${abtRecord.residentName || abtRecord.name}: ${abtRecord.medication || abtRecord.med_name} - ${formData.stewardshipDecision}`,
-        'abt',
-      );
 
       saveDB(currentDb);
       toast({
