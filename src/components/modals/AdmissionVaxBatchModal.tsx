@@ -6,13 +6,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Copy, Syringe } from 'lucide-react';
-import { addAudit, loadDB, saveDB } from '@/lib/database';
+import { addAudit, loadDB } from '@/lib/database';
 import { Resident, VaxRecord } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
 import { calculateAge, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
 import { useClinicalNote } from '@/hooks/useClinicalNote';
-import { checkDuplicateVax, formatValidationErrors, validateVaxRecord } from '@/lib/validators';
+import { checkDuplicateVax, formatValidationErrors } from '@/lib/validators';
+import { bulkCreateVaxRecords } from '@/lib/bulkOperations';
 import { createAuditLog } from '@/lib/audit';
 
 interface VaxEntry {
@@ -138,7 +139,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     const currentDb = loadDB();
     const now = nowISO();
     const vaccinationDate = todayISO();
-    const validationErrors: string[] = [];
+
     const newRecords: VaxRecord[] = vaccines.map((vax) => ({
       id: `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: resident.mrn,
@@ -161,8 +162,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     }));
 
     newRecords.forEach((record) => {
-      const validation = validateVaxRecord(record);
-      if (!validation.valid) validationErrors.push(...validation.errors);
       if (record.status === 'given' && record.dateGiven) {
         const duplicate = checkDuplicateVax(record.mrn, record.vaccine, record.dateGiven, currentDb.records.vax);
         if (duplicate) {
@@ -171,20 +170,22 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       }
     });
 
-    if (validationErrors.length > 0) {
-      toast({ title: 'Validation Failed', description: formatValidationErrors(validationErrors), variant: 'destructive' });
+    const result = bulkCreateVaxRecords(newRecords);
+    if (!result.success) {
+      toast({
+        title: 'Validation Failed',
+        description: formatValidationErrors(result.errors[0]?.errors || ['Unknown validation failure']),
+        variant: 'destructive',
+      });
       return;
     }
-
-    currentDb.records.vax = [...newRecords, ...currentDb.records.vax];
 
     const consentedCount = vaccines.filter((v) => v.status === 'consented').length;
     const declinedCount = vaccines.filter((v) => v.status === 'declined').length;
     addAudit(currentDb, 'vax_batch_add', `Admission vax batch for ${resident.name}: ${consentedCount} consented, ${declinedCount} declined`, 'vax');
     newRecords.forEach((record) => createAuditLog('create', 'vax', record.id, record.residentName || record.name));
 
-    saveDB(currentDb);
-    toast({ title: 'Vaccinations Recorded', description: `${vaccines.length} vaccination entries saved for ${resident.name}` });
+    toast({ title: 'Vaccinations Recorded', description: `${result.successCount} vaccination entries saved for ${resident.name}` });
     onSave();
     onClose();
   };
