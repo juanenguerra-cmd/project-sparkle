@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter, Printer, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -192,6 +192,19 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     return true;
   });
 
+  const getNormalizedTxDays = useCallback((record: ABTRecord): number | null => {
+    // Preserve previously stored DOT values for existing records.
+    // Only compute when historical imports/entries are missing tx_days fields.
+    const storedTxDays = record.tx_days ?? record.daysOfTherapy;
+    if (storedTxDays !== null && storedTxDays !== undefined) {
+      return storedTxDays;
+    }
+
+    const startDate = record.startDate || record.start_date || '';
+    const endDate = record.endDate || record.end_date || today;
+    return computeTxDays(startDate, endDate);
+  }, [today]);
+
   // Prepare data for sorting
   const recordsWithSortableFields = useMemo(() => filteredRecords.map(r => ({
     ...r,
@@ -199,8 +212,8 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
     _medication: r.medication || r.med_name || '',
     _startDate: isoDateFromAny(r.startDate || r.start_date || ''),
     _endDate: isoDateFromAny(r.endDate || r.end_date || ''),
-    _txDays: r.tx_days || r.daysOfTherapy || 0
-  })), [filteredRecords]);
+    _txDays: getNormalizedTxDays(r) || 0
+  })), [filteredRecords, getNormalizedTxDays]);
 
   const { sortKey, sortDirection, handleSort, sortedData: sortedRecords } = useSortableTable(recordsWithSortableFields, '_startDate', 'desc');
   const pageSize = 20;
@@ -278,7 +291,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
       escapeCSV(r.endDate || r.end_date),
       escapeCSV(r.plannedStopDate),
       escapeCSV(r.status),
-      escapeCSV(r.tx_days || r.daysOfTherapy),
+      escapeCSV(getNormalizedTxDays(r)),
       escapeCSV(r.nextReviewDate),
       escapeCSV(r.prescriber),
       escapeCSV(r.cultureCollected),
@@ -342,7 +355,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
           <td>${escapeHtml(record.infection_source || '—')}</td>
           <td>${escapeHtml(formatDate(record.startDate || record.start_date))}</td>
           <td>${escapeHtml(formatDate(record.endDate || record.end_date))}</td>
-          <td>${escapeHtml(record.tx_days || record.daysOfTherapy || '—')}</td>
+          <td>${escapeHtml(getNormalizedTxDays(record) ?? '—')}</td>
           <td>${escapeHtml(courseStatus)}</td>
         </tr>
       `;
@@ -592,7 +605,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
                     </td>
                     <td className="text-sm">{formatDate(record.startDate || record.start_date)}</td>
                     <td className="text-sm">{formatDate(record.endDate || record.end_date)}</td>
-                    <td className="font-semibold">{record.tx_days || record.daysOfTherapy || '—'}</td>
+                    <td className="font-semibold">{getNormalizedTxDays(record) ?? '—'}</td>
                     <td>{getStatusBadge(record)}</td>
                     <td>
                       <div className="flex items-center gap-1">

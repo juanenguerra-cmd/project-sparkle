@@ -22,7 +22,7 @@ import {
   SymptomCategory,
   SYMPTOM_OPTIONS
 } from './types';
-import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO } from './parsers';
+import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO, computeTxDays } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
 import { migrateResidentIds, migrateWorkflowMetrics } from './migrations';
 import { deriveAbtStatus } from './abtStatus';
@@ -299,6 +299,16 @@ const cloneDeep = <T,>(value: T): T => {
   return JSON.parse(JSON.stringify(value)) as T;
 };
 
+
+const buildAbxMergeKey = (record: Partial<ABTRecord> & Record<string, unknown>): string => {
+  const mrn = canonicalMRN(String(record.mrn || ''));
+  const med = String(record.medication || record.med_name || record.antibiotic || record.drug || '').trim().toLowerCase();
+  const start = isoDateFromAny(String(record.startDate || record.start_date || record.start || '')) || '';
+  const dose = String(record.dose || '').trim().toLowerCase();
+  const route = String(record.route || '').trim().toLowerCase();
+  return [mrn, med, start, dose, route].join('|');
+};
+
 const formatImportError = (e: unknown): string => {
   // QuotaExceededError is the most common “import looks successful but nothing saved” failure.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -425,39 +435,48 @@ export const importDBFromJSON = async (
     const abxSource = normalizedData.records?.abx || [];
     if (Array.isArray(abxSource)) {
       const existingIds = new Set(db.records.abx.map(r => r.record_id || r.id));
+      const existingMergeKeys = new Set(db.records.abx.map(r => buildAbxMergeKey(r)));
+
       abxSource.forEach((r: any) => {
         const id = r.id || r.record_id || `abx_${r.mrn}_${r.antibiotic || r.medication}_${r.startDate || r.start_date}`;
-        if (existingIds.has(id)) return;
-        
+        const mergeKey = buildAbxMergeKey(r);
+        if (existingIds.has(id) || existingMergeKeys.has(mergeKey)) return;
+
+        const startDate = r.startDate || r.start_date || r.start || '';
         const endDate = r.endDate || r.end_date || r.end || '';
         const rawStatus = String(r.status || '').toLowerCase();
         const importedStatus = rawStatus.includes('discont')
           ? 'discontinued'
           : (r.isActive || rawStatus === 'active' ? 'active' : 'completed');
+        const txDays = computeTxDays(startDate, endDate || todayISO());
 
         db.records.abx.push({
           id,
           record_id: id,
           mrn: canonicalMRN(r.mrn || ''),
-          name: r.name || r.patientName || '',
-          residentName: r.name || r.patientName || '',
+          name: r.name || r.patientName || r.residentName || '',
+          residentName: r.name || r.patientName || r.residentName || '',
           unit: r.unit || '',
           room: r.room || '',
           med_name: r.antibiotic || r.medication || r.drug || r.med_name || '',
           medication: r.antibiotic || r.medication || r.drug || r.med_name || '',
           dose: r.dose || '',
           route: r.route || '',
+          frequency: r.frequency || r.freq || '',
           indication: r.indication || '',
           infection_source: r.infectionSource || r.infection_source || 'Other',
-          start_date: r.startDate || r.start_date || r.start || '',
-          startDate: r.startDate || r.start_date || r.start || '',
+          start_date: startDate,
+          startDate,
           end_date: endDate,
           endDate,
+          tx_days: txDays,
+          daysOfTherapy: txDays,
           status: deriveAbtStatus(importedStatus, endDate),
           createdAt: now,
           source: 'json_import'
         });
         existingIds.add(id);
+        existingMergeKeys.add(mergeKey);
       });
     }
     
