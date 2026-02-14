@@ -1,118 +1,116 @@
-import React from 'react';
-import { AlertTriangle, RefreshCw, RotateCcw, Download } from 'lucide-react';
+/**
+ * Error Boundary Component
+ * 
+ * Catches React errors and displays fallback UI
+ * Integrates with Sentry for error reporting
+ */
+
+import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
+import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { createAuditLog } from '@/lib/audit';
-import { exportBackupToFile, listBackups, createManualBackup } from '@/lib/backup';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
-  errorInfo: React.ErrorInfo | null;
+  errorInfo: ErrorInfo | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
+class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    };
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    return { hasError: true, error };
+    return {
+      hasError: true,
+      error,
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
-    this.setState({ errorInfo });
-    try {
-      createAuditLog('create', 'note', `error_${Date.now()}`, `Application Error: ${error.message}`);
-    } catch (auditError) {
-      console.error('Failed to log error to audit:', auditError);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    this.setState({
+      errorInfo,
+    });
+
+    // Log to Sentry
+    Sentry.captureException(error, {
+      extra: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
+
+    // Log to console in development
+    if (import.meta.env.DEV) {
+      console.error('Error caught by boundary:', error);
+      console.error('Component stack:', errorInfo.componentStack);
     }
   }
 
-  handleReload = () => window.location.reload();
-
-  handleReset = () => this.setState({ hasError: false, error: null, errorInfo: null });
-
-  handleCreateBackup = () => {
-    try {
-      createManualBackup();
-      alert('Backup created successfully. You can now safely try recovery options.');
-    } catch {
-      alert('Failed to create backup. Please contact support.');
-    }
+  handleReset = (): void => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    });
   };
 
-  handleExportLastBackup = () => {
-    try {
-      const backups = listBackups();
-      if (backups.length > 0) exportBackupToFile(backups[0].id);
-      else alert('No backups available to export.');
-    } catch {
-      alert('Failed to export backup.');
-    }
-  };
-
-  render() {
+  render(): ReactNode {
     if (this.state.hasError) {
+      // Custom fallback UI
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      // Default fallback UI
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <Card className="w-full max-w-2xl">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Application Error</h1>
-                  <p className="text-sm text-gray-600">Something went wrong. Your data is safe.</p>
-                </div>
-              </div>
-
-              {this.state.error && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Error Details:</h3>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm font-mono text-red-900 break-all">{this.state.error.message}</p>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3 mb-6">
-                <h3 className="text-sm font-semibold text-gray-700">Recovery Options:</h3>
-                <Button onClick={this.handleReload} className="w-full" size="lg">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Reload Application
-                </Button>
-                <Button onClick={this.handleReset} variant="outline" className="w-full" size="lg">
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Try Again (Keep Current View)
-                </Button>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button onClick={this.handleCreateBackup} variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Create Backup
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Something went wrong</AlertTitle>
+              <AlertDescription className="mt-2">
+                <p className="mb-4">
+                  We're sorry, but something unexpected happened. The error has been
+                  reported to our team.
+                </p>
+                {import.meta.env.DEV && this.state.error && (
+                  <details className="mt-4 p-2 bg-muted rounded text-xs">
+                    <summary className="cursor-pointer font-semibold">
+                      Error Details (Development Only)
+                    </summary>
+                    <pre className="mt-2 whitespace-pre-wrap break-words">
+                      {this.state.error.toString()}
+                    </pre>
+                    {this.state.errorInfo && (
+                      <pre className="mt-2 whitespace-pre-wrap break-words text-[10px]">
+                        {this.state.errorInfo.componentStack}
+                      </pre>
+                    )}
+                  </details>
+                )}
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={this.handleReset} variant="outline">
+                    Try Again
                   </Button>
-                  <Button onClick={this.handleExportLastBackup} variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Backup
+                  <Button onClick={() => window.location.reload()} variant="default">
+                    Reload Page
                   </Button>
                 </div>
-              </div>
-
-              {this.state.errorInfo && (
-                <details className="mt-4">
-                  <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-900">Technical Details (for support)</summary>
-                  <pre className="mt-2 text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">{this.state.errorInfo.componentStack}</pre>
-                </details>
-              )}
-            </CardContent>
-          </Card>
+              </AlertDescription>
+            </Alert>
+          </div>
         </div>
       );
     }
@@ -120,3 +118,5 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return this.props.children;
   }
 }
+
+export default ErrorBoundary;
