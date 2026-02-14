@@ -90,6 +90,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import InfectionControlMonthlyReport from '@/components/reports/InfectionControlMonthlyReport';
+import SafetyMeetingTemplate from '@/components/reports/SafetyMeetingTemplate';
 import { ViewType, type CustomReportTemplate, type ResidentFilterConfig } from '@/lib/types';
 import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
 import { generateCustomReport as generateCustomReportFromTemplate } from '@/lib/customReports/customReportGenerator';
@@ -125,6 +126,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [editingTemplate, setEditingTemplate] = useState<CustomReportTemplate | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomReportTemplate[]>([]);
   const [showInfectionControlMonthlyReport, setShowInfectionControlMonthlyReport] = useState(false);
+  const [showSafetyMeetingTemplate, setShowSafetyMeetingTemplate] = useState(false);
 
   useEffect(() => {
     const storedTemplates = localStorage.getItem('icn_hub_custom_report_templates');
@@ -1100,6 +1102,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           <Button variant="outline" onClick={() => setShowInfectionControlMonthlyReport(true)}>
             <FileText className="w-4 h-4 mr-2" />
             IC Monthly Report
+          </Button>
+          <Button variant="outline" onClick={() => setShowSafetyMeetingTemplate(true)}>
+            <FileText className="w-4 h-4 mr-2" />
+            Safety Meeting Minutes
           </Button>
           <Button onClick={() => setShowReportBuilder(true)} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
             <Wand2 className="w-4 h-4 mr-2" />
@@ -2089,6 +2095,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       <InfectionControlMonthlyReport
         open={showInfectionControlMonthlyReport}
         onClose={() => setShowInfectionControlMonthlyReport(false)}
+      />
+
+      <SafetyMeetingTemplate
+        open={showSafetyMeetingTemplate}
+        onClose={() => setShowSafetyMeetingTemplate(false)}
       />
     </div>
   );
