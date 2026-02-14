@@ -52,3 +52,28 @@ export const detectChanges = (
   });
   return changes;
 };
+
+export const exportAuditLogs = (logs: AuditLog[]): string => {
+  const headers = ['id', 'timestamp', 'user', 'action', 'entity_type', 'entity_id', 'entity_name', 'changes'];
+
+  const escapeCsv = (value: unknown): string => {
+    const stringValue = value == null ? '' : String(value);
+    if (/[",\n]/.test(stringValue)) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
+    }
+    return stringValue;
+  };
+
+  const rows = logs.map((log) => [
+    log.id,
+    log.timestamp,
+    log.user,
+    log.action,
+    log.entity_type,
+    log.entity_id,
+    log.entity_name || '',
+    log.changes ? JSON.stringify(log.changes) : '',
+  ].map(escapeCsv).join(','));
+
+  return [headers.join(','), ...rows].join('\n');
+};

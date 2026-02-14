@@ -13,7 +13,8 @@ import VAXView from '@/components/views/VAXView';
 import NotesView from '@/components/views/NotesView';
 import OutbreakView from '@/components/views/OutbreakView';
 import ReportsView from '@/components/views/ReportsView';
-import AuditView from '@/components/views/AuditView';
+import AuditLogView from '@/components/views/AuditLogView';
+import UserManagementView from '@/components/views/UserManagementView';
 import SettingsView from '@/components/views/SettingsView';
 import ReferenceLibraryView from '@/components/views/ReferenceLibraryView';
 import DataManagementModal from '@/components/modals/DataManagementModal';
@@ -88,7 +89,9 @@ const Index = () => {
       case 'reference_library':
         return <ReferenceLibraryView />;
       case 'audit':
-        return <AuditView />;
+        return <AuditLogView />;
+      case 'user_management':
+        return <UserManagementView />;
       case 'settings':
         return <SettingsView />;
       default:
