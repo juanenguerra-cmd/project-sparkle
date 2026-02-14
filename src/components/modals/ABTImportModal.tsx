@@ -143,7 +143,9 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
         dose: row.dose,
         route: row.route,
         route_raw: row.route_raw,
+        frequency: row.frequency,
         indication: row.indication,
+        prescriber: row.prescriber,
         infection_source: source,
         start_date: row.start_date,
         startDate: row.start_date,
@@ -249,6 +251,8 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
                         <th className="px-2 py-2 text-left">Medication</th>
                         <th className="px-2 py-2 text-left">Dose</th>
                         <th className="px-2 py-2 text-left">Route</th>
+                        <th className="px-2 py-2 text-left">Frequency</th>
+                        <th className="px-2 py-2 text-left">Doctor/Provider</th>
                         <th className="px-2 py-2 text-left max-w-[160px]">Indication</th>
                         <th className="px-2 py-2 text-left w-[140px]">Source</th>
                         <th className="px-2 py-2 text-left">Start</th>
@@ -299,6 +303,22 @@ const ABTImportModal = ({ open, onClose, onImportComplete }: ABTImportModalProps
                               value={row.route}
                               onChange={(e) => updateField(idx, 'route', e.target.value)}
                               className={`h-7 text-xs w-12 px-1 ${row.route === 'TOP' ? 'text-muted-foreground' : ''}`}
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <Input
+                              value={row.frequency}
+                              onChange={(e) => updateField(idx, 'frequency', e.target.value)}
+                              className="h-7 text-xs w-20 px-1"
+                              placeholder="BID"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <Input
+                              value={row.prescriber}
+                              onChange={(e) => updateField(idx, 'prescriber', e.target.value)}
+                              className="h-7 text-xs w-28 px-1"
+                              placeholder="Dr. Name"
                             />
                           </td>
                           <td className="px-1 py-1">
