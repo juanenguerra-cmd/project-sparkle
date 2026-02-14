@@ -11,6 +11,8 @@ import { ABTRecord, Resident } from '@/lib/types';
 import { computeTxDays, nowISO, todayISO } from '@/lib/parsers';
 import { deriveAbtStatus } from '@/lib/abtStatus';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import { checkDuplicateABT, formatValidationErrors, validateABTRecord } from '@/lib/validators';
+import { createAuditLog } from '@/lib/audit';
 
 interface ABTCaseModalProps {
   open: boolean;
@@ -88,6 +90,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
   }, [open, editRecord?.mrn]);
 
   useEffect(() => {
+
     if (editRecord) {
       const resident = db.census.residentsByMrn[editRecord.mrn];
       if (resident) setSelectedResident(resident);
@@ -255,6 +258,27 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
 
     const currentDb = loadDB();
 
+
+    const validation = validateABTRecord(recordData);
+    if (!validation.valid) {
+      toast({
+        title: 'Validation Failed',
+        description: formatValidationErrors(validation.errors),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const duplicate = checkDuplicateABT(recordData.mrn, recordData.medication || '', currentDb.records.abx, editRecord?.id);
+    if (duplicate && !editRecord) {
+      toast({
+        title: 'Duplicate Antibiotic',
+        description: `${duplicate.residentName || duplicate.name} is already on ${duplicate.medication || duplicate.med_name}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (editRecord) {
       const idx = currentDb.records.abx.findIndex((r) => {
         if (editRecord.id && r.id === editRecord.id) return true;
@@ -275,6 +299,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     }
     
     saveDB(currentDb);
+    createAuditLog(editRecord ? 'update' : 'create', 'abt', recordData.id, formData.residentName);
 
     recordWorkflowMetric({
       eventName: 'workflow_save_success',

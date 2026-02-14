@@ -345,6 +345,18 @@ export interface AuditEntry {
   source?: 'ui' | 'import' | 'api' | 'migration';
 }
 
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  userId: string;
+  action: 'create' | 'update' | 'delete';
+  entity_type: 'resident' | 'ip_case' | 'abt' | 'vax' | 'note';
+  entity_id: string;
+  entity_name?: string;
+  changes?: Record<string, { old: any; new: any }>;
+}
+
 export interface HistoryEvent {
   id: string;
   entityType: 'abt' | 'ip' | 'vax';

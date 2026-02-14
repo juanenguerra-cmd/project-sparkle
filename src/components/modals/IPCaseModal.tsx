@@ -13,6 +13,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
 import PillInput from '@/components/ui/pill-input';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import { checkDuplicateIPCase, formatValidationErrors, validateIPCase } from '@/lib/validators';
+import { createAuditLog } from '@/lib/audit';
 
 interface IPCaseModalProps {
   open: boolean;
@@ -278,6 +280,30 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       createdAt: editCase?.createdAt || new Date().toISOString(),
     };
 
+
+    const validation = validateIPCase(caseData);
+    if (!validation.valid) {
+      toast({
+        title: 'Validation Failed',
+        description: formatValidationErrors(validation.errors),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const organism = caseData.infectionType || caseData.infection_type || '';
+    if (organism) {
+      const duplicate = checkDuplicateIPCase(caseData.mrn, organism, db.records.ip_cases, editCase?.id);
+      if (duplicate && !editCase) {
+        toast({
+          title: 'Duplicate Case Detected',
+          description: `Active case already exists for ${organism}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     // Calculate next review date
     const reviewDays = protocol === 'EBP' 
       ? db.settings.ipRules?.ebpReviewDays || 7
@@ -307,6 +333,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     }
     
     saveDB(db);
+    createAuditLog(editCase ? 'update' : 'create', 'ip_case', caseData.id, formData.residentName);
 
     recordWorkflowMetric({
       eventName: 'workflow_save_success',

@@ -11,6 +11,8 @@ import { VaxRecord, Resident } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
 import { getEducationScript } from '@/lib/vaccineEducationScripts';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import { checkDuplicateVax, formatValidationErrors, validateVaxRecord } from '@/lib/validators';
+import { createAuditLog } from '@/lib/audit';
 import { normalizeVaccineName } from '@/lib/regulatory';
 
 interface VAXCaseModalProps {
@@ -60,6 +62,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
   }, [open, editRecord?.mrn]);
 
   useEffect(() => {
+
     if (editRecord) {
       const resident = db.census.residentsByMrn[editRecord.mrn];
       if (resident) setSelectedResident(resident);
@@ -222,6 +225,27 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
 
     const currentDb = loadDB();
 
+
+    const validation = validateVaxRecord(recordData);
+    if (!validation.valid) {
+      toast({
+        title: 'Validation Failed',
+        description: formatValidationErrors(validation.errors),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (recordData.status === 'given' && recordData.dateGiven) {
+      const duplicate = checkDuplicateVax(recordData.mrn, recordData.vaccine, recordData.dateGiven, currentDb.records.vax, editRecord?.id);
+      if (duplicate && !editRecord) {
+        toast({
+          title: 'Possible Duplicate',
+          description: `${recordData.vaccine} already given on ${duplicate.dateGiven || duplicate.date_given}`,
+        });
+      }
+    }
+
     if (editRecord) {
       const idx = currentDb.records.vax.findIndex((r) => {
         if (editRecord.id && r.id === editRecord.id) return true;
@@ -241,6 +265,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
     }
     
     saveDB(currentDb);
+    createAuditLog(editRecord ? 'update' : 'create', 'vax', recordData.id, formData.residentName);
 
     recordWorkflowMetric({
       eventName: 'workflow_save_success',
