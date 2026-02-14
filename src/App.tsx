@@ -9,7 +9,7 @@ import NotFound from './pages/NotFound';
 import LoginPage from './components/pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { cleanupSessionMonitoring, initSessionMonitoring, isAuthenticated } from './lib/auth';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary';
 import { OfflineBanner } from './components/OfflineBanner';
 
 const queryClient = new QueryClient();

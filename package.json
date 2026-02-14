@@ -12,7 +12,8 @@
     "test:e2e": "npx playwright test",
     "test:e2e:install": "npx playwright install --with-deps",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:fix": "npm audit fix"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

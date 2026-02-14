@@ -2,11 +2,10 @@
  * Error Boundary Component
  * 
  * Catches React errors and displays fallback UI
- * Integrates with Sentry for error reporting
+ * Logs errors to console for debugging
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import * as Sentry from '@sentry/react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -44,17 +43,22 @@ class ErrorBoundary extends Component<Props, State> {
       errorInfo,
     });
 
-    // Log to Sentry
-    Sentry.captureException(error, {
-      extra: {
-        componentStack: errorInfo.componentStack,
-      },
-    });
-
-    // Log to console in development
-    if (import.meta.env.DEV) {
-      console.error('Error caught by boundary:', error);
-      console.error('Component stack:', errorInfo.componentStack);
+    // Log to console for debugging
+    console.error('Error caught by boundary:', error);
+    console.error('Component stack:', errorInfo.componentStack);
+    
+    // In production, you could send this to an error tracking service
+    // Example: Send to your backend API endpoint
+    if (!import.meta.env.DEV) {
+      // TODO: Implement production error logging
+      // fetch('/api/errors', {
+      //   method: 'POST',
+      //   body: JSON.stringify({
+      //     error: error.toString(),
+      //     stack: error.stack,
+      //     componentStack: errorInfo.componentStack,
+      //   })
+      // });
     }
   }
 
@@ -83,7 +87,7 @@ class ErrorBoundary extends Component<Props, State> {
               <AlertDescription className="mt-2">
                 <p className="mb-4">
                   We're sorry, but something unexpected happened. The error has been
-                  reported to our team.
+                  logged.
                 </p>
                 {import.meta.env.DEV && this.state.error && (
                   <details className="mt-4 p-2 bg-muted rounded text-xs">
