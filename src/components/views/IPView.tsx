@@ -14,6 +14,7 @@ import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import InfectionControlMonthlyReport from '@/components/reports/InfectionControlMonthlyReport';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
 type SortField = 'name' | 'room' | 'onset' | 'review' | 'protocol' | 'status';
@@ -52,6 +53,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [fromDateFilter, setFromDateFilter] = useState('');
   const [toDateFilter, setToDateFilter] = useState('');
+  const [showMonthlyReport, setShowMonthlyReport] = useState(false);
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -582,6 +584,10 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
             <Printer className="w-4 h-4 mr-2" />
             Print Filtered
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowMonthlyReport(true)}>
+            <FileText className="w-4 h-4 mr-2" />
+            Monthly Report
+          </Button>
           <Button size="sm" onClick={() => { setEditingCase(null); setShowCaseModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Add IP Case
@@ -938,6 +944,12 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
           ipCase={reviewingCase}
         />
       )}
+
+
+      <InfectionControlMonthlyReport
+        open={showMonthlyReport}
+        onClose={() => setShowMonthlyReport(false)}
+      />
 
       {onNavigate && (
         <SectionCard title="Next Steps">

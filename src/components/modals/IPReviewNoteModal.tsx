@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Copy, Save, Shield } from 'lucide-react';
-import { toast as sonnerToast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,9 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { addAudit, loadDB, saveDB } from '@/lib/database';
+import { loadDB, saveDB } from '@/lib/database';
 import { nowISO, todayISO, isoDateFromAny } from '@/lib/parsers';
-import { IPCase, Note } from '@/lib/types';
+import { copyToClipboardWithToast, formatDate, formatDateTime } from '@/lib/noteHelpers';
+import { IPCase } from '@/lib/types';
+import { saveClinicalNoteWithAudit } from '@/lib/clinicalNoteHelpers';
 
 interface IPReviewNoteModalProps {
   open: boolean;
@@ -231,24 +232,6 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
     }
   };
 
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '[date]';
-    try {
-      const date = new Date(`${dateStr}T00:00:00`);
-      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (date: Date): string => date.toLocaleString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   const calculateDaysOnPrecaution = (): number => {
     const startDate = isoDateFromAny(ipCase.onsetDate || ipCase.onset_date || getCaseField(ipCase, 'start_date'));
     if (!startDate) return 0;
@@ -281,10 +264,11 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
   };
 
   const handleCopyNote = async () => {
-    await navigator.clipboard.writeText(generatedNote);
-    sonnerToast.success('Progress note copied to clipboard!', {
-      description: 'Paste into your EMR documentation.',
-    });
+    await copyToClipboardWithToast(
+      generatedNote,
+      'Progress note copied to clipboard!',
+      'Paste into your EMR documentation.',
+    );
   };
 
   const handleSaveNote = () => {
@@ -293,19 +277,18 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
       const now = nowISO();
       const residentName = ipCase.residentName || ipCase.name || 'Resident';
 
-      const noteRecord: Note = {
-        id: `note_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        mrn: ipCase.mrn,
+      saveClinicalNoteWithAudit(
+        'ip_assessment',
+        ipCase.mrn,
         residentName,
-        name: residentName,
-        unit: ipCase.unit,
-        room: ipCase.room,
-        category: 'IP Review',
-        text: generatedNote,
-        createdAt: now,
-        updatedAt: now,
-      };
-      db.records.notes.unshift(noteRecord);
+        generatedNote,
+        formData.reviewDate,
+        formData.reviewedBy,
+        'ip_review',
+        `IP review completed for ${residentName}: ${formData.precautionType} - ${formData.reviewDecision}`,
+        'ip',
+        ipCase.id,
+      );
 
       const idx = db.records.ip_cases.findIndex(r => r.id === ipCase.id);
       if (idx >= 0) {
@@ -328,7 +311,6 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
         } as IPCase;
       }
 
-      addAudit(db, 'ip_review', `IP review completed for ${residentName}: ${formData.precautionType} - ${formData.reviewDecision}`, 'ip');
       saveDB(db);
       toast({ title: 'Review Note Saved', description: 'Progress note and IP case updated successfully' });
       onSave?.();

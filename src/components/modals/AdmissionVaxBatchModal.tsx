@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +9,9 @@ import { Copy, Syringe } from 'lucide-react';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { Resident, VaxRecord } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
+import { calculateAge, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
+import { useClinicalNote } from '@/hooks/useClinicalNote';
 
 interface VaxEntry {
   vaccine_type: 'Pneumococcal' | 'Influenza' | 'COVID-19' | 'RSV';
@@ -40,7 +41,6 @@ const buildDefaultVaccines = (): VaxEntry[] =>
 const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVaxBatchModalProps) => {
   const { toast } = useToast();
   const [vaccines, setVaccines] = useState<VaxEntry[]>(buildDefaultVaccines());
-  const [generatedNote, setGeneratedNote] = useState('');
   const [customNurse, setCustomNurse] = useState('');
 
   useEffect(() => {
@@ -50,40 +50,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     }
   }, [open, resident.mrn]);
 
-  const calculateAge = (dob: string): string => {
-    if (!dob) return '[age]';
-    try {
-      const birth = new Date(dob);
-      const today = new Date();
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDiff = today.getMonth() - birth.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age -= 1;
-      }
-      return age.toString();
-    } catch {
-      return '[age]';
-    }
-  };
-
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '[date]';
-    try {
-      const date = new Date(`${dateStr}T00:00:00`);
-      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (date: Date): string =>
-    date.toLocaleString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
 
   const updateVaxField = (index: number, field: keyof VaxEntry, value: string) => {
     setVaccines((prev) => {
@@ -105,47 +71,44 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     });
   };
 
-  const generated = useMemo(() => {
-    const db = loadDB();
-    const facilityName = db.settings.facilityName || '[Facility Name]';
+  const buildGeneratedNote = (): string => {
     const age = calculateAge(resident.dob || '');
     const gender = resident.sex || 'resident';
-    const admitSource = resident.notes || '[Hospital/Facility Name]';
     const admitDate = formatDate(resident.admitDate || todayISO());
-    const activeIpCases = db.records.ip_cases.filter((ip) => ip.mrn === resident.mrn && String(ip.status || '').toLowerCase() === 'active');
-    const activeAbx = db.records.abx.filter((abx) => abx.mrn === resident.mrn && String(abx.status || '').toLowerCase() === 'active');
-    const hasIsolation = activeIpCases.some((ip) => String(ip.protocol || '').toLowerCase().includes('isolation'));
-    const hasEbp = activeIpCases.some((ip) => String(ip.protocol || '').toLowerCase().includes('ebp'));
-    const isolationStatus = hasIsolation ? 'on isolation precautions' : hasEbp ? 'on enhanced barrier precautions' : 'not on isolation precautions';
-    const antibioticStatus = activeAbx.length > 0 ? 'currently on active antibiotic therapy' : 'not currently on antibiotics';
+    const consenting = vaccines.filter((v) => v.status === 'consented');
+    const declined = vaccines.filter((v) => v.status === 'declined');
 
-    const templateSettings = db.settings.admissionNoteTemplates || {};
-    const isolationStatusLine = (templateSettings.isolationStatusLine || 'Current admission isolation status: {isolationStatus}.')
-      .replace('{isolationStatus}', isolationStatus);
-    const paperworkReviewLine = templateSettings.paperworkReviewLine || 'Resident admission paperwork was reviewed.';
-    const antibioticStatusLine = (templateSettings.antibioticStatusLine || 'On admission, resident antibiotic status: {antibioticStatus}.')
-      .replace('{antibioticStatus}', antibioticStatus);
+    let note = `ADMISSION SCREENING - VACCINATION & INFECTION PREVENTION
 
-    const consentedVax = vaccines.filter((v) => v.status === 'consented');
-    const declinedVax = vaccines.filter((v) => v.status === 'declined');
+`;
+    note += `RESIDENT INFORMATION:
+`;
+    note += `${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted on ${admitDate} to ${resident.unit || '[unit]'}, Room ${resident.room || '[room]'}.
 
-    let note = `ADMISSION IP SCREENING PROGRESS NOTE\n\n${resident.name} is ${age !== '[age]' ? `a ${age} year old` : 'a'} ${gender} admitted to ${facilityName} from ${admitSource} on ${admitDate}.\n${isolationStatusLine}\n${paperworkReviewLine}\n${antibioticStatusLine}\n\nInitial infection prevention admission screening completed. Per facility protocol and CMS F880/F881/F883/F887 requirements, vaccination status and admission risk factors were reviewed with resident/responsible party. Education was provided regarding benefits, risks, contraindications, and alternatives for each vaccination. Resident/responsible party verbalized understanding.`;
+`;
 
-    note += '\n\nIMMUNIZATION STATUS SUMMARY:';
-    note += `\n- Consented: ${consentedVax.length}`;
-    if (consentedVax.length > 0) {
-      consentedVax.forEach((v) => {
-        note += `\n  • ${v.vaccine_type}`;
+    note += 'VACCINATION SCREENING SUMMARY:';
+    note += `\n- Vaccines addressed: ${vaccines.length}`;
+    note += `\n- Consented/administered: ${consenting.length}`;
+    note += `\n- Declined: ${declined.length}`;
+
+    if (consenting.length > 0) {
+      note += '\n\nVACCINES ADMINISTERED/CONSENTED:';
+      consenting.forEach((entry) => {
+        const administeredBy = entry.administered_by || customNurse || '[nurse]';
+        note += `\n- ${entry.vaccine_type}: consented, documented by ${administeredBy}.`;
       });
     }
 
-    note += `\n- Declined: ${declinedVax.length}`;
-    if (declinedVax.length > 0) {
-      declinedVax.forEach((v) => {
-        note += `\n  • ${v.vaccine_type}`;
-        note += ` — Reason: ${v.decline_reason || 'Not specified'}`;
+    if (declined.length > 0) {
+      note += '\n\nVACCINES DECLINED:';
+      declined.forEach((entry) => {
+        note += `\n- ${entry.vaccine_type}: declined (${entry.decline_reason || 'resident preference'}).`;
       });
     }
+
+    const isolationStatus = resident.isolationActive ? 'Active isolation precautions present on admission' : 'No active isolation precautions on admission';
+    const antibioticStatus = resident.activeAntibiotic ? 'Resident admitted on active antibiotic therapy' : 'No active antibiotic therapy on admission';
 
     note += '\n\nIP SCREENING SUMMARY:';
     note += `\n- Isolation status on admission: ${isolationStatus}.`;
@@ -157,21 +120,16 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     note += '\n\nDocumented by: [Your Name/Credentials]';
     note += `\nDate/Time: ${formatDateTime(new Date())}`;
     return note;
-  }, [resident, vaccines]);
+  };
 
-  useEffect(() => {
-    setGeneratedNote(generated);
-  }, [generated]);
+  const { generatedNote, setGeneratedNote, handleCopyNote: handleCopyGeneratedNote } = useClinicalNote({
+    generateNote: buildGeneratedNote,
+    dependencies: [resident, vaccines, customNurse],
+    autoGenerate: open,
+  });
 
   const handleCopyNote = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedNote);
-      sonnerToast.success('Progress note copied to clipboard!', {
-        description: 'Paste into your EMR documentation.',
-      });
-    } catch {
-      sonnerToast.error('Unable to copy note. Please copy manually.');
-    }
+    await handleCopyGeneratedNote();
   };
 
   const handleSaveAll = () => {

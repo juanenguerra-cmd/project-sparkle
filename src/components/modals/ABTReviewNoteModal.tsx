@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Copy, FileText, Save } from 'lucide-react';
-import { addAudit, loadDB, saveDB } from '@/lib/database';
+import { loadDB, saveDB } from '@/lib/database';
 import { ABTRecord } from '@/lib/types';
 import { isoDateFromAny, nowISO, todayISO } from '@/lib/parsers';
+import { saveClinicalNoteWithAudit } from '@/lib/clinicalNoteHelpers';
+import { copyToClipboardWithToast, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
 
 interface ABTReviewNoteModalProps {
   open: boolean;
@@ -102,21 +103,6 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
     }
     return Number.isFinite(age) ? age.toString() : '[age]';
   };
-
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '[date]';
-    const date = new Date(`${dateStr}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  };
-
-  const formatDateTime = (date: Date): string => date.toLocaleString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 
   const calculateDaysOfTherapy = (): number => {
     const startDate = isoDateFromAny(abtRecord.startDate || abtRecord.start_date);
@@ -234,10 +220,11 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
   };
 
   const handleCopyNote = async () => {
-    await navigator.clipboard.writeText(generatedNote);
-    sonnerToast.success('Progress note copied to clipboard!', {
-      description: 'Paste into your EMR documentation.',
-    });
+    await copyToClipboardWithToast(
+      generatedNote,
+      'Progress note copied to clipboard!',
+      'Paste into your EMR documentation.',
+    );
   };
 
   const handleSaveNote = () => {
@@ -245,20 +232,18 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
       const currentDb = loadDB();
       const now = nowISO();
 
-      const noteRecord = {
-        id: `note_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        type: 'abt_review' as const,
-        mrn: abtRecord.mrn,
-        residentName: abtRecord.residentName || abtRecord.name || '',
-        related_record_id: abtRecord.id,
-        note_text: generatedNote,
-        note_date: formData.reviewDate,
-        author: formData.reviewedBy,
-        createdAt: now,
-        updated_at: now,
-      };
-
-      currentDb.records.notes.unshift(noteRecord);
+      saveClinicalNoteWithAudit(
+        'abt_review',
+        abtRecord.mrn,
+        abtRecord.residentName || abtRecord.name || '',
+        generatedNote,
+        formData.reviewDate,
+        formData.reviewedBy,
+        'abt_review',
+        `Stewardship review completed for ${abtRecord.residentName || abtRecord.name}: ${abtRecord.medication || abtRecord.med_name} - ${formData.stewardshipDecision}`,
+        'abt',
+        abtRecord.id,
+      );
 
       const abtIdx = currentDb.records.abx.findIndex(r => r.id === abtRecord.id);
       if (abtIdx >= 0) {
@@ -276,13 +261,6 @@ const ABTReviewNoteModal = ({ open, onClose, onSave, abtRecord }: ABTReviewNoteM
           updated_at: now,
         };
       }
-
-      addAudit(
-        currentDb,
-        'abt_review',
-        `Stewardship review completed for ${abtRecord.residentName || abtRecord.name}: ${abtRecord.medication || abtRecord.med_name} - ${formData.stewardshipDecision}`,
-        'abt',
-      );
 
       saveDB(currentDb);
       toast({
