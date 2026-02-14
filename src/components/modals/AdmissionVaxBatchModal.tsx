@@ -12,6 +12,8 @@ import { nowISO, todayISO } from '@/lib/parsers';
 import { calculateAge, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
 import { useClinicalNote } from '@/hooks/useClinicalNote';
+import { checkDuplicateVax, formatValidationErrors, validateVaxRecord } from '@/lib/validators';
+import { createAuditLog } from '@/lib/audit';
 
 interface VaxEntry {
   vaccine_type: 'Pneumococcal' | 'Influenza' | 'COVID-19' | 'RSV';
@@ -136,6 +138,7 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
     const currentDb = loadDB();
     const now = nowISO();
     const vaccinationDate = todayISO();
+    const validationErrors: string[] = [];
     const newRecords: VaxRecord[] = vaccines.map((vax) => ({
       id: `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: resident.mrn,
@@ -157,11 +160,28 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       updated_at: now,
     }));
 
+    newRecords.forEach((record) => {
+      const validation = validateVaxRecord(record);
+      if (!validation.valid) validationErrors.push(...validation.errors);
+      if (record.status === 'given' && record.dateGiven) {
+        const duplicate = checkDuplicateVax(record.mrn, record.vaccine, record.dateGiven, currentDb.records.vax);
+        if (duplicate) {
+          toast({ title: 'Possible Duplicate', description: `${record.vaccine} may duplicate ${duplicate.dateGiven || duplicate.date_given}` });
+        }
+      }
+    });
+
+    if (validationErrors.length > 0) {
+      toast({ title: 'Validation Failed', description: formatValidationErrors(validationErrors), variant: 'destructive' });
+      return;
+    }
+
     currentDb.records.vax = [...newRecords, ...currentDb.records.vax];
 
     const consentedCount = vaccines.filter((v) => v.status === 'consented').length;
     const declinedCount = vaccines.filter((v) => v.status === 'declined').length;
     addAudit(currentDb, 'vax_batch_add', `Admission vax batch for ${resident.name}: ${consentedCount} consented, ${declinedCount} declined`, 'vax');
+    newRecords.forEach((record) => createAuditLog('create', 'vax', record.id, record.residentName || record.name));
 
     saveDB(currentDb);
     toast({ title: 'Vaccinations Recorded', description: `${vaccines.length} vaccination entries saved for ${resident.name}` });

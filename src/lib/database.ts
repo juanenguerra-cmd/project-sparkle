@@ -26,6 +26,7 @@ import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO, computeTx
 import { storage, defaultSettings, defaultDatabase } from './storage';
 import { migrateResidentIds, migrateWorkflowMetrics } from './migrations';
 import { deriveAbtStatus } from './abtStatus';
+import { encryptObject, decryptObject } from './encryption';
 
 export interface ICNDatabase {
   census: {
@@ -158,13 +159,22 @@ export const loadDB = (): ICNDatabase => {
   
   // Synchronous fallback for localStorage
   try {
-    const raw = localStorage.getItem('icn_hub_db');
+    const encrypted = localStorage.getItem('icn_hub_db_encrypted');
+    const raw = encrypted ? decryptObject<string>(encrypted) : localStorage.getItem('icn_hub_db');
     if (!raw) {
       dbCache = createEmptyDB();
       return dbCache;
     }
     
     const parsed = JSON.parse(raw);
+    if (encrypted === null) {
+      try {
+        localStorage.setItem('icn_hub_db_encrypted', encryptObject(raw));
+        localStorage.removeItem('icn_hub_db');
+      } catch (e) {
+        console.warn('Encryption migration failed', e);
+      }
+    }
     dbCache = {
       census: {
         residentsByMrn: parsed.census?.residentsByMrn || {},
@@ -238,6 +248,12 @@ export const saveDBAsync = async (
     : db;
 
   await storage.save(persistPayload);
+  try {
+    localStorage.setItem('icn_hub_db_encrypted', encryptObject(JSON.stringify(persistPayload)));
+    localStorage.removeItem('icn_hub_db');
+  } catch (e) {
+    console.warn('Failed to persist encrypted local backup', e);
+  }
   dbCache = persistPayload;
 };
 
