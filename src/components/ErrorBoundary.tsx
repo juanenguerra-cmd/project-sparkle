@@ -2,11 +2,10 @@
  * Error Boundary Component
  * 
  * Catches React errors and displays fallback UI
- * Integrates with Sentry for error reporting
+ * Optionally integrates with Sentry for error reporting if available
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
-import * as Sentry from '@sentry/react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,19 +38,26 @@ class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  async componentDidCatch(error: Error, errorInfo: ErrorInfo): Promise<void> {
     this.setState({
       errorInfo,
     });
 
-    // Log to Sentry
-    Sentry.captureException(error, {
-      extra: {
-        componentStack: errorInfo.componentStack,
-      },
-    });
+    // Try to log to Sentry if available
+    try {
+      const Sentry = await import('@sentry/react');
+      Sentry.captureException(error, {
+        extra: {
+          componentStack: errorInfo.componentStack,
+        },
+      });
+    } catch (sentryError) {
+      // Sentry not available or not configured, log to console instead
+      console.error('Error caught by boundary:', error);
+      console.error('Component stack:', errorInfo.componentStack);
+    }
 
-    // Log to console in development
+    // Always log to console in development
     if (import.meta.env.DEV) {
       console.error('Error caught by boundary:', error);
       console.error('Component stack:', errorInfo.componentStack);
@@ -83,7 +89,7 @@ class ErrorBoundary extends Component<Props, State> {
               <AlertDescription className="mt-2">
                 <p className="mb-4">
                   We're sorry, but something unexpected happened. The error has been
-                  reported to our team.
+                  logged.
                 </p>
                 {import.meta.env.DEV && this.state.error && (
                   <details className="mt-4 p-2 bg-muted rounded text-xs">
