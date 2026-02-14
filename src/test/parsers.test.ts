@@ -6,6 +6,7 @@ import {
   isValidUnit,
   canonicalMRN,
   computeTxDays,
+  parseABTMedlistRaw,
 } from "@/lib/parsers";
 
 
@@ -247,5 +248,41 @@ describe("parseCensusRaw", () => {
     expect(parseCensusRaw("")).toEqual([]);
     expect(parseCensusRaw("no mrn here")).toEqual([]);
     expect(parseCensusRaw(null as any)).toEqual([]);
+  });
+});
+
+describe("parseABTMedlistRaw", () => {
+  it("parses frequency and provider from free text medication lines", () => {
+    const input = `
+      DOE, JOHN (123456) Meropenem 1 gram intravenously once a day Provider: Jane Smith 01/01/2026 01/07/2026 for pneumonia
+      DOE, JOHN (123456) Cefepime 2 gram intravenous every 8 hours Dr. Adams 01/02/2026 01/09/2026 for infection
+      DOE, JOHN (123456) Vancomycin 1 gram iv every 6 hours Doctor: Mark Lee 01/03/2026 01/10/2026 for sepsis
+    `;
+
+    const rows = parseABTMedlistRaw(input);
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0].frequency).toBe('OD');
+    expect(rows[0].prescriber).toBe('Jane Smith');
+
+    expect(rows[1].frequency).toBe('QA');
+    expect(rows[1].prescriber).toBe('Dr. Adams');
+
+    expect(rows[2].frequency).toBe('Q6');
+    expect(rows[2].prescriber).toBe('Mark Lee');
+  });
+
+  it("maps natural language schedule variants to ABT frequency codes", () => {
+    const input = `
+      DOE, JOHN (123456) Amoxicillin 500 mg po twice a day 01/01/2026 01/05/2026 for uti
+      DOE, JOHN (123456) Azithromycin 250 mg po thrice a day 01/01/2026 01/05/2026 for infection
+      DOE, JOHN (123456) Ceftriaxone 1 g iv every 2 hours 01/01/2026 01/05/2026 for infection
+      DOE, JOHN (123456) Ciprofloxacin 500 mg po every 4 hours 01/01/2026 01/05/2026 for infection
+      DOE, JOHN (123456) Levofloxacin 750 mg po every 12 hours 01/01/2026 01/05/2026 for infection
+      DOE, JOHN (123456) Doxycycline 100 mg po every 24 hours 01/01/2026 01/05/2026 for infection
+    `;
+
+    const rows = parseABTMedlistRaw(input);
+    expect(rows.map((row) => row.frequency)).toEqual(['BID', 'TID', 'Q2', 'Q4', 'Q12', 'Q24']);
   });
 });

@@ -369,6 +369,8 @@ export interface ParsedABTRow {
   dose: string;
   route: string;
   route_raw: string;
+  frequency: string;
+  prescriber: string;
   indication: string;
   infection_source: string;
   start_date: string;
@@ -446,6 +448,33 @@ export const parseABTMedlistRaw = (raw: string): ParsedABTRow[] => {
     const hasDate = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/.test(line);
     const hasMedKeyword = medNamePattern.test(line) || antibioticPattern.test(line);
     return hasDate || hasMedKeyword;
+  };
+
+  const detectFrequency = (line: string): string => {
+    const normalized = line.toLowerCase();
+
+    if (/\b(once (daily|a day)|one time daily|daily)\b/.test(normalized)) return 'OD';
+    if (/\b(twice (daily|a day)|two times daily|bid)\b/.test(normalized)) return 'BID';
+    if (/\b(thrice (daily|a day)|three times daily|tid|tds?)\b/.test(normalized)) return 'TID';
+
+    if (/\bevery\s*2\s*hours?\b|\bq\s*2\s*h(?:ours?)?\b/.test(normalized)) return 'Q2';
+    if (/\bevery\s*4\s*hours?\b|\bq\s*4\s*h(?:ours?)?\b/.test(normalized)) return 'Q4';
+    if (/\bevery\s*6\s*hours?\b|\bq\s*6\s*h(?:ours?)?\b/.test(normalized)) return 'Q6';
+    if (/\bevery\s*8\s*hours?\b|\bq\s*8\s*h(?:ours?)?\b/.test(normalized)) return 'QA';
+    if (/\bevery\s*12\s*hours?\b|\bq\s*12\s*h(?:ours?)?\b/.test(normalized)) return 'Q12';
+    if (/\bevery\s*24\s*hours?\b|\bq\s*24\s*h(?:ours?)?\b/.test(normalized)) return 'Q24';
+
+    return '';
+  };
+
+  const detectPrescriber = (line: string): string => {
+    const explicitLabel = line.match(/\b(?:doctor|dr|provider|prescriber)\s*[:\-]\s*([A-Za-z][A-Za-z\s,.'\-]+)/i);
+    if (explicitLabel) return explicitLabel[1].trim().replace(/\s+/g, ' ');
+
+    const drMatch = line.match(/\bdr\.?\s+([A-Za-z][A-Za-z\s.'\-]+)/i);
+    if (drMatch) return `Dr. ${drMatch[1].trim().replace(/\s+/g, ' ')}`;
+
+    return '';
   };
 
   console.log('[ABT Parse] Starting parse, total lines:', lines.length);
@@ -616,6 +645,8 @@ export const parseABTMedlistRaw = (raw: string): ParsedABTRow[] => {
     const start_date = isoDateFromAny(dateM?.[0] || "");
     const end_date = isoDateFromAny(dateM?.[1] || "");
     const route = normalizeRoute(route_raw);
+    const frequency = detectFrequency(lineForParsing);
+    const prescriber = detectPrescriber(lineForParsing);
     const tx_days = computeTxDays(start_date, end_date);
     const infection_source = detectInfectionSource(indication || med_name);
 
@@ -629,6 +660,8 @@ export const parseABTMedlistRaw = (raw: string): ParsedABTRow[] => {
       dose,
       route,
       route_raw,
+      frequency,
+      prescriber,
       indication,
       infection_source,
       start_date,
