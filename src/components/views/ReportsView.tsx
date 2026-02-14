@@ -91,6 +91,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import InfectionControlMonthlyReport from '@/components/reports/InfectionControlMonthlyReport';
 import SafetyMeetingTemplate from '@/components/reports/SafetyMeetingTemplate';
+import MasteredITReviewPanel from '@/components/reports/MasteredITReviewPanel';
 import { ViewType, type CustomReportTemplate, type ResidentFilterConfig } from '@/lib/types';
 import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
 import { generateCustomReport as generateCustomReportFromTemplate } from '@/lib/customReports/customReportGenerator';
@@ -1056,6 +1057,8 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
       <SectionCard title="Integrated Data Flow">
         <DataFlowVisual />
       </SectionCard>
+
+      <MasteredITReviewPanel />
 
       {/* Quick Stats - Clickable */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
