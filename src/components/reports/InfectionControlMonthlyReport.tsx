@@ -56,50 +56,87 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-const InfectionControlMonthlyReport = ({ open, onClose }: InfectionControlMonthlyReportProps) => {
-  const currentDate = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
-  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
-  const [generatedReport, setGeneratedReport] = useState('');
+const isResolvedStatus = (status?: string) => {
+  const normalizedStatus = normalizeIPStatus(status);
+  return normalizedStatus === 'resolved' || normalizedStatus === 'discharged';
+};
 
-  const calculateReportData = (): MonthlyReportData => {
-    const db = loadDB();
+const isCaseActiveOnDate = (ipCase: Record<string, unknown>, date: Date) => {
+  const onsetDate = toDate((ipCase.onset_date as string) || (ipCase.onsetDate as string) || (ipCase.createdAt as string));
+  if (!onsetDate || onsetDate > date) return false;
 
-    const startDate = new Date(selectedYear, selectedMonth, 1);
-    const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999);
+  const resolutionDate = toDate((ipCase.resolution_date as string) || (ipCase.resolutionDate as string));
+  if (resolutionDate && resolutionDate <= date) return false;
 
-    const monthCases = db.records.ip_cases.filter(ipCase => {
-      const caseDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
-      if (!caseDate) return false;
-      return caseDate >= startDate && caseDate <= endDate;
-    });
+  return !isResolvedStatus((ipCase.status as string) || (ipCase.case_status as string));
+};
 
-    const prevStartDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const prevEndDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
-    const prevMonthCases = db.records.ip_cases.filter(ipCase => {
-      const caseDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
-      if (!caseDate) return false;
-      return caseDate >= prevStartDate && caseDate <= prevEndDate;
-    });
+export const calculateInfectionControlMonthlyReportData = (
+  db: ReturnType<typeof loadDB>,
+  selectedMonth: number,
+  selectedYear: number,
+): MonthlyReportData => {
+  const startDate = new Date(selectedYear, selectedMonth, 1);
+  const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999);
+  const prevEndDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+  const prevStartDate = new Date(selectedYear, selectedMonth - 1, 1);
 
-    const activeCases = monthCases.filter(c => {
-      const normalizedStatus = normalizeIPStatus(c.status || c.case_status);
-      return normalizedStatus !== 'resolved' && normalizedStatus !== 'discharged';
-    });
-    const resolvedCases = monthCases.filter(c => {
-      const normalizedStatus = normalizeIPStatus(c.status || c.case_status);
-      return normalizedStatus === 'resolved' || normalizedStatus === 'discharged';
-    });
+  const newCases = db.records.ip_cases.filter(ipCase => {
+    const onsetDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
+    if (!onsetDate) return false;
+    return onsetDate >= startDate && onsetDate <= endDate;
+  });
 
-    const byType = {
-      contact: 0,
-      droplet: 0,
-      airborne: 0,
-      ebp: 0,
-      contactPlus: 0,
-    };
+  const carryoverCases = db.records.ip_cases.filter(ipCase => {
+    const onsetDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
+    if (!onsetDate || onsetDate >= startDate) return false;
 
-    monthCases.forEach(ipCase => {
+    const resolutionDate = toDate(ipCase.resolution_date || ipCase.resolutionDate);
+    if (resolutionDate && resolutionDate < startDate) return false;
+
+    return true;
+  });
+
+  const resolvedCases = db.records.ip_cases.filter(ipCase => {
+    const resolutionDate = toDate(ipCase.resolution_date || ipCase.resolutionDate);
+    if (resolutionDate) {
+      return resolutionDate >= startDate && resolutionDate <= endDate;
+    }
+
+    return false;
+  });
+
+  const activeCases = db.records.ip_cases.filter(ipCase => isCaseActiveOnDate(ipCase, endDate));
+
+  const reportingPeriodCases = db.records.ip_cases.filter(ipCase => {
+    const onsetDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
+    if (!onsetDate || onsetDate > endDate) return false;
+
+    const resolutionDate = toDate(ipCase.resolution_date || ipCase.resolutionDate);
+    if (resolutionDate && resolutionDate < startDate) return false;
+
+    return true;
+  });
+
+  const prevMonthCases = db.records.ip_cases.filter(ipCase => {
+    const onsetDate = toDate(ipCase.onset_date || ipCase.onsetDate || ipCase.createdAt);
+    if (!onsetDate || onsetDate > prevEndDate) return false;
+
+    const resolutionDate = toDate(ipCase.resolution_date || ipCase.resolutionDate);
+    if (resolutionDate && resolutionDate < prevStartDate) return false;
+
+    return true;
+  });
+
+  const byType = {
+    contact: 0,
+    droplet: 0,
+    airborne: 0,
+    ebp: 0,
+    contactPlus: 0,
+  };
+
+  reportingPeriodCases.forEach(ipCase => {
       const type = (ipCase.isolationType || ipCase.isolation_type || ipCase.protocol || '').toLowerCase();
       if (type.includes('contact') && (type.includes('plus') || type.includes('c. diff'))) {
         byType.contactPlus++;
@@ -116,56 +153,67 @@ const InfectionControlMonthlyReport = ({ open, onClose }: InfectionControlMonthl
       }
     });
 
-    const byOrganism: Record<string, number> = {};
-    monthCases.forEach(ipCase => {
-      const organism = ipCase.suspectedOrConfirmedOrganism || ipCase.infectionType || ipCase.infection_type || 'Unknown';
-      byOrganism[organism] = (byOrganism[organism] || 0) + 1;
-    });
+  const byOrganism: Record<string, number> = {};
+  reportingPeriodCases.forEach(ipCase => {
+    const organism = ipCase.suspectedOrConfirmedOrganism || ipCase.infectionType || ipCase.infection_type || 'Unknown';
+    byOrganism[organism] = (byOrganism[organism] || 0) + 1;
+  });
 
-    const durations: number[] = [];
-    monthCases.forEach(ipCase => {
-      const start = toDate(ipCase.onset_date || ipCase.onsetDate);
-      const status = normalizeIPStatus(ipCase.status || ipCase.case_status);
-      const end = toDate(ipCase.resolution_date || ipCase.resolutionDate) || (status === 'resolved' ? new Date() : null);
-      if (!start || !end) return;
-      const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      durations.push(Math.max(days, 0));
-    });
+  const durations: number[] = [];
+  reportingPeriodCases.forEach(ipCase => {
+    const start = toDate(ipCase.onset_date || ipCase.onsetDate);
+    const end = toDate(ipCase.resolution_date || ipCase.resolutionDate);
+    if (!start || !end) return;
+    const days = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    durations.push(Math.max(days, 0));
+  });
 
-    const averageDuration = durations.length > 0
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-      : 0;
-    const longestDuration = durations.length > 0 ? Math.max(...durations) : 0;
+  const averageDuration = durations.length > 0
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : 0;
+  const longestDuration = durations.length > 0 ? Math.max(...durations) : 0;
 
-    const today = new Date();
-    const reviewsOverdue = activeCases.filter(ipCase => {
-      const nextReviewDate = toDate(ipCase.next_review_date || ipCase.nextReviewDate);
-      if (!nextReviewDate) return false;
-      return nextReviewDate < today;
-    }).length;
+  const today = new Date();
+  const reviewsOverdue = activeCases.filter(ipCase => {
+    const nextReviewDate = toDate(ipCase.next_review_date || ipCase.nextReviewDate);
+    if (!nextReviewDate) return false;
+    return nextReviewDate < today;
+  }).length;
 
-    const reviewsCompleted = monthCases.filter(ipCase => !!toDate(ipCase.lastReviewDate)).length;
+  const reviewsCompleted = reportingPeriodCases.filter(ipCase => !!toDate(ipCase.lastReviewDate)).length;
 
-    const percentChange = prevMonthCases.length > 0
-      ? Math.round(((monthCases.length - prevMonthCases.length) / prevMonthCases.length) * 100)
-      : 0;
+  const totalCases = carryoverCases.length + newCases.length;
+  const percentChange = prevMonthCases.length > 0
+    ? Math.round(((totalCases - prevMonthCases.length) / prevMonthCases.length) * 100)
+    : 0;
 
-    return {
-      month: MONTHS[selectedMonth],
-      year: selectedYear,
-      totalCases: monthCases.length,
-      activeCases: activeCases.length,
-      resolvedCases: resolvedCases.length,
-      newCases: monthCases.length,
-      byType,
-      byOrganism,
-      averageDuration,
-      longestDuration,
-      reviewsCompleted,
-      reviewsOverdue,
-      previousMonthTotal: prevMonthCases.length,
-      percentChange,
-    };
+  return {
+    month: MONTHS[selectedMonth],
+    year: selectedYear,
+    totalCases,
+    activeCases: activeCases.length,
+    resolvedCases: resolvedCases.length,
+    newCases: newCases.length,
+    byType,
+    byOrganism,
+    averageDuration,
+    longestDuration,
+    reviewsCompleted,
+    reviewsOverdue,
+    previousMonthTotal: prevMonthCases.length,
+    percentChange,
+  };
+};
+
+const InfectionControlMonthlyReport = ({ open, onClose }: InfectionControlMonthlyReportProps) => {
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [generatedReport, setGeneratedReport] = useState('');
+
+  const calculateReportData = (): MonthlyReportData => {
+    const db = loadDB();
+    return calculateInfectionControlMonthlyReportData(db, selectedMonth, selectedYear);
   };
 
   const data = useMemo(() => (open ? calculateReportData() : null), [open, selectedMonth, selectedYear]);
