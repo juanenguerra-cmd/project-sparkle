@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown } from 'lucide-react';
 import SectionCard from '@/components/dashboard/SectionCard';
 import LineListingFieldsSettings from '@/components/settings/LineListingFieldsSettings';
+import DataManagementModal from '@/components/modals/DataManagementModal';
 import { loadDB, saveDB, addAudit } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { generateUserGuidePdf, generateTrackerCapabilitiesPdf } from '@/lib/pdf/userGuidePdf';
@@ -33,6 +34,7 @@ const SettingsView = () => {
     (db.settings.lineListingConfigs as Record<string, CustomLineListingConfig>) || {}
   );
   const [showLineListingSettings, setShowLineListingSettings] = useState(false);
+  const [showDataManagementModal, setShowDataManagementModal] = useState(false);
   const [isolationStatusLine, setIsolationStatusLine] = useState(
     db.settings.admissionNoteTemplates?.isolationStatusLine || 'Current admission isolation status: {isolationStatus}.'
   );
@@ -246,15 +248,19 @@ const SettingsView = () => {
 
         <SectionCard title="Data Management">
           <div className="space-y-4">
-            <Button variant="outline" className="w-full justify-start">
-              Export All Data
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => setShowDataManagementModal(true)}
+            >
+              Open Data Management Tools
             </Button>
-            <Button variant="outline" className="w-full justify-start">
-              Import Data Backup
-            </Button>
-            <Button variant="destructive" className="w-full justify-start">
-              Clear All Data
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              This opens the same export/import/clear workflow as the Dashboard <span className="font-medium">Data</span> button.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The backup reminder banner is a shortcut for quick backup prompts and first-visit import only.
+            </p>
           </div>
         </SectionCard>
 
@@ -378,6 +384,15 @@ const SettingsView = () => {
           )}
         </SectionCard>
       </Collapsible>
+
+
+      <DataManagementModal
+        open={showDataManagementModal}
+        onClose={() => setShowDataManagementModal(false)}
+        onDataChange={() => {
+          // Settings values are controlled in local state; no extra refresh needed.
+        }}
+      />
     </div>
   );
 };
