@@ -89,6 +89,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import InfectionControlMonthlyReport from '@/components/reports/InfectionControlMonthlyReport';
 import { ViewType, type CustomReportTemplate, type ResidentFilterConfig } from '@/lib/types';
 import { METRICS_DEFINITIONS } from '@/lib/metricsDefinitions';
 import { generateCustomReport as generateCustomReportFromTemplate } from '@/lib/customReports/customReportGenerator';
@@ -123,6 +124,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [searchTemplatesQuery, setSearchTemplatesQuery] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<CustomReportTemplate | null>(null);
   const [customTemplates, setCustomTemplates] = useState<CustomReportTemplate[]>([]);
+  const [showInfectionControlMonthlyReport, setShowInfectionControlMonthlyReport] = useState(false);
 
   useEffect(() => {
     const storedTemplates = localStorage.getItem('icn_hub_custom_report_templates');
@@ -1095,6 +1097,10 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           <p className="text-sm text-muted-foreground">Generate standardized and custom reports</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowInfectionControlMonthlyReport(true)}>
+            <FileText className="w-4 h-4 mr-2" />
+            IC Monthly Report
+          </Button>
           <Button onClick={() => setShowReportBuilder(true)} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
             <Wand2 className="w-4 h-4 mr-2" />
             Create Custom Report
@@ -2079,6 +2085,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
           </div>
         </DialogContent>
       </Dialog>
+
+      <InfectionControlMonthlyReport
+        open={showInfectionControlMonthlyReport}
+        onClose={() => setShowInfectionControlMonthlyReport(false)}
+      />
     </div>
   );
 };

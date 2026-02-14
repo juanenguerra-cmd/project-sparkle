@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Copy, Save, Shield } from 'lucide-react';
-import { toast as sonnerToast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { nowISO, todayISO, isoDateFromAny } from '@/lib/parsers';
+import { copyToClipboardWithToast, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { IPCase, Note } from '@/lib/types';
 
 interface IPReviewNoteModalProps {
@@ -231,24 +231,6 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
     }
   };
 
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '[date]';
-    try {
-      const date = new Date(`${dateStr}T00:00:00`);
-      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (date: Date): string => date.toLocaleString('en-US', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
   const calculateDaysOnPrecaution = (): number => {
     const startDate = isoDateFromAny(ipCase.onsetDate || ipCase.onset_date || getCaseField(ipCase, 'start_date'));
     if (!startDate) return 0;
@@ -281,10 +263,11 @@ const IPReviewNoteModal = ({ open, onClose, onSave, ipCase }: IPReviewNoteModalP
   };
 
   const handleCopyNote = async () => {
-    await navigator.clipboard.writeText(generatedNote);
-    sonnerToast.success('Progress note copied to clipboard!', {
-      description: 'Paste into your EMR documentation.',
-    });
+    await copyToClipboardWithToast(
+      generatedNote,
+      'Progress note copied to clipboard!',
+      'Paste into your EMR documentation.',
+    );
   };
 
   const handleSaveNote = () => {

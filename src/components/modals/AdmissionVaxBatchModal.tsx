@@ -9,8 +9,8 @@ import { Copy, Syringe } from 'lucide-react';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { Resident, VaxRecord } from '@/lib/types';
 import { nowISO, todayISO } from '@/lib/parsers';
+import { copyToClipboardWithToast, formatDate, formatDateTime } from '@/lib/noteHelpers';
 import { useToast } from '@/hooks/use-toast';
-import { toast as sonnerToast } from 'sonner';
 
 interface VaxEntry {
   vaccine_type: 'Pneumococcal' | 'Influenza' | 'COVID-19' | 'RSV';
@@ -65,25 +65,6 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
       return '[age]';
     }
   };
-
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '[date]';
-    try {
-      const date = new Date(`${dateStr}T00:00:00`);
-      return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatDateTime = (date: Date): string =>
-    date.toLocaleString('en-US', {
-      month: '2-digit',
-      day: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
 
   const updateVaxField = (index: number, field: keyof VaxEntry, value: string) => {
     setVaccines((prev) => {
@@ -164,14 +145,11 @@ const AdmissionVaxBatchModal = ({ open, onClose, onSave, resident }: AdmissionVa
   }, [generated]);
 
   const handleCopyNote = async () => {
-    try {
-      await navigator.clipboard.writeText(generatedNote);
-      sonnerToast.success('Progress note copied to clipboard!', {
-        description: 'Paste into your EMR documentation.',
-      });
-    } catch {
-      sonnerToast.error('Unable to copy note. Please copy manually.');
-    }
+    await copyToClipboardWithToast(
+      generatedNote,
+      'Progress note copied to clipboard!',
+      'Paste into your EMR documentation.',
+    );
   };
 
   const handleSaveAll = () => {
