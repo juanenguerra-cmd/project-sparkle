@@ -813,9 +813,11 @@ export const dismissLineListingRecommendation = (db: ICNDatabase, recommendation
 
 // IP helpers - excludes discharged residents
 // Status check is case-insensitive and handles common variants (e.g., "Active Case")
-export const normalizeIPStatus = (status?: string): string => {
-  const normalized = (status || '').trim().toLowerCase();
-  if (!normalized) return '';
+export const normalizeIPStatus = (status?: unknown): string => {
+  if (status == null) return '';
+
+  const normalized = String(status).trim().toLowerCase();
+  if (!normalized || normalized === '[object object]') return '';
   if (normalized.includes('discharge')) return 'discharged';
   if (normalized.includes('resolve')) return 'resolved';
   if (normalized.includes('active') || normalized.includes('open')) return 'active';

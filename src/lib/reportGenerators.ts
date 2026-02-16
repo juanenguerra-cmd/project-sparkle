@@ -5,6 +5,7 @@ import { isoDateFromAny } from './parsers';
 import { differenceInDays, format, isWithinInterval, startOfMonth, endOfMonth, parseISO, isBefore, isAfter, addDays, subDays, isSameDay } from 'date-fns';
 import { inferMedicationClassFromRecord } from './medicationClass';
 import { getFilteredResidents, formatResidentNameForReport as formatResidentNameWithStatus } from './reports/residentFilter';
+import { getDailyIpBinderData } from './reports/useDailyIpBinderData';
 import type { ResidentFilterConfig } from './types';
 
 export interface ReportSection {
@@ -274,6 +275,83 @@ export const generateDailyIPWorklist = (
     },
     headers: ['Room', 'Resident', 'MRN', 'Protocol', 'Infection Type', 'Source', 'Next Review', 'Notes'],
     rows
+  };
+};
+
+export const generateDailyIpBinderReport = (
+  db: ICNDatabase,
+  date: string,
+  unitId: string,
+): ReportData => {
+  const reportDate = date || format(new Date(), 'yyyy-MM-dd');
+  const data = getDailyIpBinderData(db, { date: reportDate, unitId });
+
+  const mapRows = <T extends Record<string, string | number>>(rows: T[], keys: Array<keyof T>): string[][] => (
+    rows.map((row) => keys.map((key) => String(row[key] ?? '')))
+  );
+
+  return {
+    title: 'Daily Infection Prevention Binder',
+    generatedAt: new Date().toISOString(),
+    reportType: 'daily-ip-binder',
+    filters: {
+      unit: data.unit.name,
+      date: format(new Date(reportDate), 'MM/dd/yyyy'),
+    },
+    headers: [],
+    rows: [],
+    sections: [
+      {
+        title: '1. Census & Risk Overview',
+        headers: ['Room', 'Resident Name', 'MRN', 'Admission Date', 'Risk Flags', 'New Admission/Readmission', 'Primary Diagnosis', 'Notes'],
+        rows: mapRows(data.census, ['room', 'residentName', 'mrn', 'admissionDate', 'riskFlags', 'newAdmissionReadmission', 'primaryDiagnosis', 'notes']),
+      },
+      {
+        title: '2. Active Infections & Precautions',
+        headers: ['Room', 'Resident Name', 'Infection/Diagnosis', 'Organism', 'Site', 'Onset Date', 'HAI vs Community', 'Precaution Type', 'Precaution Start Date', 'Target Review/End Date', 'Cohorting Notes'],
+        rows: mapRows(data.infections, ['room', 'residentName', 'infectionDiagnosis', 'organism', 'site', 'onsetDate', 'haiVsCommunity', 'precautionType', 'precautionStartDate', 'targetReviewEndDate', 'cohortingNotes']),
+      },
+      {
+        title: '3. Outbreaks & Clusters',
+        headers: ['Outbreak Type', 'Status', 'Unit(s) Affected', 'Date Declared', 'Cases Today', 'Total Cases', 'Control Measures', 'Notes'],
+        rows: mapRows(data.outbreaks, ['outbreakType', 'status', 'unitsAffected', 'dateDeclared', 'casesToday', 'totalCases', 'controlMeasures', 'notes']),
+      },
+      {
+        title: '4. Devices & Invasive Procedures',
+        headers: ['Room', 'Resident Name', 'Device Type', 'Insertion Date', 'Indication', 'Last Device Review Date', 'Review Today?', 'Planned Removal Date', 'Notes'],
+        rows: mapRows(data.devices, ['room', 'residentName', 'deviceType', 'insertionDate', 'indication', 'lastDeviceReviewDate', 'reviewToday', 'plannedRemovalDate', 'notes']),
+      },
+      {
+        title: '5. Vaccination & Prophylaxis',
+        headers: ['Room', 'Resident Name', 'Vaccine', 'Last Dose Date', 'Declined Date', 'Decline Reason', 'Education Provided', 'Due/Overdue Status', 'Outbreak-Triggered Offer?', 'Notes'],
+        rows: mapRows(data.vaccines, ['room', 'residentName', 'vaccine', 'lastDoseDate', 'declinedDate', 'declineReason', 'educationProvided', 'dueOverdueStatus', 'outbreakTriggeredOffer', 'notes']),
+      },
+      {
+        title: '6. Environmental Cleaning & Isolation Rooms',
+        headers: ['Room', 'Resident Name', 'Reason', 'Status', 'Required Cleaning Type', 'Product/Method', 'Completion Status', 'Completed By/Time', 'Notes'],
+        rows: mapRows(data.cleaningTasks, ['room', 'residentName', 'reason', 'status', 'requiredCleaningType', 'productMethod', 'completionStatus', 'completedByTime', 'notes']),
+      },
+      {
+        title: '7. Lab & Diagnostic Follow-Ups',
+        headers: ['Room', 'Resident Name', 'Specimen Type', 'Collection Date/Time', 'Status', 'Organism(s)', 'Susceptibility/MDRO Flag', 'Required Action', 'Action Completed?', 'Notes'],
+        rows: mapRows(data.labs, ['room', 'residentName', 'specimenType', 'collectionDateTime', 'status', 'organisms', 'susceptibilityMdroFlag', 'requiredAction', 'actionCompleted', 'notes']),
+      },
+      {
+        title: '8. Hand Hygiene & PPE Focus',
+        headers: ['Metric', 'Value', 'Notes'],
+        rows: mapRows(data.handHygiene, ['metric', 'value', 'notes']),
+      },
+      {
+        title: '9. Education & Staff Reminders',
+        headers: ['Topic', 'Target Staff', 'Format', 'Materials Needed', 'Completed?', 'Notes'],
+        rows: mapRows(data.education, ['topic', 'targetStaff', 'format', 'materialsNeeded', 'completed', 'notes']),
+      },
+      {
+        title: '10. Action Items & IP Notes',
+        headers: ['Priority', 'Category', 'Description', 'Responsible Role', 'Due Date/Time', 'Status', 'IP Notes'],
+        rows: mapRows(data.actionItems, ['priority', 'category', 'description', 'responsibleRole', 'dueDateTime', 'status', 'ipNotes']),
+      },
+    ],
   };
 };
 

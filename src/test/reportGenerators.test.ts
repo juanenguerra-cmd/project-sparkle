@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateStandardOfCareReport } from '@/lib/reportGenerators';
+import { generateDailyIpBinderReport, generateStandardOfCareReport } from '@/lib/reportGenerators';
 import type { ICNDatabase } from '@/lib/database';
 
 const createDb = (): ICNDatabase => ({
@@ -179,5 +179,42 @@ describe('generateStandardOfCareReport', () => {
     expect(vaxSection?.rows).toHaveLength(3);
     expect(vaxSection?.rows.map(row => row[3])).toEqual(['Influenza', 'COVID-19', 'RSV']);
     expect(vaxSection?.rows.map(row => row[5])).toEqual(['03/02/2026', '03/04/2026', '03/05/2026']);
+  });
+});
+
+
+describe('generateDailyIpBinderReport', () => {
+  it('includes active IP rows and does not throw for malformed status payloads', () => {
+    const db = createDb();
+    db.records.ip_cases = [
+      {
+        id: 'ip-valid-active',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        protocol: 'Isolation',
+        status: 'Active Case',
+        infectionType: 'Respiratory',
+        onsetDate: '2026-03-03',
+      },
+      {
+        id: 'ip-bad-status-object',
+        mrn: '123',
+        residentName: 'DOE, JANE',
+        unit: 'Unit 3',
+        room: '301',
+        protocol: 'Isolation',
+        // simulate malformed import shape
+        status: { value: 'active' } as unknown as 'Active' | 'Resolved' | 'Discharged',
+      },
+    ];
+
+    const report = generateDailyIpBinderReport(db, '2026-03-07', 'Unit 3');
+    const infectionSection = report.sections?.find(section => section.title.includes('Active Infections'));
+
+    expect(report.title).toBe('Daily Infection Prevention Binder');
+    expect(infectionSection?.rows).toHaveLength(1);
+    expect(infectionSection?.rows[0][1]).toBe('DOE, JANE');
   });
 });
