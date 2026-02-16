@@ -103,7 +103,7 @@ interface ReportsViewProps {
 
 const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => {
   const [executiveOpen, setExecutiveOpen] = useState(false);
-  const [operationalOpen, setOperationalOpen] = useState(false);
+  const [operationalOpen, setOperationalOpen] = useState(true);
   const [surveillanceOpen, setSurveillanceOpen] = useState(false);
   const [floorLayoutOpen, setFloorLayoutOpen] = useState(false);
   const [admissionScreeningOpen, setAdmissionScreeningOpen] = useState(false);
@@ -1582,6 +1582,27 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
             Generate printable cover pages and section dividers for organizing your physical Infection Control binder.
           </p>
           <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => {
+                void handleGenerateReport('daily-ip-binder');
+                toast.success('Daily Infection Prevention Binder loaded in report output');
+              }}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View Daily Infection Prevention Binder
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const report = generateDailyIpBinderReport(loadDB(), fromDate || todayISO(), selectedUnit);
+                setCurrentReport(report);
+                setExportFormat('PDF');
+                exportReportAsPdf(report, 'PDF');
+              }}
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              Download Daily Binder PDF
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => {
