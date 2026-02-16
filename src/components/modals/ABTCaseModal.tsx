@@ -259,7 +259,7 @@ const ABTCaseModal = ({ open, onClose, onSave, editRecord }: ABTCaseModalProps) 
     const currentDb = loadDB();
 
 
-    const validation = validateABTRecord(recordData);
+    const validation = validateABTRecord(recordData, { allowEndDateOverride: !!editRecord });
     if (!validation.valid) {
       toast({
         title: 'Validation Failed',

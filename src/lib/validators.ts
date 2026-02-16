@@ -122,11 +122,15 @@ export const validateIPCase = (ipCase: Partial<IPCase>): ValidationResult => {
   return { valid: errors.length === 0, errors };
 };
 
-export const validateABTRecord = (abt: Partial<ABTRecord>): ValidationResult => {
+export const validateABTRecord = (
+  abt: Partial<ABTRecord>,
+  options: { allowEndDateOverride?: boolean } = {}
+): ValidationResult => {
   const errors: string[] = [];
   const med = abt.medication || abt.med_name;
   const start = abt.startDate || abt.start_date || abt.orderDate;
   const end = abt.endDate || abt.end_date;
+  const { allowEndDateOverride = false } = options;
 
   if (!abt.mrn) errors.push('MRN is required');
   if (!abt.residentName && !abt.name) errors.push('Resident name is required');
@@ -143,7 +147,7 @@ export const validateABTRecord = (abt: Partial<ABTRecord>): ValidationResult => 
     errors.push('End date is required for completed/discontinued antibiotics');
   }
 
-  if (start && end) {
+  if (start && end && !allowEndDateOverride) {
     const rangeErr = validateDateRange(start, end, 'Start date', 'End date');
     if (rangeErr) errors.push(rangeErr);
   }
