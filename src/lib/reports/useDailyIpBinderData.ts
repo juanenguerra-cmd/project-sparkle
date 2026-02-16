@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AppDatabase, IPCase, Outbreak, Resident, VaxRecord } from '@/lib/types';
-import { loadDB, normalizeIPStatus } from '@/lib/database';
+import { getActiveIPCases, loadDB } from '@/lib/database';
 
 export interface DailyIpBinderParams {
   date: string;
@@ -219,9 +219,7 @@ export const getDailyIpBinderData = (
   const residentsInScope = residents.filter((resident) => isResidentInScope(resident, unitId));
   const residentsByMrn = new Map(residentsInScope.map((resident) => [resident.mrn, resident]));
 
-  const activeIpCases = (db.records.ip_cases || []).filter((ipCase) => {
-    const normalizedStatus = normalizeIPStatus(ipCase.status || ipCase.case_status);
-    if (normalizedStatus !== 'active') return false;
+  const activeIpCases = getActiveIPCases(db as any).filter((ipCase) => {
     if (!residentsByMrn.has(ipCase.mrn)) return false;
     const onsetDate = ipCase.onsetDate || ipCase.onset_date;
     return !onsetDate || onsetDate <= reportDate;
