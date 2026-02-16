@@ -5,7 +5,8 @@ import {
   validateIPCase,
   validateResident,
   checkDuplicateMRN,
-  checkDuplicateIPCase
+  checkDuplicateIPCase,
+  validateABTRecord
 } from '../validators';
 
 describe('Date Validation', () => {
@@ -142,6 +143,41 @@ describe('Resident Validation', () => {
       admitDate: '2024-01-01'
     };
     const result = validateResident(resident as any);
+    expect(result.valid).toBe(true);
+  });
+});
+
+
+describe('ABT Validation', () => {
+  it('should block end date before start date by default', () => {
+    const result = validateABTRecord({
+      mrn: 'TEST001',
+      residentName: 'Test Patient',
+      medication: 'Amoxicillin',
+      indication: 'UTI',
+      startDate: '2024-05-10',
+      endDate: '2024-05-01',
+      status: 'active'
+    } as any);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.includes('End date cannot be before Start date'))).toBe(true);
+  });
+
+  it('should allow end date override for edited ABT records', () => {
+    const result = validateABTRecord(
+      {
+        mrn: 'TEST001',
+        residentName: 'Test Patient',
+        medication: 'Amoxicillin',
+        indication: 'UTI',
+        startDate: '2024-05-10',
+        endDate: '2024-05-01',
+        status: 'active'
+      } as any,
+      { allowEndDateOverride: true }
+    );
+
     expect(result.valid).toBe(true);
   });
 });
