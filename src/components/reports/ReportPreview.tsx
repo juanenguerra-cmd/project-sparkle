@@ -13,6 +13,8 @@ const isPrecautionListReport = (title: string) => {
   return title.toUpperCase().includes('PRECAUTION') || title.toUpperCase().includes('ISOLATION');
 };
 
+const isDailyIpBinderReport = (title: string) => title.toLowerCase().includes('daily infection prevention binder');
+
 const isActiveDailyPrecautionList = (title: string) => {
   const upper = title.toUpperCase();
   return upper.includes('RESIDENTS ON PRECAUTIONS') || upper.includes('DAILY PRECAUTION');
@@ -24,6 +26,7 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
   const isPrecautionList = isPrecautionListReport(report.title);
   const isDailyPrecautionList = isActiveDailyPrecautionList(report.title);
   const useBrandedTemplate = !isDailyPrecautionList;
+  const isDailyBinder = isDailyIpBinderReport(report.title);
   const isCompact = printFontSize === 'compact';
   const tableLayout = columnWidth === 'narrow' ? 'fixed' : 'auto';
   const wordBreak = columnWidth === 'narrow' ? 'break-word' : 'normal';
@@ -98,7 +101,7 @@ const ReportPreview = ({ report, facilityName, printFontSize = 'normal', columnW
           {rows.length === 0 ? (
             <tr>
               <td colSpan={headers.length} className="text-center py-4 text-gray-500">
-                No records found for the selected filters
+                {isDailyBinder ? 'No items for today' : 'No records found for the selected filters'}
               </td>
             </tr>
           ) : (
