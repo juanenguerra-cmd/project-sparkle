@@ -1,7 +1,8 @@
 const ENCRYPTION_KEY =
   import.meta.env.VITE_ENCRYPTION_KEY || 'sparkle-default-key-CHANGE-IN-PRODUCTION-min-32-chars';
+const IS_PRODUCTION = import.meta.env.PROD;
 
-if (ENCRYPTION_KEY === 'sparkle-default-key-CHANGE-IN-PRODUCTION-min-32-chars') {
+if (IS_PRODUCTION && ENCRYPTION_KEY === 'sparkle-default-key-CHANGE-IN-PRODUCTION-min-32-chars') {
   console.warn('⚠️ Using default encryption key. Set VITE_ENCRYPTION_KEY in production!');
 }
 
