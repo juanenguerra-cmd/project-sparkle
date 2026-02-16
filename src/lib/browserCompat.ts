@@ -49,11 +49,20 @@ export const detectBrowser = (): BrowserInfo => {
 
 export const initBrowserCompatibility = (): void => {
   const browserInfo = detectBrowser();
-  console.log('Browser:', browserInfo.name, browserInfo.version);
+
+  if (import.meta.env.DEV) {
+    console.info('Browser:', browserInfo.name, browserInfo.version);
+  }
+
   if (browserInfo.warnings.length > 0) {
     console.warn('Browser compatibility warnings:', browserInfo.warnings);
   }
-  sessionStorage.setItem('browser_info', JSON.stringify(browserInfo));
+
+  try {
+    sessionStorage.setItem('browser_info', JSON.stringify(browserInfo));
+  } catch (error) {
+    console.warn('Failed to persist browser info to sessionStorage:', error);
+  }
 };
 
 export const testLocalStorage = (): boolean => {
