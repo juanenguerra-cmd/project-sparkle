@@ -13,7 +13,9 @@
     "test:e2e:install": "npx playwright install --with-deps",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:fix": "npm audit fix"
+    "audit:fix": "npm audit fix",
+    "verify:redirects": "node scripts/verify-redirects.mjs",
+    "build:ci": "npm run build && npm run verify:redirects"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
