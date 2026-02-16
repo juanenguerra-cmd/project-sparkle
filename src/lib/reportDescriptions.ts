@@ -24,6 +24,7 @@ export const defaultReportDescriptions: Record<string, string> = {
   // Operational Reports
   ip_daily_morning: 'Morning report combining IP precautions, active ABT, vaccinations due today, line listings, and follow-up notes.',
   daily_ip: 'Daily worklist of active isolation precautions and Enhanced Barrier Precautions (EBP) cases requiring attention.',
+  'daily-ip-binder': 'Daily Infection Prevention Binder with unit-level census risk, active infections, outbreaks, devices, vaccination/prophylaxis, cleaning, labs, PPE focus, education, and action items.',
   abt_review: 'Antibiotic courses requiring clinical review based on configured cadence (72-hour, weekly, or custom).',
   vax_due: 'Residents with upcoming or overdue vaccinations including flu, pneumonia, COVID-19, and RSV immunizations.',
   vax_reoffer: 'Residents eligible for vaccine re-offer per CDC guidelines: Influenza (30 days, flu season), COVID-19 (180 days).',

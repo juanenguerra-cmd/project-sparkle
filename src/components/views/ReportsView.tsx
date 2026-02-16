@@ -34,6 +34,7 @@ import {
   generateNewAdmissionScreeningReport,
   generateOutbreakSummaryReport,
   generateIPDailyMorningReport,
+  generateDailyIpBinderReport,
   isIPDailyMorningReport,
   InfectionTrendReport
 } from '@/lib/reportGenerators';
@@ -333,6 +334,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const operationalReports = [
     { id: 'ip_daily_morning', name: 'IP Daily Morning Report', description: 'Combined morning IP report with IP precautions, ABT, VAX due today, line listings, and follow-up notes' },
     { id: 'daily_ip', name: 'Daily IP Worklist', description: 'Active isolation precautions and EBP cases' },
+    { id: 'daily-ip-binder', name: 'Daily Infection Prevention Binder', description: 'Unit-level daily infection prevention binder with 10 sections for print/PDF.' },
     { id: 'abt_review', name: 'ABT Review Worklist', description: 'Antibiotic courses requiring review' },
     { id: 'abt_duration', name: 'Antibiotic Duration Analysis', description: 'Prolonged ABT courses (≥7 days) requiring stewardship review' },
     { id: 'vax_due', name: 'Vaccination Due List', description: 'Residents with upcoming or overdue vaccinations' },
@@ -438,6 +440,9 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         break;
       case 'daily_ip':
         report = generateDailyIPWorklist(db, selectedUnit);
+        break;
+      case 'daily-ip-binder':
+        report = generateDailyIpBinderReport(db, fromDate || todayISO(), selectedUnit);
         break;
       case 'abt_review':
         report = generateABTWorklist(db, selectedUnit);
@@ -1962,6 +1967,11 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                   report={currentReport}
                   printFontSize={printFontSize}
                   columnWidth={printColumnWidth}
+                />
+              ) : currentReport.reportType === 'daily-ip-binder' ? (
+                <DailyIpBinderReport
+                  date={fromDate || todayISO()}
+                  unitId={selectedUnit}
                 />
               ) : (
                 <ReportPreview

@@ -29,6 +29,7 @@ const STORAGE_KEY = 'icn_scheduled_reports';
 const reportOptions = [
   { id: 'precautions_list', name: 'Daily Precautions List', category: 'Operational' },
   { id: 'daily_ip', name: 'Daily IP Worklist', category: 'Operational' },
+  { id: 'daily-ip-binder', name: 'Daily Infection Prevention Binder', category: 'Operational' },
   { id: 'abt_review', name: 'ABT Review Worklist', category: 'Operational' },
   { id: 'abt_duration', name: 'Antibiotic Duration Analysis', category: 'Operational' },
   { id: 'vax_due', name: 'Vaccination Due List', category: 'Operational' },
