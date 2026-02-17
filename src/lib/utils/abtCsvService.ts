@@ -2,18 +2,7 @@ import { format } from 'date-fns';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { isoDateFromAny } from '@/lib/parsers';
 import { collectColumns, convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
-
-const ABT_PREFERRED_COLUMNS = [
-  'id', 'mrn', 'residentName', 'name', 'unit', 'room', 'status',
-  'medication', 'med_name', 'dose', 'route', 'frequency', 'indication', 'infection_source',
-  'startDate', 'start_date', 'endDate', 'end_date', 'plannedStopDate',
-  'tx_days', 'daysOfTherapy', 'nextReviewDate', 'prescriber',
-  'cultureCollected', 'cultureResult', 'cultureReviewedDate',
-  'timeoutReviewDate', 'timeoutOutcome', 'adverseEffects', 'cdiffRisk',
-  'stewardshipNotes', 'source', 'notes', 'createdAt', 'updated_at',
-];
-
-const REQUIRED_COLUMNS = ['residentName', 'medication', 'startDate'];
+import { ABT_REQUIRED_COLUMN_GROUPS, ABT_TRACKER_COLUMNS, getMissingColumnGroups } from '@/lib/utils/trackerFieldMaps';
 
 export const exportABTToCSV = (): void => {
   const records = loadDB().records.abx as Array<Record<string, unknown>>;
@@ -22,7 +11,7 @@ export const exportABTToCSV = (): void => {
     return;
   }
 
-  const columns = collectColumns(records, ABT_PREFERRED_COLUMNS);
+  const columns = collectColumns(records, [...ABT_TRACKER_COLUMNS]);
   const csv = convertToCSV(records, columns);
   downloadCSV(csv, `abt-tracker-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
 };
@@ -37,7 +26,7 @@ export const importABTFromCSV = async (file: File | null): Promise<{ newCount: n
     throw new Error('CSV file is empty.');
   }
 
-  const missingColumns = REQUIRED_COLUMNS.filter((column) => !(column in rows[0]));
+  const missingColumns = getMissingColumnGroups(rows[0], ABT_REQUIRED_COLUMN_GROUPS);
   if (missingColumns.length > 0) {
     throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
   }
@@ -136,8 +125,10 @@ const buildABTSignature = (record: Record<string, unknown>): string => {
 const normalizeABTRecord = (row: Record<string, string>): Record<string, unknown> => ({
   ...row,
   id: row.id || '',
+  record_id: row.record_id || row.id || '',
   residentName: row.residentName || row.name || '',
   medication: row.medication || row.med_name || '',
+  route_raw: row.route_raw || row.route || '',
   startDate: toISODate(row.startDate || row.start_date),
   endDate: toISODate(row.endDate || row.end_date),
   timeoutReviewDate: toISODate(row.timeoutReviewDate),
