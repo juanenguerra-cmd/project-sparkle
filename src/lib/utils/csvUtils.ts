@@ -8,6 +8,23 @@ export const convertToCSV = (records: Array<Record<string, unknown>>, columns: s
   return [header, ...rows].join('\n');
 };
 
+export const collectColumns = (
+  records: Array<Record<string, unknown>>,
+  preferredColumns: string[] = [],
+): string[] => {
+  const ordered = new Set<string>(preferredColumns);
+
+  records.forEach((record) => {
+    Object.keys(record).forEach((key) => {
+      if (!ordered.has(key)) {
+        ordered.add(key);
+      }
+    });
+  });
+
+  return Array.from(ordered);
+};
+
 const escapeCSV = (value: unknown): string => {
   if (value === null || value === undefined) {
     return '';
@@ -24,9 +41,11 @@ export const downloadCSV = (csvContent: string, filename: string): void => {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
+
   link.href = url;
   link.download = filename;
   link.style.display = 'none';
+
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -44,9 +63,11 @@ export const parseCSV = (text: string): Array<Record<string, string>> => {
   return lines.slice(1).map((line) => {
     const values = parseCSVLine(line);
     const row: Record<string, string> = {};
+
     headers.forEach((header, index) => {
       row[header] = values[index] ?? '';
     });
+
     return row;
   });
 };

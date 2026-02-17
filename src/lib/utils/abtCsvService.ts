@@ -1,12 +1,16 @@
 import { format } from 'date-fns';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { isoDateFromAny } from '@/lib/parsers';
-import { convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
+import { collectColumns, convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
 
-const ABT_COLUMNS = [
-  'id', 'residentName', 'mrn', 'unit', 'room', 'medication', 'indication', 'startDate', 'endDate',
-  'prescriber', 'route', 'frequency', 'dose', 'timeoutReviewDate', 'timeoutOutcome', 'notes',
-  'createdAt', 'updated_at',
+const ABT_PREFERRED_COLUMNS = [
+  'id', 'mrn', 'residentName', 'name', 'unit', 'room', 'status',
+  'medication', 'med_name', 'dose', 'route', 'frequency', 'indication', 'infection_source',
+  'startDate', 'start_date', 'endDate', 'end_date', 'plannedStopDate',
+  'tx_days', 'daysOfTherapy', 'nextReviewDate', 'prescriber',
+  'cultureCollected', 'cultureResult', 'cultureReviewedDate',
+  'timeoutReviewDate', 'timeoutOutcome', 'adverseEffects', 'cdiffRisk',
+  'stewardshipNotes', 'source', 'notes', 'createdAt', 'updated_at',
 ];
 
 const REQUIRED_COLUMNS = ['residentName', 'medication', 'startDate'];
@@ -18,7 +22,8 @@ export const exportABTToCSV = (): void => {
     return;
   }
 
-  const csv = convertToCSV(records, ABT_COLUMNS);
+  const columns = collectColumns(records, ABT_PREFERRED_COLUMNS);
+  const csv = convertToCSV(records, columns);
   downloadCSV(csv, `abt-tracker-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
 };
 
@@ -39,24 +44,41 @@ export const importABTFromCSV = async (file: File | null): Promise<{ newCount: n
 
   const db = loadDB();
   const existing = db.records.abx;
-  const existingIds = new Set(existing.map((record) => record.id));
-  const newCount = rows.filter((record) => !record.id || !existingIds.has(record.id)).length;
-  const updateCount = rows.length - newCount;
+  const preview = summarizeABTChanges(rows, existing as Array<Record<string, unknown>>);
 
   const confirmed = window.confirm(
-    `Import ${rows.length} ABT records?\n\n${newCount} new records\n${updateCount} updates\n\nThis will overwrite matching IDs. Continue?`,
+    `Import ${rows.length} ABT records?\n\n${preview.newCount} new records\n${preview.updateCount} updates\n\nMatching records are updated (not duplicated). Continue?`,
   );
   if (!confirmed) {
     return { newCount: 0, updateCount: 0 };
   }
 
-  const result = upsertABTRecords(rows);
-  return result;
+  return upsertABTRecords(rows);
+};
+
+const summarizeABTChanges = (
+  rows: Array<Record<string, string>>,
+  existing: Array<Record<string, unknown>>,
+): { newCount: number; updateCount: number } => {
+  let newCount = 0;
+  let updateCount = 0;
+
+  rows.forEach((row) => {
+    const normalized = normalizeABTRecord(row);
+    const idx = findABTMatchIndex(existing, normalized);
+    if (idx >= 0) {
+      updateCount += 1;
+    } else {
+      newCount += 1;
+    }
+  });
+
+  return { newCount, updateCount };
 };
 
 const upsertABTRecords = (rows: Array<Record<string, string>>): { newCount: number; updateCount: number } => {
   const db = loadDB();
-  const existing = db.records.abx;
+  const existing = db.records.abx as Array<Record<string, unknown>>;
   const now = new Date().toISOString();
 
   let newCount = 0;
@@ -64,21 +86,51 @@ const upsertABTRecords = (rows: Array<Record<string, string>>): { newCount: numb
 
   rows.forEach((row) => {
     const normalized = normalizeABTRecord(row);
-    const idx = normalized.id ? existing.findIndex((record) => record.id === normalized.id) : -1;
+    const idx = findABTMatchIndex(existing, normalized);
 
     if (idx >= 0) {
-      existing[idx] = { ...existing[idx], ...normalized, updated_at: now };
+      const current = existing[idx];
+      existing[idx] = { ...current, ...normalized, id: String(current.id || normalized.id || generateId()), updated_at: now };
       updateCount += 1;
       return;
     }
 
-    existing.unshift({ ...normalized, id: normalized.id || generateId(), createdAt: now, updated_at: now });
+    existing.unshift({ ...normalized, id: String(normalized.id || generateId()), createdAt: now, updated_at: now });
     newCount += 1;
   });
 
   addAudit(db, 'abx_import_csv', `Imported ABT CSV (${newCount} new, ${updateCount} updated)`, 'abt');
   saveDB(db);
   return { newCount, updateCount };
+};
+
+const findABTMatchIndex = (existing: Array<Record<string, unknown>>, candidate: Record<string, unknown>): number => {
+  const candidateId = String(candidate.id || '').trim();
+  if (candidateId) {
+    const byId = existing.findIndex((record) => String(record.id || '') === candidateId);
+    if (byId >= 0) {
+      return byId;
+    }
+  }
+
+  const signature = buildABTSignature(candidate);
+  if (!signature) {
+    return -1;
+  }
+
+  return existing.findIndex((record) => buildABTSignature(record) === signature);
+};
+
+const buildABTSignature = (record: Record<string, unknown>): string => {
+  const mrn = String(record.mrn || '').trim().toLowerCase();
+  const medication = String(record.medication || record.med_name || '').trim().toLowerCase();
+  const startDate = toISODate(String(record.startDate || record.start_date || ''));
+
+  if (!mrn || !medication || !startDate) {
+    return '';
+  }
+
+  return `${mrn}|${medication}|${startDate}`;
 };
 
 const normalizeABTRecord = (row: Record<string, string>): Record<string, unknown> => ({
@@ -95,7 +147,7 @@ const toISODate = (value?: string): string => {
   if (!value) {
     return '';
   }
-  return isoDateFromAny(value) || '';
+  return isoDateFromAny(value) || value;
 };
 
 const generateId = (): string => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
