@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, Upload, UserX, Filter, Printer, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,16 +16,7 @@ import { SortableTableHeader, useSortableTable } from '@/components/ui/sortable-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
-
-// Helper to escape CSV values
-const escapeCSV = (val: string | number | boolean | null | undefined): string => {
-  if (val === null || val === undefined) return '';
-  const str = String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
-};
+import { exportABTToCSV, importABTFromCSV } from '@/lib/utils/abtCsvService';
 
 const escapeHtml = (value: string | number | boolean | null | undefined): string => {
   if (value === null || value === undefined) return '';
@@ -56,6 +47,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
   const [reviewingRecord, setReviewingRecord] = useState<ABTRecord | null>(null);
   const [db, setDb] = useState(() => loadDB());
   const [currentPage, setCurrentPage] = useState(1);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -266,62 +258,34 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
   };
 
   const handleExport = () => {
-    const headers = [
-      'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Medication', 'Dose', 'Route', 
-      'Frequency', 'Indication', 'Infection Source', 'Start Date', 'End Date', 
-      'Planned Stop Date', 'Status', 'Days of Therapy', 'Next Review Date', 
-      'Prescriber', 'Culture Collected', 'Culture Result', 'Culture Reviewed Date',
-      'Timeout Review Date', 'Timeout Outcome', 'Adverse Effects', 'C.diff Risk',
-      'Stewardship Notes', 'Notes', 'Created At', 'Updated At', 'Source'
-    ];
-    
-    const rows = records.map(r => [
-      escapeCSV(r.id),
-      escapeCSV(r.mrn),
-      escapeCSV(r.residentName || r.name),
-      escapeCSV(r.unit),
-      escapeCSV(r.room),
-      escapeCSV(r.medication || r.med_name),
-      escapeCSV(r.dose),
-      escapeCSV(r.route),
-      escapeCSV(r.frequency),
-      escapeCSV(r.indication),
-      escapeCSV(r.infection_source),
-      escapeCSV(r.startDate || r.start_date),
-      escapeCSV(r.endDate || r.end_date),
-      escapeCSV(r.plannedStopDate),
-      escapeCSV(r.status),
-      escapeCSV(getNormalizedTxDays(r)),
-      escapeCSV(r.nextReviewDate),
-      escapeCSV(r.prescriber),
-      escapeCSV(r.cultureCollected),
-      escapeCSV(r.cultureResult),
-      escapeCSV(r.cultureReviewedDate),
-      escapeCSV(r.timeoutReviewDate),
-      escapeCSV(r.timeoutOutcome),
-      escapeCSV(r.adverseEffects),
-      escapeCSV(r.cdiffRisk),
-      escapeCSV(r.stewardshipNotes),
-      escapeCSV(r.notes),
-      escapeCSV(r.createdAt),
-      escapeCSV(r.updated_at),
-      escapeCSV(r.source)
-    ].join(','));
-    
     recordWorkflowMetric({
       eventName: 'workflow_report_quick_run',
       view: 'abt',
-      metadata: { caseType: 'abt', reportType: 'abt_export_csv', resultCount: rows.length },
+      metadata: { caseType: 'abt', reportType: 'abt_export_csv', resultCount: records.length },
     });
+    exportABTToCSV();
+  };
 
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `abt_records_${todayISO()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleCsvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    try {
+      const result = await importABTFromCSV(file);
+      if (result.newCount > 0 || result.updateCount > 0) {
+        setDb(loadDB());
+        toast({ title: 'ABT CSV import complete', description: `${result.newCount} new, ${result.updateCount} updated.` });
+      }
+    } catch (error) {
+      toast({
+        title: 'ABT CSV import failed',
+        description: error instanceof Error ? error.message : 'Unable to parse CSV file.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePrintFilteredView = () => {
@@ -435,7 +399,18 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
+          </Button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleCsvImport}
+          />
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrintFilteredView}>
             <Printer className="w-4 h-4 mr-2" />
@@ -443,7 +418,7 @@ const ABTView = ({ onNavigate, initialStatusFilter }: ABTViewProps) => {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Upload className="w-4 h-4 mr-2" />
-            Import
+            Import Wizard
           </Button>
           <Button size="sm" onClick={() => { setEditingRecord(null); setShowCaseModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />

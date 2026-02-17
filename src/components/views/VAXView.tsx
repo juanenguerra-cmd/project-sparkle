@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Check, X, Upload, Trash2, RotateCcw, Printer, AlertTriangle, BookOpen, Flame, ChevronLeft, ChevronRight, ClipboardCopy, CalendarCheck2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +18,8 @@ import { getReofferCandidates, ReofferCandidate, getReofferSummary } from '@/lib
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SortableTableHeader, SortDirection } from '@/components/ui/sortable-table-header';
-import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
+import { isoDateFromAny, mrnMatchKeys } from '@/lib/parsers';
+import { exportVaxToCSV, importVaxFromCSV } from '@/lib/utils/vaxCsvService';
 
 type VAXFilter = 'all' | 'due' | 'overdue' | 'given' | 'declined' | 'reoffer';
 
@@ -55,6 +56,7 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [fromDateFilter, setFromDateFilter] = useState('');
   const [toDateFilter, setToDateFilter] = useState('');
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
 
   useEffect(() => {
@@ -342,46 +344,29 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
   };
 
   const handleExport = () => {
-    const headers = [
-      'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Vaccine', 'Dose', 'Status',
-      'Date Given', 'Due Date', 'Next Due Date', 'Offer Date', 'Education Provided',
-      'Education Date', 'Education Outcome', 'Manufacturer', 'Lot Number',
-      'Administration Site', 'Decline Reason', 'Consent Form Attached', 'Notes', 'Created At'
-    ];
-    
-    const rows = records.map(r => [
-      escapeCSV(r.id),
-      escapeCSV(r.mrn),
-      escapeCSV(r.residentName || r.name),
-      escapeCSV(r.unit),
-      escapeCSV(r.room),
-      escapeCSV(r.vaccine || r.vaccine_type),
-      escapeCSV(r.dose),
-      escapeCSV(r.status),
-      escapeCSV(r.dateGiven || r.date_given),
-      escapeCSV(r.dueDate || r.due_date),
-      escapeCSV(r.nextDueDate),
-      escapeCSV(r.offerDate),
-      escapeCSV(r.educationProvided),
-      escapeCSV(r.educationDate),
-      escapeCSV(r.educationOutcome),
-      escapeCSV(r.manufacturer),
-      escapeCSV(r.lotNumber),
-      escapeCSV(r.administrationSite),
-      escapeCSV(r.declineReason),
-      escapeCSV(r.consentFormAttached),
-      escapeCSV(r.notes),
-      escapeCSV(r.createdAt)
-    ].join(','));
-    
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `vax_records_${todayISO()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportVaxToCSV();
+  };
+
+  const handleCsvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    try {
+      const result = await importVaxFromCSV(file);
+      if (result.newCount > 0 || result.updateCount > 0) {
+        setDb(loadDB());
+        toast({ title: 'Vaccination CSV import complete', description: `${result.newCount} new, ${result.updateCount} updated.` });
+      }
+    } catch (error) {
+      toast({
+        title: 'Vaccination CSV import failed',
+        description: error instanceof Error ? error.message : 'Unable to parse CSV file.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePrintReofferList = () => {
@@ -598,15 +583,26 @@ const VAXView = ({ initialStatusFilter }: VAXViewProps) => {
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrintFiltered}>
             <Printer className="w-4 h-4 mr-2" />
             Print Filtered
           </Button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleCsvImport}
+          />
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
             <Upload className="w-4 h-4 mr-2" />
-            Import
+            Import Wizard
           </Button>
           <Button size="sm" onClick={() => { setEditingRecord(null); setShowCaseModal(true); }}>
             <Plus className="w-4 h-4 mr-2" />

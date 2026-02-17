@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, RefreshCw, Download, Search, Eye, Edit, Trash2, AlertTriangle, Upload, UserX, ArrowUpDown, ArrowUp, ArrowDown, Filter, Printer, FileText, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { isoDateFromAny, mrnMatchKeys, todayISO } from '@/lib/parsers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TablePagination from '@/components/ui/table-pagination';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
+import { exportIPToCSV, importIPFromCSV } from '@/lib/utils/ipCsvService';
 import InfectionControlMonthlyReport from '@/components/reports/InfectionControlMonthlyReport';
 
 type IPFilter = 'all' | 'active' | 'ebp' | 'isolation' | 'standard' | 'resolved';
@@ -54,6 +55,7 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   const [fromDateFilter, setFromDateFilter] = useState('');
   const [toDateFilter, setToDateFilter] = useState('');
   const [showMonthlyReport, setShowMonthlyReport] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -406,63 +408,36 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
   };
 
   const handleExport = () => {
-    const headers = [
-      'ID', 'MRN', 'Resident Name', 'Unit', 'Room', 'Infection Type', 'Protocol',
-      'Isolation Type', 'Source of Infection', 'Onset Date', 'Resolution Date',
-      'Status', 'Next Review Date', 'Last Review Date', 'Review Notes',
-      'Trigger Reason', 'High Contact Care', 'Signage Posted', 'Supplies Stocked',
-      'Room Check Date', 'Exposure Linked', 'Outbreak ID', 'Required PPE',
-      'NHSN Pathogen Code', 'Vaccine Status', 'Staff Assignments', 'Close Contacts',
-      'Common Areas Visited', 'Shared Equipment', 'Other Equipment',
-      'Auto Closed', 'Auto Closed Reason', 'Notes', 'Created At'
-    ];
-    
-    const rows = records.map(r => [
-      escapeCSV(r.id),
-      escapeCSV(r.mrn),
-      escapeCSV(r.residentName || r.name),
-      escapeCSV(r.unit),
-      escapeCSV(r.room),
-      escapeCSV(r.infectionType || r.infection_type),
-      escapeCSV(r.protocol),
-      escapeCSV(r.isolationType || r.isolation_type),
-      escapeCSV(r.sourceOfInfection || r.source_of_infection),
-      escapeCSV(r.onsetDate || r.onset_date),
-      escapeCSV(r.resolutionDate || r.resolution_date),
-      escapeCSV(r.status),
-      escapeCSV(r.nextReviewDate || r.next_review_date),
-      escapeCSV(r.lastReviewDate),
-      escapeCSV(r.reviewNotes),
-      escapeCSV(r.triggerReason),
-      escapeCSV(r.highContactCare?.join('; ')),
-      escapeCSV(r.signagePosted),
-      escapeCSV(r.suppliesStocked),
-      escapeCSV(r.roomCheckDate),
-      escapeCSV(r.exposureLinked),
-      escapeCSV(r.outbreakId),
-      escapeCSV(r.requiredPPE),
-      escapeCSV(r.nhsnPathogenCode),
-      escapeCSV(r.vaccineStatus),
-      escapeCSV(r.staffAssignments),
-      escapeCSV(r.closeContacts),
-      escapeCSV(r.commonAreasVisited?.join('; ')),
-      escapeCSV(r.sharedEquipment?.join('; ')),
-      escapeCSV(r.otherEquipment),
-      escapeCSV(r._autoClosed),
-      escapeCSV(r._autoClosedReason),
-      escapeCSV(r.notes),
-      escapeCSV(r.createdAt)
-    ].join(','));
-    
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ip_cases_${todayISO()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    recordWorkflowMetric({
+      eventName: 'workflow_report_quick_run',
+      view: 'ip',
+      metadata: { caseType: 'ip', reportType: 'ip_export_csv', resultCount: records.length },
+    });
+    exportIPToCSV();
   };
+
+  const handleCsvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    try {
+      const result = await importIPFromCSV(file);
+      if (result.newCount > 0 || result.updateCount > 0) {
+        setDb(loadDB());
+        toast({ title: 'IP CSV import complete', description: `${result.newCount} new, ${result.updateCount} updated.` });
+      }
+    } catch (error) {
+      toast({
+        title: 'IP CSV import failed',
+        description: error instanceof Error ? error.message : 'Unable to parse CSV file.',
+        variant: 'destructive',
+      });
+    }
+  };
+
 
 
   const downloadIpSubsetReport = (reportType: 'pathogen' | 'source', reportValue: string) => {
@@ -578,7 +553,18 @@ const IPView = ({ onNavigate, initialStatusFilter }: IPViewProps) => {
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Export
+            Export CSV
+          </Button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleCsvImport}
+          />
+          <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import CSV
           </Button>
           <Button variant="outline" size="sm" onClick={handlePrintFiltered}>
             <Printer className="w-4 h-4 mr-2" />
