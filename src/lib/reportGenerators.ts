@@ -2088,16 +2088,14 @@ export const generateNewAdmissionScreeningReport = (
       if (!r.active_on_census) return false;
       const admitDate = r.admitDate;
       if (!admitDate) return false;
-      try {
-        const admit = parseISO(admitDate);
-        return admit >= cutoffDate;
-      } catch {
-        return false;
-      }
+      const admit = parseDateValue(admitDate);
+      return !!admit && admit >= cutoffDate;
     })
     .sort((a, b) => {
-      const dateA = parseISO(a.admitDate || '');
-      const dateB = parseISO(b.admitDate || '');
+      const dateA = parseDateValue(a.admitDate);
+      const dateB = parseDateValue(b.admitDate);
+      if (!dateA) return 1;
+      if (!dateB) return -1;
       return dateB.getTime() - dateA.getTime();
     });
   
@@ -2106,7 +2104,8 @@ export const generateNewAdmissionScreeningReport = (
     .filter((resident) => !db.records.ip_cases.some((c) => c.mrn === resident.mrn))
     .map(resident => {
       const admitDate = resident.admitDate || '';
-      const daysSinceAdmit = differenceInDays(today, parseISO(admitDate));
+      const parsedAdmitDate = parseDateValue(admitDate);
+      const daysSinceAdmit = parsedAdmitDate ? differenceInDays(today, parsedAdmitDate) : 0;
 
       const screeningStatus = daysSinceAdmit > 3 ? '⚠️ OVERDUE' : 'PENDING';
       const screeningNotes = daysSinceAdmit > 3
@@ -2118,7 +2117,7 @@ export const generateNewAdmissionScreeningReport = (
         resident.name,
         resident.mrn,
         resident.unit,
-        format(parseISO(admitDate), 'MM/dd/yyyy'),
+        parsedAdmitDate ? format(parsedAdmitDate, 'MM/dd/yyyy') : '',
         `${daysSinceAdmit} days`,
         screeningStatus,
         screeningNotes
