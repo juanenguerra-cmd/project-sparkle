@@ -175,6 +175,10 @@ export interface DailyIpBinderData {
 
 const asOfDate = (date: string): string => date || new Date().toISOString().slice(0, 10);
 
+const isObjectRecord = <T>(value: T | null | undefined): value is T => (
+  value !== null && typeof value === 'object'
+);
+
 const residentName = (resident: Resident): string => resident.name || 'Unknown';
 
 const resolveDeclinedDate = (record: VaxRecord): string => {
@@ -228,11 +232,18 @@ export const getDailyIpBinderData = (
   { date, unitId }: DailyIpBinderParams,
 ): DailyIpBinderData => {
   const reportDate = asOfDate(date);
-  const residents = Object.values(db.census.residentsByMrn || {});
+  const residents = Object.values(db.census?.residentsByMrn || {}).filter(isObjectRecord<Resident>);
   const residentsInScope = residents.filter((resident) => isResidentInScope(resident, unitId));
   const residentsByMrn = new Map(residentsInScope.map((resident) => [resident.mrn, resident]));
 
-  const activeIpCases = (db.records.ip_cases || []).filter((ipCase) => {
+  const ipCases = (db.records?.ip_cases || []).filter(isObjectRecord<IPCase>);
+  const outbreaks = (db.records?.outbreaks || []).filter(isObjectRecord<Outbreak>);
+  const lineListings = (db.records?.line_listings || []).filter(isObjectRecord);
+  const vaxRecords = (db.records?.vax || []).filter(isObjectRecord<VaxRecord>);
+  const abxRecords = (db.records?.abx || []).filter(isObjectRecord);
+  const notes = (db.records?.notes || []).filter(isObjectRecord);
+
+  const activeIpCases = ipCases.filter((ipCase) => {
     const normalizedStatus = normalizeIPStatus(ipCase.status || ipCase.case_status);
     if (normalizedStatus !== 'active') return false;
     if (!residentsByMrn.has(ipCase.mrn)) return false;
@@ -240,23 +251,23 @@ export const getDailyIpBinderData = (
     return !onsetDate || onsetDate <= reportDate;
   });
 
-  const outbreaksForUnit = (db.records.outbreaks || []).filter((outbreak) => {
+  const outbreaksForUnit = outbreaks.filter((outbreak) => {
     const affectedUnits = getAffectedUnits(outbreak);
     return unitId === 'all' || affectedUnits.includes(unitId);
   });
 
-  const outbreakCases = (db.records.line_listings || []).filter((entry) => {
+  const outbreakCases = lineListings.filter((entry) => {
     const resident = residentsByMrn.get(entry.mrn);
     return Boolean(resident) && (entry.onsetDate || '') <= reportDate;
   });
 
-  const vaccines = (db.records.vax || []).filter((record) => residentsByMrn.has(record.mrn));
+  const vaccines = vaxRecords.filter((record) => residentsByMrn.has(record.mrn));
 
-  const prophylaxis = (db.records.abx || [])
+  const prophylaxis = abxRecords
     .filter((record) => residentsByMrn.has(record.mrn))
     .filter((record) => /prophy/i.test(record.indication || ''));
 
-  const actionItems = (db.records.notes || [])
+  const actionItems = notes
     .filter((note) => 'followUpStatus' in note && (note.followUpStatus === 'pending' || note.followUpStatus === 'escalated'))
     .filter((note) => residentsByMrn.has(note.mrn));
 
