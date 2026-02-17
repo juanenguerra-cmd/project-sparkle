@@ -134,4 +134,29 @@ describe('daily ip binder data', () => {
     expect(report.sections?.[0].title).toBe('1. Census & Risk Overview');
     expect(report.sections?.[9].title).toBe('10. Action Items & IP Notes');
   });
+
+  it('handles malformed outbreak affectedUnits without throwing', () => {
+    const db = createDb();
+    const malformedOutbreak = {
+      id: 'out-2',
+      name: 'Malformed outbreak',
+      type: 'Influenza',
+      status: 'active',
+      affectedUnits: undefined,
+      startDate: '2026-03-10',
+    } as unknown as (typeof db.records.outbreaks)[number];
+
+    db.records.outbreaks.push(malformedOutbreak);
+
+    expect(() => getDailyIpBinderData(db, { date: '2026-03-10', unitId: 'all' })).not.toThrow();
+  });
+
+  it('falls back to raw filter date when binder report date is invalid', () => {
+    const db = createDb();
+
+    expect(() => generateDailyIpBinderReport(db, 'not-a-date', 'Unit A')).not.toThrow();
+    const report = generateDailyIpBinderReport(db, 'not-a-date', 'Unit A');
+    expect(report.filters.date).toBe('not-a-date');
+  });
+
 });
