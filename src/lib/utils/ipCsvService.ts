@@ -2,20 +2,7 @@ import { format } from 'date-fns';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
 import { isoDateFromAny } from '@/lib/parsers';
 import { collectColumns, convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
-
-const IP_PREFERRED_COLUMNS = [
-  'id', 'mrn', 'residentName', 'name', 'unit', 'room', 'status', 'case_status',
-  'infectionType', 'infection_type', 'protocol', 'isolationType', 'isolation_type',
-  'sourceOfInfection', 'source_of_infection', 'pathogen', 'organism',
-  'onsetDate', 'onset_date', 'precautionStartDate', 'resolutionDate', 'resolution_date',
-  'nextReviewDate', 'next_review_date', 'lastReviewDate', 'reviewNotes',
-  'triggerReason', 'highContactCare', 'signagePosted', 'suppliesStocked', 'roomCheckDate',
-  'exposureLinked', 'outbreakId', 'requiredPPE', 'nhsnPathogenCode', 'vaccineStatus',
-  'staffAssignments', 'closeContacts', 'commonAreasVisited', 'sharedEquipment', 'otherEquipment',
-  '_autoClosed', '_autoClosedReason', 'notes', 'createdAt', 'updatedAt',
-];
-
-const REQUIRED_COLUMNS = ['residentName', 'infectionType', 'onsetDate'];
+import { getMissingColumnGroups, IP_REQUIRED_COLUMN_GROUPS, IP_TRACKER_COLUMNS } from '@/lib/utils/trackerFieldMaps';
 const ARRAY_FIELDS = ['highContactCare', 'commonAreasVisited', 'sharedEquipment'];
 
 export const exportIPToCSV = (): void => {
@@ -25,7 +12,7 @@ export const exportIPToCSV = (): void => {
     return;
   }
 
-  const columns = collectColumns(records, IP_PREFERRED_COLUMNS);
+  const columns = collectColumns(records, [...IP_TRACKER_COLUMNS]);
   const csv = convertToCSV(records, columns);
   downloadCSV(csv, `ip-tracker-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
 };
@@ -40,7 +27,7 @@ export const importIPFromCSV = async (file: File | null): Promise<{ newCount: nu
     throw new Error('CSV file is empty.');
   }
 
-  const missingColumns = REQUIRED_COLUMNS.filter((column) => !(column in rows[0]));
+  const missingColumns = getMissingColumnGroups(rows[0], IP_REQUIRED_COLUMN_GROUPS);
   if (missingColumns.length > 0) {
     throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
   }
@@ -140,6 +127,7 @@ const normalizeIPRecord = (row: Record<string, string>): Record<string, unknown>
   const normalized: Record<string, unknown> = {
     ...row,
     id: row.id || '',
+    record_id: row.record_id || row.id || '',
     residentName: row.residentName || row.name || '',
     infectionType: row.infectionType || row.infection_type || '',
     sourceOfInfection: row.sourceOfInfection || row.source_of_infection || '',
