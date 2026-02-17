@@ -130,6 +130,53 @@
         break-before: page;
       }
 
+      .no-print-controls {
+        border: 1px solid #777;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .control-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .control-grid label {
+        display: block;
+        font-size: 9pt;
+        margin-bottom: 2px;
+      }
+
+      .control-grid input,
+      .control-grid select,
+      .control-grid button {
+        width: 100%;
+        border: 1px solid #666;
+        padding: 5px 7px;
+        font-size: 10pt;
+      }
+
+      .auto-note {
+        font-size: 9pt;
+        color: #333;
+        margin: 5px 0 0;
+      }
+
+      .auto-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+        font-size: 9.5pt;
+      }
+
+      .auto-table th,
+      .auto-table td {
+        border: 1px solid #666;
+        padding: 4px 6px;
+        vertical-align: top;
+      }
+
       @media screen {
         body {
           padding: 12px;
@@ -144,6 +191,11 @@
         body {
           padding: 0;
         }
+
+        .no-print-controls {
+          display: none;
+        }
+
         .report {
           border: none;
           padding: 0;
@@ -153,19 +205,52 @@
   </head>
   <body>
     <main class="report">
+      <section class="no-print-controls">
+        <div class="control-grid">
+          <div>
+            <label for="reportDate">Report date</label>
+            <input id="reportDate" type="date" />
+          </div>
+          <div>
+            <label for="unitSelect">Unit</label>
+            <select id="unitSelect"></select>
+          </div>
+          <div>
+            <label for="facilityInput">Facility Name</label>
+            <input
+              id="facilityInput"
+              type="text"
+              placeholder="[ENTER FACILITY NAME]"
+            />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button id="autofillButton" type="button">
+              Auto-fill from Active Records
+            </button>
+          </div>
+        </div>
+        <p class="auto-note">
+          Auto-fill reads from <strong>UNIFIED_DB_V1</strong> (ip_cases, abx,
+          vax). If unavailable, placeholders remain for manual completion.
+        </p>
+      </section>
+
       <header class="header">
         <div class="header-grid">
           <div>
             <strong>Facility Name:</strong>
-            <span class="placeholder">[ENTER FACILITY NAME]</span>
+            <span class="placeholder" id="facilityName"
+              >[ENTER FACILITY NAME]</span
+            >
           </div>
           <div>
             <strong>Unit (if applicable):</strong>
-            <span class="placeholder">[ENTER UNIT]</span>
+            <span class="placeholder" id="unitName">[ENTER UNIT]</span>
           </div>
           <div>
             <strong>Date of Report:</strong>
-            <span class="placeholder">[ENTER DATE]</span>
+            <span class="placeholder" id="dateOfReport">[ENTER DATE]</span>
           </div>
           <div>
             <strong>Prepared By:</strong>
@@ -236,6 +321,28 @@
             2. Isolation, Enhanced Barrier Precautions (EBP) &amp;
             Transmission-Based Precautions
           </h3>
+          <div class="item">
+            • Auto-populated active precautions snapshot:
+            <span class="placeholder" id="autoPrecautionsSummary"
+              >[N/A IF NONE]</span
+            >
+          </div>
+          <table class="auto-table" id="precautionsTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Room</th>
+                <th>Unit</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
           <div class="item">
             • New transmission-based precautions initiated today:
             <span class="placeholder">[YES/NO]</span>
@@ -309,6 +416,26 @@
         <div class="subsection">
           <h3>4. Antibiotic Stewardship Activity</h3>
           <div class="item">
+            • Auto-populated new antibiotic starts (selected date):
+            <span class="placeholder" id="autoAbxStarts">[NUMBER / NONE]</span>
+          </div>
+          <table class="auto-table" id="abxTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Unit</th>
+                <th>Medication</th>
+                <th>Indication</th>
+                <th>Start Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="item">
             • New antibiotic starts today:
             <span class="placeholder">[NUMBER / NONE]</span>
           </div>
@@ -344,6 +471,28 @@
 
         <div class="subsection">
           <h3>5. Immunization Program Activity</h3>
+          <div class="item">
+            • Auto-populated vaccines administered today:
+            <span class="placeholder" id="autoVaccineCount"
+              >[DESCRIBE OR NONE]</span
+            >
+          </div>
+          <table class="auto-table" id="vaccineTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Unit</th>
+                <th>Vaccine</th>
+                <th>Status</th>
+                <th>Date Given</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
           <div class="item">
             • Vaccines administered today:
             <span class="placeholder">[DESCRIBE OR NONE]</span>
@@ -755,5 +904,236 @@
         </div>
       </section>
     </main>
+
+    <script>
+      function safeParse(raw, fallback) {
+        try {
+          return JSON.parse(raw);
+        } catch (_err) {
+          return fallback;
+        }
+      }
+
+      function toISODate(value) {
+        if (!value) return null;
+        if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
+          return value;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      }
+
+      function pick(record, keys) {
+        for (const key of keys) {
+          if (
+            record &&
+            record[key] !== undefined &&
+            record[key] !== null &&
+            String(record[key]).trim() !== ""
+          ) {
+            return record[key];
+          }
+        }
+        return null;
+      }
+
+      function inferStartDate(record) {
+        return toISODate(
+          pick(record, [
+            "onsetDate",
+            "precautionStartDate",
+            "initiationDate",
+            "startDate",
+          ]),
+        );
+      }
+
+      function inferEndDate(record) {
+        return toISODate(
+          pick(record, [
+            "resolutionDate",
+            "precautionEndDate",
+            "dischargeDate",
+            "endDate",
+          ]),
+        );
+      }
+
+      function getUnit(record) {
+        return String(
+          pick(record, ["unit", "unitId", "locationUnit"]) || "",
+        ).trim();
+      }
+
+      function unitMatch(record, selectedUnit) {
+        if (selectedUnit === "facility") return true;
+        return getUnit(record) === selectedUnit;
+      }
+
+      function isActiveOnDate(record, reportDate) {
+        const startDate = inferStartDate(record);
+        const endDate = inferEndDate(record);
+        if (!startDate || startDate > reportDate) return false;
+        if (!endDate) return true;
+        return endDate >= reportDate;
+      }
+
+      function writeRows(tableId, rows, fallbackColspan) {
+        const body = document.querySelector(`#${tableId} tbody`);
+        if (!body) return;
+        if (!rows.length) {
+          body.innerHTML = `<tr><td colspan="${fallbackColspan}">[SEE ATTACHED LOG / N/A]</td></tr>`;
+          return;
+        }
+        body.innerHTML = rows
+          .map(
+            (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`,
+          )
+          .join("");
+      }
+
+      function collectUnits(db) {
+        const units = new Set(["facility"]);
+        [
+          db.records?.ip_cases || [],
+          db.records?.abx || [],
+          db.records?.vax || [],
+        ].forEach((list) => {
+          list.forEach((record) => {
+            const unit = getUnit(record);
+            if (unit) units.add(unit);
+          });
+        });
+        return Array.from(units);
+      }
+
+      function normalize(db) {
+        return {
+          records: {
+            ip_cases: Array.isArray(db?.records?.ip_cases)
+              ? db.records.ip_cases
+              : [],
+            abx: Array.isArray(db?.records?.abx) ? db.records.abx : [],
+            vax: Array.isArray(db?.records?.vax) ? db.records.vax : [],
+          },
+        };
+      }
+
+      function applyAutoFill() {
+        const db = normalize(
+          safeParse(localStorage.getItem("UNIFIED_DB_V1"), {}),
+        );
+        const reportDate =
+          document.getElementById("reportDate").value || toISODate(new Date());
+        const selectedUnit =
+          document.getElementById("unitSelect").value || "facility";
+        const facilityValue = document
+          .getElementById("facilityInput")
+          .value.trim();
+
+        document.getElementById("facilityName").textContent =
+          facilityValue || "[ENTER FACILITY NAME]";
+        document.getElementById("unitName").textContent =
+          selectedUnit === "facility" ? "Facility (All Units)" : selectedUnit;
+        document.getElementById("dateOfReport").textContent =
+          reportDate || "[ENTER DATE]";
+
+        const activePrecautions = db.records.ip_cases.filter(
+          (record) =>
+            unitMatch(record, selectedUnit) &&
+            isActiveOnDate(record, reportDate),
+        );
+        const newAbx = db.records.abx.filter(
+          (record) =>
+            unitMatch(record, selectedUnit) &&
+            toISODate(pick(record, ["startDate", "orderDate", "createdAt"])) ===
+              reportDate,
+        );
+        const vaxGiven = db.records.vax.filter((record) => {
+          const status = String(pick(record, ["status"]) || "").toLowerCase();
+          return (
+            unitMatch(record, selectedUnit) &&
+            status === "given" &&
+            toISODate(
+              pick(record, ["dateGiven", "givenDate", "administrationDate"]),
+            ) === reportDate
+          );
+        });
+
+        document.getElementById("autoPrecautionsSummary").textContent =
+          activePrecautions.length
+            ? `${activePrecautions.length} active case(s)`
+            : "[N/A IF NONE]";
+        document.getElementById("autoAbxStarts").textContent = newAbx.length
+          ? String(newAbx.length)
+          : "[NUMBER / NONE]";
+        document.getElementById("autoVaccineCount").textContent =
+          vaxGiven.length
+            ? `${vaxGiven.length} dose(s) documented`
+            : "[DESCRIBE OR NONE]";
+
+        writeRows(
+          "precautionsTable",
+          activePrecautions.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            pick(record, ["room", "roomNumber", "location"]) || "[N/A IF NONE]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["precautionType", "isolationType", "protocol"]) ||
+              "[CHECK IF APPLICABLE]",
+            inferEndDate(record) ? "Closed" : "Active",
+          ]),
+          5,
+        );
+
+        writeRows(
+          "abxTable",
+          newAbx.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["antibiotic", "medication", "drug"]) ||
+              "[DESCRIBE ACTION TAKEN]",
+            pick(record, ["indication", "reason", "diagnosis"]) ||
+              "[N/A IF NONE]",
+            toISODate(pick(record, ["startDate", "orderDate", "createdAt"])) ||
+              "[N/A IF NONE]",
+          ]),
+          5,
+        );
+
+        writeRows(
+          "vaccineTable",
+          vaxGiven.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["vaccineType", "vaccine", "type"]) || "[N/A IF NONE]",
+            pick(record, ["status"]) || "given",
+            toISODate(
+              pick(record, ["dateGiven", "givenDate", "administrationDate"]),
+            ) || "[N/A IF NONE]",
+          ]),
+          5,
+        );
+      }
+
+      (function initAutoFill() {
+        const unitSelect = document.getElementById("unitSelect");
+        const reportDate = document.getElementById("reportDate");
+        const db = normalize(
+          safeParse(localStorage.getItem("UNIFIED_DB_V1"), {}),
+        );
+        const units = collectUnits(db);
+        unitSelect.innerHTML = units
+          .map(
+            (unit) =>
+              `<option value="${unit}">${unit === "facility" ? "Facility (All Units)" : unit}</option>`,
+          )
+          .join("");
+        reportDate.value = toISODate(new Date());
+        document
+          .getElementById("autofillButton")
+          .addEventListener("click", applyAutoFill);
+        applyAutoFill();
+      })();
+    </script>
   </body>
 </html>
