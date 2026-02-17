@@ -177,6 +177,15 @@ const asOfDate = (date: string): string => date || new Date().toISOString().slic
 
 const residentName = (resident: Resident): string => resident.name || 'Unknown';
 
+const resolveDeclinedDate = (record: VaxRecord): string => {
+  const withExtendedDates = record as VaxRecord & { dateDeclined?: string; dateOffered?: string };
+  return withExtendedDates.dateDeclined
+    || record.offerDate
+    || withExtendedDates.dateOffered
+    || record.educationDate
+    || '';
+};
+
 const isResidentInScope = (resident: Resident, unitId: string): boolean => (
   resident.active_on_census && (unitId === 'all' || resident.unit === unitId)
 );
@@ -220,8 +229,8 @@ export const getDailyIpBinderData = (
   const residentsByMrn = new Map(residentsInScope.map((resident) => [resident.mrn, resident]));
 
   const activeIpCases = (db.records.ip_cases || []).filter((ipCase) => {
-    const normalizedStatus = normalizeIPStatus(ipCase);
-    if (normalizedStatus !== 'Active') return false;
+    const normalizedStatus = normalizeIPStatus(ipCase.status || ipCase.case_status);
+    if (normalizedStatus !== 'active') return false;
     if (!residentsByMrn.has(ipCase.mrn)) return false;
     const onsetDate = ipCase.onsetDate || ipCase.onset_date;
     return !onsetDate || onsetDate <= reportDate;
@@ -295,7 +304,7 @@ export const getDailyIpBinderData = (
       residentName: record.residentName || record.name || residentsByMrn.get(record.mrn)?.name || 'Unknown',
       vaccine: record.vaccine || record.vaccine_type || '',
       lastDoseDate: record.dateGiven || record.date_given || '',
-      declinedDate: record.status === 'declined' ? (record.offerDate || record.educationDate || '') : '',
+      declinedDate: record.status === 'declined' ? resolveDeclinedDate(record) : '',
       declineReason: record.declineReason || record.decline_reason || '',
       educationProvided: record.educationProvided ? 'Yes' : 'No',
       dueOverdueStatus: record.status,
