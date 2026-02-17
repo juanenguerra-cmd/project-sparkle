@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily IP + Unit Binder Reports Module</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card: #ffffff;
+      --ink: #111827;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --line-dark: #9ca3af;
+      --warn-bg: #fef3c7;
+      --warn-border: #f59e0b;
+      --radius-xl: 16px;
+      --radius-full: 999px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: CameraPlainVariable, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+
+    .app {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .surface {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      padding: 14px;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+    }
+
+    .warning {
+      border: 1px solid var(--warn-border);
+      background: var(--warn-bg);
+      border-radius: 12px;
+      padding: 10px;
+      display: none;
+      font-size: 14px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+      align-items: end;
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input, select, button {
+      width: 100%;
+      border: 1px solid var(--line-dark);
+      border-radius: var(--radius-full);
+      padding: 9px 12px;
+      background: white;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .report {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 240px;
+      overflow: auto;
+    }
+
+    .print-area .page {
+      min-height: 10.1in;
+      break-after: page;
+      page-break-after: always;
+      padding: 2px;
+    }
+
+    .print-area .page:last-child {
+      break-after: auto;
+      page-break-after: auto;
+    }
+
+    .header-block {
+      border: 1px solid #111;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    .header-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px 14px;
+      font-size: 14px;
+    }
+
+    .sec {
+      border-top: 1px solid var(--line-dark);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    .line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px dotted #d1d5db;
+      margin: 4px 0;
+      font-size: 14px;
+    }
+
+    .v { font-weight: 700; }
+
+    .hand {
+      border-bottom: 1px solid #374151;
+      min-height: 22px;
+      margin-top: 6px;
+    }
+
+    .small { font-size: 12px; color: #374151; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      z-index: 1;
+    }
+
+    th, td {
+      border: 1px solid var(--line-dark);
+      padding: 6px;
+      text-align: left;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f9fafb;
+    }
+
+    @media print {
+      @page { size: Letter; margin: 0.5in; }
+      body { background: #fff; color: #000; font-size: 12pt; }
+      .no-print { display: none !important; }
+      .app, .surface { padding: 0; margin: 0; border: none; box-shadow: none; }
+      .report { border: none; padding: 0; }
+      .print-area .page { min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="warningBanner" class="warning no-print"></div>
+
+    <section class="surface no-print">
+      <h1 style="margin:0 0 8px;">Daily IP + Unit Binder Reports</h1>
+      <div class="controls">
+        <div>
+          <label for="reportDate">Report Date</label>
+          <input id="reportDate" type="date" />
+        </div>
+        <div>
+          <label for="unitSelect">Unit</label>
+          <select id="unitSelect"></select>
+        </div>
+        <div>
+          <label for="facilityName">Facility</label>
+          <input id="facilityName" type="text" placeholder="[ENTER FACILITY NAME]" />
+        </div>
+        <div>
+          <label for="preparedBy">Prepared by</label>
+          <input id="preparedBy" type="text" placeholder="[ENTER NAME/TITLE]" />
+        </div>
+        <div>
+          <label for="reviewedBy">Reviewed by</label>
+          <input id="reviewedBy" type="text" placeholder="[ENTER NAME/TITLE]" />
+        </div>
+        <div>
+          <label for="timeoutHours">ABX timeout hours</label>
+          <input id="timeoutHours" type="number" value="72" min="48" max="72" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="btnIP">Generate IP Nurse Report</button>
+        <button id="btnUnit">Generate Unit Report</button>
+        <button id="btnBoth">Generate Both</button>
+        <button id="btnSave">Save Daily Metrics</button>
+        <button id="btnPrint">Print</button>
+      </div>
+    </section>
+
+    <section class="surface">
+      <h2 style="margin-top:0;" class="no-print">Report Preview</h2>
+      <div id="reportPreview" class="report print-area"></div>
+    </section>
+
+    <section class="surface no-print">
+      <h2 style="margin-top:0;">Weekly Summary Preview (Last 7 Days)</h2>
+      <div id="weeklySummary"></div>
+    </section>
+
+    <section class="surface no-print">
+      <details>
+        <summary>About / Debug</summary>
+        <div id="debugPanel" class="small"></div>
+      </details>
+    </section>
+  </div>
+
+  <script>
+    const APP_ID = 'unified.daily-ip-unit-binder.module';
+    const BUILD_TAG = '2026.02.17-r2';
+    const SCHEMA_VERSION_COMPAT_MIN = '1.0.0';
+    const SCHEMA_VERSION_COMPAT_MAX = '9.9.9';
+    const CAPABILITIES_REQUIRED = ['UNIFIED_DB_V1', 'RECORDS_IP', 'RECORDS_ABX', 'RECORDS_VAX'];
+    const CAPABILITIES_OPTIONAL = ['RECORDS_OUTBREAKS', 'RECORDS_LINE_LISTINGS', 'CENSUS'];
+
+    const els = {
+      warningBanner: document.getElementById('warningBanner'),
+      reportDate: document.getElementById('reportDate'),
+      unitSelect: document.getElementById('unitSelect'),
+      facilityName: document.getElementById('facilityName'),
+      preparedBy: document.getElementById('preparedBy'),
+      reviewedBy: document.getElementById('reviewedBy'),
+      timeoutHours: document.getElementById('timeoutHours'),
+      reportPreview: document.getElementById('reportPreview'),
+      weeklySummary: document.getElementById('weeklySummary'),
+      debugPanel: document.getElementById('debugPanel'),
+      btnIP: document.getElementById('btnIP'),
+      btnUnit: document.getElementById('btnUnit'),
+      btnBoth: document.getElementById('btnBoth'),
+      btnSave: document.getElementById('btnSave'),
+      btnPrint: document.getElementById('btnPrint')
+    };
+
+    let dbState = null;
+    let helloAck = null;
+    let lastSavedAt = null;
+
+    function safeParse(raw, fallback) {
+      try { return JSON.parse(raw); } catch (_) { return fallback; }
+    }
+
+    function fallbackLoadDB() {
+      return safeParse(localStorage.getItem('UNIFIED_DB_V1'), { schema: 'UNIFIED_DB_V1', records: {} });
+    }
+
+    async function fallbackSaveDBAsync(db) {
+      localStorage.setItem('UNIFIED_DB_V1', JSON.stringify(db));
+      return true;
+    }
+
+    function suiteLoadDB() {
+      if (typeof window.loadDB === 'function') return window.loadDB();
+      return fallbackLoadDB();
+    }
+
+    async function suiteSaveDBAsync(db) {
+      if (typeof window.saveDBAsync === 'function') return window.saveDBAsync(db);
+      return fallbackSaveDBAsync(db);
+    }
+
+    function compareVersions(a, b) {
+      const pa = String(a || '').split('.').map(n => Number(n) || 0);
+      const pb = String(b || '').split('.').map(n => Number(n) || 0);
+      for (let i = 0; i < 3; i++) {
+        if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+        if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+      }
+      return 0;
+    }
+
+    function toISODate(x) {
+      if (!x && x !== 0) return null;
+      if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
+      const d = new Date(x);
+      if (Number.isNaN(d.getTime())) return null;
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function pick(record, keys) {
+      for (const key of keys) {
+        const value = record && record[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+      }
+      return null;
+    }
+
+    function getUnit(record) {
+      const unit = pick(record, ['unit', 'unitId', 'locationUnit']);
+      return unit ? String(unit).trim() : null;
+    }
+
+    function matchesUnit(record, selectedUnit) {
+      if (selectedUnit === 'facility') return true;
+      return getUnit(record) === selectedUnit;
+    }
+
+    function inferStartDate(record) {
+      return toISODate(pick(record, ['onsetDate', 'precautionStartDate', 'initiationDate', 'startDate']));
+    }
+
+    function inferEndDate(record) {
+      return toISODate(pick(record, ['resolutionDate', 'precautionEndDate', 'dischargeDate', 'endDate']));
+    }
+
+    function isActiveOnDate(record, date) {
+      const start = inferStartDate(record);
+      const end = inferEndDate(record);
+      if (!start) return false;
+      if (start > date) return false;
+      if (!end) return true;
+      return end >= date;
+    }
+
+    function normalizeDB(db) {
+      const safe = db && typeof db === 'object' ? db : {};
+      const records = safe.records && typeof safe.records === 'object' ? safe.records : {};
+      return {
+        ...safe,
+        schema: safe.schema || 'UNIFIED_DB_V1',
+        records: {
+          ...records,
+          ip_cases: Array.isArray(records.ip_cases) ? records.ip_cases : [],
+          abx: Array.isArray(records.abx) ? records.abx : [],
+          vax: Array.isArray(records.vax) ? records.vax : [],
+          outbreaks: Array.isArray(records.outbreaks) ? records.outbreaks : [],
+          line_listings: Array.isArray(records.line_listings) ? records.line_listings : [],
+          ip_daily_metrics: Array.isArray(records.ip_daily_metrics) ? records.ip_daily_metrics : []
+        },
+        census: Array.isArray(safe.census) ? safe.census : []
+      };
+    }
+
+    function collectUnits(db) {
+      const set = new Set();
+      db.census.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
+      db.records.ip_cases.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
+      db.records.abx.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
+      db.records.vax.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
+      return ['facility', ...Array.from(set).sort()];
+    }
+
+    function includesMDRO(record) {
+      const text = String(pick(record, ['pathogen', 'organism', 'suspectedOrConfirmedOrganism']) || '').toLowerCase();
+      return ['mrsa', 'vre', 'esbl', 'cre', 'c. diff', 'c diff', 'mdr', 'mdro'].some(k => text.includes(k));
+    }
+
+    function infectionTypeBucket(record) {
+      const text = String(pick(record, ['infectionType', 'sourceCondition', 'sourceOfInfection']) || '').toLowerCase();
+      if (text.includes('resp')) return 'Resp';
+      if (text.includes('gi') || text.includes('gastro') || text.includes('diarr')) return 'GI';
+      if (text.includes('uti') || text.includes('urinary')) return 'UTI';
+      if (text.includes('ssti') || text.includes('skin') || text.includes('wound')) return 'SSTI';
+      return 'Other';
+    }
+
+    function censusCountFor(db, date, unitId) {
+      const rows = db.census.filter(r => {
+        const d = toISODate(pick(r, ['date', 'reportDate', 'censusDate']));
+        const dateMatch = !d || d === date;
+        const unitMatch = unitId === 'facility' ? true : getUnit(r) === unitId;
+        return dateMatch && unitMatch;
+      });
+      const values = rows.map(r => Number(pick(r, ['censusCount', 'count', 'residents', 'census']))).filter(Number.isFinite);
+      if (!values.length) return null;
+      return values.reduce((a, b) => a + b, 0);
+    }
+
+    function deriveMetrics(db, date, unitId) {
+      const timeoutHours = Math.max(48, Math.min(72, Number(els.timeoutHours.value) || 72));
+      const ip = db.records.ip_cases.filter(r => matchesUnit(r, unitId));
+      const abx = db.records.abx.filter(r => matchesUnit(r, unitId));
+      const vax = db.records.vax.filter(r => matchesUnit(r, unitId));
+      const outbreaks = db.records.outbreaks.filter(r => matchesUnit(r, unitId));
+      const lines = db.records.line_listings.filter(r => matchesUnit(r, unitId));
+
+      const newInfections = ip.filter(r => inferStartDate(r) === date).length;
+      const activeIPCases = ip.filter(r => isActiveOnDate(r, date)).length;
+      const newPrecautionsInitiated = ip.filter(r => toISODate(pick(r, ['precautionStartDate'])) === date || (!pick(r, ['precautionStartDate']) && inferStartDate(r) === date)).length;
+      const precautionsDiscontinued = ip.filter(r => inferEndDate(r) === date).length;
+      const residentsOnEBP = ip.filter(r => {
+        if (!isActiveOnDate(r, date)) return false;
+        const p = String(pick(r, ['protocol', 'isolationType', 'precautionType']) || '').toLowerCase();
+        return p.includes('ebp');
+      }).length;
+      const mdroActive = ip.filter(r => isActiveOnDate(r, date) && includesMDRO(r)).length;
+      const culturesCollectedToday = ip.filter(r => toISODate(pick(r, ['collectionDateTime', 'cultureCollectionDate', 'cultureDate'])) === date).length;
+      const culturesPendingFollowup = ip.filter(r => pick(r, ['collectionDateTime', 'cultureCollectionDate', 'cultureDate']) && !pick(r, ['cultureResult', 'labResults'])).length;
+
+      const newABTStarts = abx.filter(r => toISODate(pick(r, ['startDate'])) === date).length;
+      const activeABT = abx.filter(r => isActiveOnDate(r, date));
+      const activeABTCourses = activeABT.length;
+      const withIndication = activeABT.filter(r => String(pick(r, ['indication']) || '').trim()).length;
+      const abxWithIndicationPct = activeABTCourses ? Number(((withIndication / activeABTCourses) * 100).toFixed(1)) : 0;
+      const abxTimeoutsDueToday = abx.filter(r => {
+        const s = toISODate(pick(r, ['startDate']));
+        if (!s) return false;
+        const due = new Date(`${s}T00:00:00`);
+        due.setHours(due.getHours() + timeoutHours);
+        return toISODate(due) === date;
+      }).length;
+      const abxTimeoutsCompletedToday = abx.filter(r => toISODate(pick(r, ['timeoutReviewDate', 'timeoutOutcomeDate', 'reviewDate'])) === date).length;
+
+      const vaccinesGivenToday = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'given' && toISODate(pick(r, ['dateGiven', 'givenDate'])) === date).length;
+      const vaxDeclinesToday = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'declined' && toISODate(pick(r, ['offerDate', 'educationDate'])) === date).length;
+      const vaxDueCount = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'due').length;
+      const vaxOverdueCount = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'overdue').length;
+
+      const outbreaksActiveToday = outbreaks.filter(r => {
+        const status = String(pick(r, ['status']) || '').toLowerCase();
+        const s = toISODate(pick(r, ['startDate', 'dateStart']));
+        const e = toISODate(pick(r, ['endDate', 'dateEnd']));
+        return status === 'active' || (s && s <= date && (!e || e >= date));
+      }).length;
+      const outbreakCasesToday = lines.filter(r => toISODate(pick(r, ['onsetDate', 'symptomOnsetDate'])) === date).length;
+
+      const censusCount = censusCountFor(db, date, unitId);
+      return {
+        schema: 'DAILY_IP_METRICS_V1',
+        date,
+        unitId,
+        censusCount,
+        residentDays: censusCount,
+        newInfections,
+        activeIPCases,
+        residentsOnEBP,
+        newPrecautionsInitiated,
+        precautionsDiscontinued,
+        mdroActive,
+        culturesCollectedToday,
+        culturesPendingFollowup,
+        newABTStarts,
+        activeABTCourses,
+        abxWithIndicationPct,
+        abxTimeoutsDueToday,
+        abxTimeoutsCompletedToday,
+        vaccinesGivenToday,
+        vaxDeclinesToday,
+        vaxDueCount,
+        vaxOverdueCount,
+        outbreaksActiveToday,
+        outbreakCasesToday,
+        generatedAtISO: new Date().toISOString()
+      };
+    }
+
+    function upsertDailyMetric(db, metric) {
+      const list = db.records.ip_daily_metrics;
+      const idx = list.findIndex(r => r.date === metric.date && r.unitId === metric.unitId);
+      if (idx >= 0) list[idx] = metric;
+      else list.push(metric);
+    }
+
+    function reportHeader(date, unitId) {
+      const unitLabel = unitId === 'facility' ? 'Facility (All Units)' : unitId;
+      return `
+        <div class="header-block">
+          <div class="header-grid">
+            <div><strong>Facility:</strong> ${els.facilityName.value || '[ENTER FACILITY NAME]'}</div>
+            <div><strong>Date:</strong> ${date || '[ENTER DATE]'}</div>
+            <div><strong>Unit:</strong> ${unitLabel}</div>
+            <div><strong>Prepared by:</strong> ${els.preparedBy.value || '[ENTER NAME/TITLE]'}</div>
+            <div><strong>Reviewed by:</strong> ${els.reviewedBy.value || '[ENTER NAME/TITLE]'}</div>
+            <div><strong>Survey Flag:</strong> [CHECK IF APPLICABLE]</div>
+          </div>
+        </div>`;
+    }
+
+    const li = (k, v) => `<div class="line"><span>${k}</span><span class="v">${v}</span></div>`;
+
+    function renderIPPage(db, date, unitId) {
+      const m = deriveMetrics(db, date, unitId);
+      const active = db.records.ip_cases.filter(r => matchesUnit(r, unitId) && isActiveOnDate(r, date));
+      const buckets = { Resp: 0, GI: 0, UTI: 0, SSTI: 0, Other: 0 };
+      active.forEach(r => buckets[infectionTypeBucket(r)]++);
+
+      return `
+        <article class="page">
+          <h2>DAILY INFECTION PREVENTION SURVEY-READINESS UPDATE REPORT</h2>
+          ${reportHeader(date, unitId)}
+          <section class="sec"><h3>A1. Surveillance Summary</h3>
+            ${li('New infections today', m.newInfections)}
+            ${li('Active IP cases today', m.activeIPCases)}
+            ${li('Resp / GI / UTI / SSTI / Other', `${buckets.Resp} / ${buckets.GI} / ${buckets.UTI} / ${buckets.SSTI} / ${buckets.Other}`)}
+            <div class="small">Actions taken today: [ENTER …]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A2. Isolation / Precautions / EBP</h3>
+            ${li('New precautions initiated today', m.newPrecautionsInitiated)}
+            ${li('Precautions discontinued today', m.precautionsDiscontinued)}
+            ${li('Active EBP count', m.residentsOnEBP)}
+            <div class="small">PPE supply status: [ENTER …]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A3. MDRO / Culture Follow-up</h3>
+            ${li('MDRO active today', m.mdroActive)}
+            ${li('Cultures collected today', m.culturesCollectedToday)}
+            ${li('Cultures pending follow-up', m.culturesPendingFollowup)}
+            <div class="small">Notes: [ENTER …]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A4. Outbreak Monitoring</h3>
+            ${li('Active outbreaks today', m.outbreaksActiveToday)}
+            ${li('Outbreak cases today', m.outbreakCasesToday)}
+            <div class="small">DOH notification: [CHECK IF APPLICABLE]</div>
+            <div class="small">Control measures: [N/A IF NONE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A5. Antibiotic Stewardship</h3>
+            ${li('New ABT starts today', m.newABTStarts)}
+            ${li('Active ABT courses today', m.activeABTCourses)}
+            ${li('% with documented indication', `${m.abxWithIndicationPct}%`)}
+            ${li('Timeouts due today', m.abxTimeoutsDueToday)}
+            ${li('Timeouts completed today', m.abxTimeoutsCompletedToday)}
+          </section>
+          <section class="sec"><h3>A6. Immunization Activity</h3>
+            ${li('Vaccines given today', m.vaccinesGivenToday)}
+            ${li('Declines today', m.vaxDeclinesToday)}
+            ${li('Due / Overdue', `${m.vaxDueCount} / ${m.vaxOverdueCount}`)}
+          </section>
+          <section class="sec"><h3>A7. Staff Illness / Exposure</h3>
+            <div class="small">Staff illness reported: [CHECK IF APPLICABLE]</div>
+            <div class="small">Work restrictions: [CHECK IF APPLICABLE]</div>
+            <div class="small">Exposure incidents: [N/A IF NONE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A8. Environmental Cleaning</h3>
+            <div class="small">Issues identified: [CHECK IF APPLICABLE]</div>
+            <div class="small">High-risk areas addressed: [N/A IF NONE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>A9. Education / Compliance</h3>
+            <div class="small">Audit notes: [N/A IF NONE]</div>
+            <div class="small">Coaching provided: [CHECK IF APPLICABLE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>Signatures</h3>
+            <div>Prepared by signature: _________________________ Date: ___________</div>
+            <div>Reviewed by signature: _________________________ Date: ___________</div>
+          </section>
+        </article>`;
+    }
+
+    function residentQuickList(db, date, unitId) {
+      const rows = db.records.ip_cases
+        .filter(r => matchesUnit(r, unitId) && isActiveOnDate(r, date))
+        .slice(0, 10)
+        .map(r => {
+          const name = pick(r, ['residentName', 'name', 'patientName']) || '[ENTER …]';
+          const room = pick(r, ['room', 'roomNumber']) || '[ENTER …]';
+          return `<li>${name} — ${room}</li>`;
+        });
+      return rows.length ? `<ol>${rows.join('')}</ol>` : '<div class="small">[N/A IF NONE]</div>';
+    }
+
+    function unitBreakdownTable(db, date) {
+      const units = collectUnits(db).filter(u => u !== 'facility');
+      if (!units.length) return '<div class="small">[N/A IF NONE]</div>';
+      const body = units.map(u => {
+        const m = deriveMetrics(db, date, u);
+        return `<tr><td>${u}</td><td>${m.activeIPCases}</td><td>${m.newPrecautionsInitiated}</td><td>${m.newInfections}</td></tr>`;
+      }).join('');
+      return `<table><thead><tr><th>Unit</th><th>Active Precautions</th><th>New Precautions</th><th>New Infections</th></tr></thead><tbody>${body}</tbody></table>`;
+    }
+
+    function renderUnitPage(db, date, unitId) {
+      const m = deriveMetrics(db, date, unitId);
+      return `
+        <article class="page">
+          <h2>DAILY UNIT INFECTION PREVENTION UPDATE</h2>
+          ${reportHeader(date, unitId)}
+          <section class="sec"><h3>B1. Unit Isolation Status</h3>
+            ${li('Total on precautions today', m.activeIPCases)}
+            ${li('New precautions initiated today', m.newPrecautionsInitiated)}
+            ${li('Discontinued today', m.precautionsDiscontinued)}
+            <div class="small">Signage verified: [CHECK IF APPLICABLE]</div>
+            <div class="small">Quick list (top 10):</div>${residentQuickList(db, date, unitId)}
+            ${unitId === 'facility' ? unitBreakdownTable(db, date) : ''}
+          </section>
+          <section class="sec"><h3>B2. Symptom Surveillance</h3>
+            <div class="small">Fever cases today: [ENTER …]</div>
+            <div class="small">Respiratory symptoms: [ENTER …]</div>
+            <div class="small">GI symptoms: [ENTER …]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>B3. Device / Wound Monitoring</h3>
+            <div class="small">Foley concerns: [CHECK IF APPLICABLE]</div>
+            <div class="small">Feeding tube concerns: [CHECK IF APPLICABLE]</div>
+            <div class="small">Wound concerns: [CHECK IF APPLICABLE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>B4. Equipment Cleaning</h3>
+            <div class="small">Shared equipment cleaned: [CHECK IF APPLICABLE]</div>
+            <div class="small">Glucometer cleaning verified: [CHECK IF APPLICABLE]</div>
+            <div class="small">Isolation equipment handling compliant: [CHECK IF APPLICABLE]</div>
+          </section>
+          <section class="sec"><h3>B5. Hand Hygiene / PPE</h3>
+            <div class="small">Compliance status: [ENTER …]</div>
+            <div class="small">Supplies at point of care: [CHECK IF APPLICABLE]</div>
+            <div class="small">Coaching provided: [CHECK IF APPLICABLE]</div>
+          </section>
+          <section class="sec"><h3>B6. Reporting / Escalation</h3>
+            <div class="small">IP nurse notified: [CHECK IF APPLICABLE]</div>
+            <div class="small">Provider notified: [CHECK IF APPLICABLE]</div>
+            <div class="small">Incident reports filed: [CHECK IF APPLICABLE]</div>
+            <div class="small">Notes: [N/A IF NONE]</div><div class="hand"></div>
+          </section>
+          <section class="sec"><h3>Signatures</h3>
+            <div>Charge Nurse signature: _______________________ Date: ___________</div>
+            <div>Unit Manager signature: _______________________ Date: ___________</div>
+          </section>
+        </article>`;
+    }
+
+    function renderPreview(which) {
+      const date = els.reportDate.value;
+      const unitId = els.unitSelect.value;
+      let html = '';
+      if (which === 'ip' || which === 'both') html += renderIPPage(dbState, date, unitId);
+      if (which === 'unit' || which === 'both') html += renderUnitPage(dbState, date, unitId);
+      els.reportPreview.innerHTML = html;
+      renderWeeklySummary();
+      renderDebug();
+    }
+
+    function renderWeeklySummary() {
+      const unitId = els.unitSelect.value;
+      const date = els.reportDate.value;
+      const list = dbState.records.ip_daily_metrics.filter(r => r.unitId === unitId);
+      const end = new Date(`${date}T00:00:00`);
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      const startISO = toISODate(start);
+      const rows = list.filter(r => r.date >= startISO && r.date <= date).sort((a, b) => a.date.localeCompare(b.date));
+
+      if (!rows.length) {
+        els.weeklySummary.innerHTML = '<div class="small">No saved metrics for selected unit/date range.</div>';
+        return;
+      }
+
+      const sum = f => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
+      const residentDays = sum('residentDays');
+      const infections = sum('newInfections');
+      const per1000 = residentDays ? ((infections / residentDays) * 1000).toFixed(2) : 'N/A';
+      const tRows = rows.map(r => `<tr><td>${r.date}</td><td>${r.newInfections}</td><td>${r.activeIPCases}</td><td>${r.newABTStarts}</td><td>${r.vaccinesGivenToday}</td></tr>`).join('');
+
+      els.weeklySummary.innerHTML = `
+        <div><strong>Total new infections:</strong> ${infections}</div>
+        <div><strong>Total active IP snapshots:</strong> ${sum('activeIPCases')}</div>
+        <div><strong>Total ABT starts:</strong> ${sum('newABTStarts')}</div>
+        <div><strong>Total vaccines given:</strong> ${sum('vaccinesGivenToday')}</div>
+        <div><strong>Per 1000 resident-days:</strong> ${per1000}</div>
+        <table><thead><tr><th>Date</th><th>New Inf</th><th>Active IP</th><th>ABT Starts</th><th>Vax Given</th></tr></thead><tbody>${tRows}</tbody></table>`;
+    }
+
+    async function saveDailyMetrics() {
+      const date = els.reportDate.value;
+      const unitId = els.unitSelect.value;
+      const metric = deriveMetrics(dbState, date, unitId);
+      upsertDailyMetric(dbState, metric);
+      await suiteSaveDBAsync(dbState);
+      lastSavedAt = new Date().toISOString();
+      renderWeeklySummary();
+      renderDebug();
+      alert('Saved to db.records.ip_daily_metrics');
+    }
+
+    function showWarning(message) {
+      els.warningBanner.textContent = message;
+      els.warningBanner.style.display = 'block';
+    }
+
+    function validateCompatibility() {
+      const problems = [];
+      const schemaVersion = dbState.schemaVersion || '0.0.0';
+      if (compareVersions(schemaVersion, SCHEMA_VERSION_COMPAT_MIN) < 0 || compareVersions(schemaVersion, SCHEMA_VERSION_COMPAT_MAX) > 0) {
+        problems.push(`schemaVersion ${schemaVersion} outside compatible range ${SCHEMA_VERSION_COMPAT_MIN}..${SCHEMA_VERSION_COMPAT_MAX}`);
+      }
+
+      const capsObj = dbState.capabilities && typeof dbState.capabilities === 'object' ? dbState.capabilities : {};
+      const caps = new Set([
+        ...Object.keys(capsObj).filter(k => capsObj[k]),
+        ...Object.keys(capsObj).filter(k => capsObj[k] === true),
+        ...(Array.isArray(dbState.capabilities) ? dbState.capabilities : [])
+      ]);
+      CAPABILITIES_REQUIRED.forEach(c => { if (!caps.has(c)) problems.push(`missing required capability: ${c}`); });
+
+      if (problems.length) showWarning(`Compatibility warning: ${problems.join(' | ')}`);
+    }
+
+    function postModuleHello() {
+      const msg = { type: 'MODULE_HELLO', appId: APP_ID, buildTag: BUILD_TAG, ts: Date.now() };
+      try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (_) {}
+      try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (_) {}
+    }
+
+    function waitForAck(timeoutMs = 1200) {
+      return new Promise(resolve => {
+        let done = false;
+        const timer = setTimeout(() => {
+          if (done) return;
+          done = true;
+          window.removeEventListener('message', onMessage);
+          resolve(null);
+        }, timeoutMs);
+
+        function onMessage(ev) {
+          const data = ev.data || {};
+          if (data.type !== 'UNIFIED_HELLO_ACK') return;
+          clearTimeout(timer);
+          window.removeEventListener('message', onMessage);
+          if (!done) {
+            done = true;
+            resolve(data);
+          }
+        }
+
+        window.addEventListener('message', onMessage);
+      });
+    }
+
+    function renderDebug() {
+      const unitCount = collectUnits(dbState).length;
+      const schemaVersion = dbState.schemaVersion || 'unknown';
+      const ack = helloAck ? 'received' : 'not received';
+      els.debugPanel.innerHTML = `
+        <div>APP_ID: ${APP_ID}</div>
+        <div>BUILD_TAG: ${BUILD_TAG}</div>
+        <div>Detected schemaVersion: ${schemaVersion}</div>
+        <div>Unit list count: ${unitCount}</div>
+        <div>Hello ACK: ${ack}</div>
+        <div>Last metrics saved: ${lastSavedAt || '[N/A IF NONE]'}</div>
+        <div>Required capabilities: ${CAPABILITIES_REQUIRED.join(', ')}</div>
+        <div>Optional capabilities: ${CAPABILITIES_OPTIONAL.join(', ')}</div>`;
+    }
+
+    function initUnits() {
+      const units = collectUnits(dbState);
+      els.unitSelect.innerHTML = units.map(u => `<option value="${u}">${u === 'facility' ? 'Facility (All Units)' : u}</option>`).join('');
+    }
+
+    function printReportOnly() {
+      window.print();
+    }
+
+    async function init() {
+      els.reportDate.value = toISODate(new Date());
+      postModuleHello();
+      helloAck = await waitForAck();
+      if (!helloAck) showWarning('Handshake warning: UNIFIED_HELLO_ACK not received. Module continues in standalone mode.');
+
+      dbState = normalizeDB(suiteLoadDB());
+      validateCompatibility();
+      initUnits();
+      renderPreview('both');
+    }
+
+    els.btnIP.addEventListener('click', () => renderPreview('ip'));
+    els.btnUnit.addEventListener('click', () => renderPreview('unit'));
+    els.btnBoth.addEventListener('click', () => renderPreview('both'));
+    els.btnSave.addEventListener('click', () => saveDailyMetrics().catch(err => showWarning(`Save failed: ${err.message || err}`)));
+    els.btnPrint.addEventListener('click', printReportOnly);
+    els.unitSelect.addEventListener('change', () => renderPreview('both'));
+    els.reportDate.addEventListener('change', () => renderPreview('both'));
+
+    init().catch(err => showWarning(`Initialization warning: ${err.message || err}`));
+  </script>
+</body>
+</html>
