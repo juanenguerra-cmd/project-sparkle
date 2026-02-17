@@ -1,22 +1,7 @@
 import { format } from 'date-fns';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
-import { isoDateFromAny } from '@/lib/parsers';
 import { collectColumns, convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
-
-const VAX_PREFERRED_COLUMNS = [
-  'id', 'mrn', 'residentName', 'name', 'unit', 'room',
-  'vaccine', 'vaccine_type', 'dose', 'status',
-  'dateGiven', 'date_given', 'dueDate', 'due_date', 'nextDueDate',
-  'offerDate', 'dateOffered', 'dateDeclined',
-  'educationDate', 'educationProvided', 'educationOutcome',
-  'administered_by', 'administeredBy', 'givenBy',
-  'manufacturer', 'lot', 'lotNumber', 'site', 'administrationSite',
-  'declineReason', 'consentStatus', 'consentFormAttached',
-  'nextEligibleDate', 'lastOfferedDate', 'reofferDueDate',
-  'outbreakTriggered', 'outbreakTriggerDate', 'outbreakName',
-  'seasonOverrideCurrent', 'seasonOverrideAt',
-  'source', 'notes', 'createdAt', 'updatedAt',
-];
+import { VAX_PREFERRED_COLUMNS, normalizeVaxRecordShape, toISODate } from '@/lib/vaxRecordFields';
 
 const REQUIRED_COLUMNS = ['residentName', 'vaccine', 'status'];
 
@@ -69,7 +54,7 @@ const summarizeVaxChanges = (
   let updateCount = 0;
 
   rows.forEach((row) => {
-    const normalized = normalizeVaxRecord(row);
+    const normalized = normalizeVaxRecordShape(row);
     const idx = findVaxMatchIndex(existing, normalized);
     if (idx >= 0) {
       updateCount += 1;
@@ -90,7 +75,7 @@ const upsertVaxRecords = (rows: Array<Record<string, string>>): { newCount: numb
   let updateCount = 0;
 
   rows.forEach((row) => {
-    const normalized = normalizeVaxRecord(row);
+    const normalized = normalizeVaxRecordShape(row);
     const idx = findVaxMatchIndex(existing, normalized);
 
     if (idx >= 0) {
@@ -130,7 +115,7 @@ const buildVaxSignature = (record: Record<string, unknown>): string => {
   const mrn = String(record.mrn || '').trim().toLowerCase();
   const vaccine = String(record.vaccine || record.vaccine_type || '').trim().toLowerCase();
   const anchorDate = toISODate(
-    String(record.dateGiven || record.date_given || record.dueDate || record.due_date || record.offerDate || ''),
+    String(record.dateGiven || record.date_given || record.dueDate || record.due_date || record.offerDate || record.dateOffered || ''),
   );
 
   if (!mrn || !vaccine || !anchorDate) {
@@ -138,25 +123,6 @@ const buildVaxSignature = (record: Record<string, unknown>): string => {
   }
 
   return `${mrn}|${vaccine}|${anchorDate}`;
-};
-
-const normalizeVaxRecord = (row: Record<string, string>): Record<string, unknown> => ({
-  ...row,
-  id: row.id || '',
-  residentName: row.residentName || row.name || '',
-  vaccine: row.vaccine || row.vaccine_type || '',
-  status: row.status || 'due',
-  dateGiven: toISODate(row.dateGiven || row.date_given),
-  dueDate: toISODate(row.dueDate || row.due_date),
-  dateOffered: toISODate(row.dateOffered || row.offerDate),
-  dateDeclined: toISODate(row.dateDeclined),
-});
-
-const toISODate = (value?: string): string => {
-  if (!value) {
-    return '';
-  }
-  return isoDateFromAny(value) || value;
 };
 
 const generateId = (): string => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
