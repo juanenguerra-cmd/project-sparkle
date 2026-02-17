@@ -192,6 +192,10 @@ const isResidentInScope = (resident: Resident, unitId: string): boolean => (
 
 const mdroPattern = /mrsa|vre|mdro|c\.?\s*difficile|c\.diff|cre/i;
 
+const getAffectedUnits = (outbreak: Outbreak): string[] => (
+  Array.isArray(outbreak.affectedUnits) ? outbreak.affectedUnits : []
+);
+
 const getRiskFlags = (resident: Resident, activeCases: IPCase[]): string => {
   const flags: string[] = [];
   if ((resident.notes || '').toLowerCase().includes('wound')) flags.push('Wound');
@@ -211,7 +215,7 @@ const isNewAdmission = (admitDate?: string, reportDate?: string): string => {
 const mapOutbreak = (outbreak: Outbreak, lineListingsToday: number): OutbreakRow => ({
   outbreakType: outbreak.name || outbreak.type,
   status: outbreak.status,
-  unitsAffected: outbreak.affectedUnits.join(', '),
+  unitsAffected: getAffectedUnits(outbreak).join(', '),
   dateDeclared: outbreak.declaredAt || outbreak.startDate,
   casesToday: lineListingsToday,
   totalCases: outbreak.totalCases || 0,
@@ -236,9 +240,10 @@ export const getDailyIpBinderData = (
     return !onsetDate || onsetDate <= reportDate;
   });
 
-  const outbreaksForUnit = (db.records.outbreaks || []).filter((outbreak) => (
-    unitId === 'all' || outbreak.affectedUnits.includes(unitId)
-  ));
+  const outbreaksForUnit = (db.records.outbreaks || []).filter((outbreak) => {
+    const affectedUnits = getAffectedUnits(outbreak);
+    return unitId === 'all' || affectedUnits.includes(unitId);
+  });
 
   const outbreakCases = (db.records.line_listings || []).filter((entry) => {
     const resident = residentsByMrn.get(entry.mrn);

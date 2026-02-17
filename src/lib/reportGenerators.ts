@@ -290,13 +290,15 @@ export const generateDailyIpBinderReport = (
     rows.map((row) => keys.map((key) => String(row[key] ?? '')))
   );
 
+  const parsedReportDate = parseDateValue(reportDate);
+
   return {
     title: 'Daily Infection Prevention Binder',
     generatedAt: new Date().toISOString(),
     reportType: 'daily-ip-binder',
     filters: {
       unit: data.unit.name,
-      date: format(new Date(reportDate), 'MM/dd/yyyy'),
+      date: parsedReportDate ? format(parsedReportDate, 'MM/dd/yyyy') : reportDate,
     },
     headers: [],
     rows: [],

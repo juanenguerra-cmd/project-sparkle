@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { useDailyIpBinderData } from '@/lib/reports/useDailyIpBinderData';
 
 interface DailyIpBinderReportProps {
@@ -13,6 +13,17 @@ const renderEmptyState = (columns: number) => (
   </tr>
 );
 
+
+const formatReportDate = (value: string): string => {
+  if (!value) return 'N/A';
+
+  const parsed = parseISO(value);
+  if (isValid(parsed)) return format(parsed, 'MM/dd/yyyy');
+
+  const fallback = new Date(value);
+  return isValid(fallback) ? format(fallback, 'MM/dd/yyyy') : value;
+};
+
 const DailyIpBinderReport = ({ date, unitId }: DailyIpBinderReportProps) => {
   const data = useDailyIpBinderData({ date, unitId });
 
@@ -25,7 +36,7 @@ const DailyIpBinderReport = ({ date, unitId }: DailyIpBinderReportProps) => {
       <section className="binder-page space-y-4">
         <header>
           <h1 className="text-xl font-bold">Daily Infection Prevention Binder</h1>
-          <p>Unit: {data.unit.name} | Date: {format(new Date(date), 'MM/dd/yyyy')}</p>
+          <p>Unit: {data.unit.name} | Date: {formatReportDate(date)}</p>
         </header>
 
         <h2 className="font-semibold">1. Census & Risk Overview</h2>
