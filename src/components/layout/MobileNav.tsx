@@ -97,8 +97,11 @@ const MobileNav = ({ activeView, onViewChange }: MobileNavProps) => {
               <span className="text-[11px] leading-tight">More</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="h-auto max-h-[80vh]">
-            <div className="space-y-6 pt-4 pb-6 overflow-y-auto">
+          <SheetContent
+            side="bottom"
+            className="flex h-auto max-h-[85dvh] flex-col overflow-hidden px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-4"
+          >
+            <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain pr-1">
               <div className="space-y-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Quick Actions
