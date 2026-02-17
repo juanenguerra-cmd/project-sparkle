@@ -1,799 +1,1157 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily IP + Unit Binder Reports Module</title>
-  <style>
-    :root {
-      --bg: #f3f4f6;
-      --card: #ffffff;
-      --ink: #111827;
-      --muted: #6b7280;
-      --line: #d1d5db;
-      --line-dark: #9ca3af;
-      --warn-bg: #fef3c7;
-      --warn-border: #f59e0b;
-      --radius-xl: 16px;
-      --radius-full: 999px;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: CameraPlainVariable, "Segoe UI", Arial, sans-serif;
-      background: var(--bg);
-      color: var(--ink);
-      line-height: 1.45;
-    }
-
-    .app {
-      max-width: 1220px;
-      margin: 0 auto;
-      padding: 16px;
-      display: grid;
-      gap: 12px;
-    }
-
-    .surface {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-xl);
-      padding: 14px;
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
-    }
-
-    .warning {
-      border: 1px solid var(--warn-border);
-      background: var(--warn-bg);
-      border-radius: 12px;
-      padding: 10px;
-      display: none;
-      font-size: 14px;
-    }
-
-    .controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
-      align-items: end;
-    }
-
-    label {
-      font-size: 12px;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    input, select, button {
-      width: 100%;
-      border: 1px solid var(--line-dark);
-      border-radius: var(--radius-full);
-      padding: 9px 12px;
-      background: white;
-      font-size: 14px;
-    }
-
-    button {
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    .btn-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    details summary {
-      cursor: pointer;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-
-    .report {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 16px;
-      min-height: 240px;
-      overflow: auto;
-    }
-
-    .print-area .page {
-      min-height: 10.1in;
-      break-after: page;
-      page-break-after: always;
-      padding: 2px;
-    }
-
-    .print-area .page:last-child {
-      break-after: auto;
-      page-break-after: auto;
-    }
-
-    .header-block {
-      border: 1px solid #111;
-      padding: 8px;
-      margin-bottom: 10px;
-    }
-
-    .header-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 5px 14px;
-      font-size: 14px;
-    }
-
-    .sec {
-      border-top: 1px solid var(--line-dark);
-      padding-top: 8px;
-      margin-top: 8px;
-    }
-
-    .line {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      border-bottom: 1px dotted #d1d5db;
-      margin: 4px 0;
-      font-size: 14px;
-    }
-
-    .v { font-weight: 700; }
-
-    .hand {
-      border-bottom: 1px solid #374151;
-      min-height: 22px;
-      margin-top: 6px;
-    }
-
-    .small { font-size: 12px; color: #374151; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    thead th {
-      position: sticky;
-      top: 0;
-      background: #f9fafb;
-      z-index: 1;
-    }
-
-    th, td {
-      border: 1px solid var(--line-dark);
-      padding: 6px;
-      text-align: left;
-    }
-
-    tbody tr:nth-child(even) {
-      background: #f9fafb;
-    }
-
-    @media print {
-      @page { size: Letter; margin: 0.5in; }
-      body { background: #fff; color: #000; font-size: 12pt; }
-      .no-print { display: none !important; }
-      .app, .surface { padding: 0; margin: 0; border: none; box-shadow: none; }
-      .report { border: none; padding: 0; }
-      .print-area .page { min-height: auto; }
-    }
-  </style>
-</head>
-<body>
-  <div class="app">
-    <div id="warningBanner" class="warning no-print"></div>
-
-    <section class="surface no-print">
-      <h1 style="margin:0 0 8px;">Daily IP + Unit Binder Reports</h1>
-      <div class="controls">
-        <div>
-          <label for="reportDate">Report Date</label>
-          <input id="reportDate" type="date" />
-        </div>
-        <div>
-          <label for="unitSelect">Unit</label>
-          <select id="unitSelect"></select>
-        </div>
-        <div>
-          <label for="facilityName">Facility</label>
-          <input id="facilityName" type="text" placeholder="[ENTER FACILITY NAME]" />
-        </div>
-        <div>
-          <label for="preparedBy">Prepared by</label>
-          <input id="preparedBy" type="text" placeholder="[ENTER NAME/TITLE]" />
-        </div>
-        <div>
-          <label for="reviewedBy">Reviewed by</label>
-          <input id="reviewedBy" type="text" placeholder="[ENTER NAME/TITLE]" />
-        </div>
-        <div>
-          <label for="timeoutHours">ABX timeout hours</label>
-          <input id="timeoutHours" type="number" value="72" min="48" max="72" />
-        </div>
-      </div>
-      <div class="btn-row">
-        <button id="btnIP">Generate IP Nurse Report</button>
-        <button id="btnUnit">Generate Unit Report</button>
-        <button id="btnBoth">Generate Both</button>
-        <button id="btnSave">Save Daily Metrics</button>
-        <button id="btnPrint">Print</button>
-      </div>
-    </section>
-
-    <section class="surface">
-      <h2 style="margin-top:0;" class="no-print">Report Preview</h2>
-      <div id="reportPreview" class="report print-area"></div>
-    </section>
-
-    <section class="surface no-print">
-      <h2 style="margin-top:0;">Weekly Summary Preview (Last 7 Days)</h2>
-      <div id="weeklySummary"></div>
-    </section>
-
-    <section class="surface no-print">
-      <details>
-        <summary>About / Debug</summary>
-        <div id="debugPanel" class="small"></div>
-      </details>
-    </section>
-  </div>
-
-  <script>
-    const APP_ID = 'unified.daily-ip-unit-binder.module';
-    const BUILD_TAG = '2026.02.17-r2';
-    const SCHEMA_VERSION_COMPAT_MIN = '1.0.0';
-    const SCHEMA_VERSION_COMPAT_MAX = '9.9.9';
-    const CAPABILITIES_REQUIRED = ['UNIFIED_DB_V1', 'RECORDS_IP', 'RECORDS_ABX', 'RECORDS_VAX'];
-    const CAPABILITIES_OPTIONAL = ['RECORDS_OUTBREAKS', 'RECORDS_LINE_LISTINGS', 'CENSUS'];
-
-    const els = {
-      warningBanner: document.getElementById('warningBanner'),
-      reportDate: document.getElementById('reportDate'),
-      unitSelect: document.getElementById('unitSelect'),
-      facilityName: document.getElementById('facilityName'),
-      preparedBy: document.getElementById('preparedBy'),
-      reviewedBy: document.getElementById('reviewedBy'),
-      timeoutHours: document.getElementById('timeoutHours'),
-      reportPreview: document.getElementById('reportPreview'),
-      weeklySummary: document.getElementById('weeklySummary'),
-      debugPanel: document.getElementById('debugPanel'),
-      btnIP: document.getElementById('btnIP'),
-      btnUnit: document.getElementById('btnUnit'),
-      btnBoth: document.getElementById('btnBoth'),
-      btnSave: document.getElementById('btnSave'),
-      btnPrint: document.getElementById('btnPrint')
-    };
-
-    let dbState = null;
-    let helloAck = null;
-    let lastSavedAt = null;
-
-    function safeParse(raw, fallback) {
-      try { return JSON.parse(raw); } catch (_) { return fallback; }
-    }
-
-    function fallbackLoadDB() {
-      return safeParse(localStorage.getItem('UNIFIED_DB_V1'), { schema: 'UNIFIED_DB_V1', records: {} });
-    }
-
-    async function fallbackSaveDBAsync(db) {
-      localStorage.setItem('UNIFIED_DB_V1', JSON.stringify(db));
-      return true;
-    }
-
-    function suiteLoadDB() {
-      if (typeof window.loadDB === 'function') return window.loadDB();
-      return fallbackLoadDB();
-    }
-
-    async function suiteSaveDBAsync(db) {
-      if (typeof window.saveDBAsync === 'function') return window.saveDBAsync(db);
-      return fallbackSaveDBAsync(db);
-    }
-
-    function compareVersions(a, b) {
-      const pa = String(a || '').split('.').map(n => Number(n) || 0);
-      const pb = String(b || '').split('.').map(n => Number(n) || 0);
-      for (let i = 0; i < 3; i++) {
-        if ((pa[i] || 0) > (pb[i] || 0)) return 1;
-        if ((pa[i] || 0) < (pb[i] || 0)) return -1;
-      }
-      return 0;
-    }
-
-    function toISODate(x) {
-      if (!x && x !== 0) return null;
-      if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
-      const d = new Date(x);
-      if (Number.isNaN(d.getTime())) return null;
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-
-    function pick(record, keys) {
-      for (const key of keys) {
-        const value = record && record[key];
-        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
-      }
-      return null;
-    }
-
-    function getUnit(record) {
-      const unit = pick(record, ['unit', 'unitId', 'locationUnit']);
-      return unit ? String(unit).trim() : null;
-    }
-
-    function matchesUnit(record, selectedUnit) {
-      if (selectedUnit === 'facility') return true;
-      return getUnit(record) === selectedUnit;
-    }
-
-    function inferStartDate(record) {
-      return toISODate(pick(record, ['onsetDate', 'precautionStartDate', 'initiationDate', 'startDate']));
-    }
-
-    function inferEndDate(record) {
-      return toISODate(pick(record, ['resolutionDate', 'precautionEndDate', 'dischargeDate', 'endDate']));
-    }
-
-    function isActiveOnDate(record, date) {
-      const start = inferStartDate(record);
-      const end = inferEndDate(record);
-      if (!start) return false;
-      if (start > date) return false;
-      if (!end) return true;
-      return end >= date;
-    }
-
-    function normalizeDB(db) {
-      const safe = db && typeof db === 'object' ? db : {};
-      const records = safe.records && typeof safe.records === 'object' ? safe.records : {};
-      return {
-        ...safe,
-        schema: safe.schema || 'UNIFIED_DB_V1',
-        records: {
-          ...records,
-          ip_cases: Array.isArray(records.ip_cases) ? records.ip_cases : [],
-          abx: Array.isArray(records.abx) ? records.abx : [],
-          vax: Array.isArray(records.vax) ? records.vax : [],
-          outbreaks: Array.isArray(records.outbreaks) ? records.outbreaks : [],
-          line_listings: Array.isArray(records.line_listings) ? records.line_listings : [],
-          ip_daily_metrics: Array.isArray(records.ip_daily_metrics) ? records.ip_daily_metrics : []
-        },
-        census: Array.isArray(safe.census) ? safe.census : []
-      };
-    }
-
-    function collectUnits(db) {
-      const set = new Set();
-      db.census.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
-      db.records.ip_cases.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
-      db.records.abx.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
-      db.records.vax.forEach(r => { const u = getUnit(r); if (u) set.add(u); });
-      return ['facility', ...Array.from(set).sort()];
-    }
-
-    function includesMDRO(record) {
-      const text = String(pick(record, ['pathogen', 'organism', 'suspectedOrConfirmedOrganism']) || '').toLowerCase();
-      return ['mrsa', 'vre', 'esbl', 'cre', 'c. diff', 'c diff', 'mdr', 'mdro'].some(k => text.includes(k));
-    }
-
-    function infectionTypeBucket(record) {
-      const text = String(pick(record, ['infectionType', 'sourceCondition', 'sourceOfInfection']) || '').toLowerCase();
-      if (text.includes('resp')) return 'Resp';
-      if (text.includes('gi') || text.includes('gastro') || text.includes('diarr')) return 'GI';
-      if (text.includes('uti') || text.includes('urinary')) return 'UTI';
-      if (text.includes('ssti') || text.includes('skin') || text.includes('wound')) return 'SSTI';
-      return 'Other';
-    }
-
-    function censusCountFor(db, date, unitId) {
-      const rows = db.census.filter(r => {
-        const d = toISODate(pick(r, ['date', 'reportDate', 'censusDate']));
-        const dateMatch = !d || d === date;
-        const unitMatch = unitId === 'facility' ? true : getUnit(r) === unitId;
-        return dateMatch && unitMatch;
-      });
-      const values = rows.map(r => Number(pick(r, ['censusCount', 'count', 'residents', 'census']))).filter(Number.isFinite);
-      if (!values.length) return null;
-      return values.reduce((a, b) => a + b, 0);
-    }
-
-    function deriveMetrics(db, date, unitId) {
-      const timeoutHours = Math.max(48, Math.min(72, Number(els.timeoutHours.value) || 72));
-      const ip = db.records.ip_cases.filter(r => matchesUnit(r, unitId));
-      const abx = db.records.abx.filter(r => matchesUnit(r, unitId));
-      const vax = db.records.vax.filter(r => matchesUnit(r, unitId));
-      const outbreaks = db.records.outbreaks.filter(r => matchesUnit(r, unitId));
-      const lines = db.records.line_listings.filter(r => matchesUnit(r, unitId));
-
-      const newInfections = ip.filter(r => inferStartDate(r) === date).length;
-      const activeIPCases = ip.filter(r => isActiveOnDate(r, date)).length;
-      const newPrecautionsInitiated = ip.filter(r => toISODate(pick(r, ['precautionStartDate'])) === date || (!pick(r, ['precautionStartDate']) && inferStartDate(r) === date)).length;
-      const precautionsDiscontinued = ip.filter(r => inferEndDate(r) === date).length;
-      const residentsOnEBP = ip.filter(r => {
-        if (!isActiveOnDate(r, date)) return false;
-        const p = String(pick(r, ['protocol', 'isolationType', 'precautionType']) || '').toLowerCase();
-        return p.includes('ebp');
-      }).length;
-      const mdroActive = ip.filter(r => isActiveOnDate(r, date) && includesMDRO(r)).length;
-      const culturesCollectedToday = ip.filter(r => toISODate(pick(r, ['collectionDateTime', 'cultureCollectionDate', 'cultureDate'])) === date).length;
-      const culturesPendingFollowup = ip.filter(r => pick(r, ['collectionDateTime', 'cultureCollectionDate', 'cultureDate']) && !pick(r, ['cultureResult', 'labResults'])).length;
-
-      const newABTStarts = abx.filter(r => toISODate(pick(r, ['startDate'])) === date).length;
-      const activeABT = abx.filter(r => isActiveOnDate(r, date));
-      const activeABTCourses = activeABT.length;
-      const withIndication = activeABT.filter(r => String(pick(r, ['indication']) || '').trim()).length;
-      const abxWithIndicationPct = activeABTCourses ? Number(((withIndication / activeABTCourses) * 100).toFixed(1)) : 0;
-      const abxTimeoutsDueToday = abx.filter(r => {
-        const s = toISODate(pick(r, ['startDate']));
-        if (!s) return false;
-        const due = new Date(`${s}T00:00:00`);
-        due.setHours(due.getHours() + timeoutHours);
-        return toISODate(due) === date;
-      }).length;
-      const abxTimeoutsCompletedToday = abx.filter(r => toISODate(pick(r, ['timeoutReviewDate', 'timeoutOutcomeDate', 'reviewDate'])) === date).length;
-
-      const vaccinesGivenToday = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'given' && toISODate(pick(r, ['dateGiven', 'givenDate'])) === date).length;
-      const vaxDeclinesToday = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'declined' && toISODate(pick(r, ['offerDate', 'educationDate'])) === date).length;
-      const vaxDueCount = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'due').length;
-      const vaxOverdueCount = vax.filter(r => String(pick(r, ['status']) || '').toLowerCase() === 'overdue').length;
-
-      const outbreaksActiveToday = outbreaks.filter(r => {
-        const status = String(pick(r, ['status']) || '').toLowerCase();
-        const s = toISODate(pick(r, ['startDate', 'dateStart']));
-        const e = toISODate(pick(r, ['endDate', 'dateEnd']));
-        return status === 'active' || (s && s <= date && (!e || e >= date));
-      }).length;
-      const outbreakCasesToday = lines.filter(r => toISODate(pick(r, ['onsetDate', 'symptomOnsetDate'])) === date).length;
-
-      const censusCount = censusCountFor(db, date, unitId);
-      return {
-        schema: 'DAILY_IP_METRICS_V1',
-        date,
-        unitId,
-        censusCount,
-        residentDays: censusCount,
-        newInfections,
-        activeIPCases,
-        residentsOnEBP,
-        newPrecautionsInitiated,
-        precautionsDiscontinued,
-        mdroActive,
-        culturesCollectedToday,
-        culturesPendingFollowup,
-        newABTStarts,
-        activeABTCourses,
-        abxWithIndicationPct,
-        abxTimeoutsDueToday,
-        abxTimeoutsCompletedToday,
-        vaccinesGivenToday,
-        vaxDeclinesToday,
-        vaxDueCount,
-        vaxOverdueCount,
-        outbreaksActiveToday,
-        outbreakCasesToday,
-        generatedAtISO: new Date().toISOString()
-      };
-    }
-
-    function upsertDailyMetric(db, metric) {
-      const list = db.records.ip_daily_metrics;
-      const idx = list.findIndex(r => r.date === metric.date && r.unitId === metric.unitId);
-      if (idx >= 0) list[idx] = metric;
-      else list.push(metric);
-    }
-
-    function reportHeader(date, unitId) {
-      const unitLabel = unitId === 'facility' ? 'Facility (All Units)' : unitId;
-      return `
-        <div class="header-block">
-          <div class="header-grid">
-            <div><strong>Facility:</strong> ${els.facilityName.value || '[ENTER FACILITY NAME]'}</div>
-            <div><strong>Date:</strong> ${date || '[ENTER DATE]'}</div>
-            <div><strong>Unit:</strong> ${unitLabel}</div>
-            <div><strong>Prepared by:</strong> ${els.preparedBy.value || '[ENTER NAME/TITLE]'}</div>
-            <div><strong>Reviewed by:</strong> ${els.reviewedBy.value || '[ENTER NAME/TITLE]'}</div>
-            <div><strong>Survey Flag:</strong> [CHECK IF APPLICABLE]</div>
-          </div>
-        </div>`;
-    }
-
-    const li = (k, v) => `<div class="line"><span>${k}</span><span class="v">${v}</span></div>`;
-
-    function renderIPPage(db, date, unitId) {
-      const m = deriveMetrics(db, date, unitId);
-      const active = db.records.ip_cases.filter(r => matchesUnit(r, unitId) && isActiveOnDate(r, date));
-      const buckets = { Resp: 0, GI: 0, UTI: 0, SSTI: 0, Other: 0 };
-      active.forEach(r => buckets[infectionTypeBucket(r)]++);
-
-      return `
-        <article class="page">
-          <h2>DAILY INFECTION PREVENTION SURVEY-READINESS UPDATE REPORT</h2>
-          ${reportHeader(date, unitId)}
-          <section class="sec"><h3>A1. Surveillance Summary</h3>
-            ${li('New infections today', m.newInfections)}
-            ${li('Active IP cases today', m.activeIPCases)}
-            ${li('Resp / GI / UTI / SSTI / Other', `${buckets.Resp} / ${buckets.GI} / ${buckets.UTI} / ${buckets.SSTI} / ${buckets.Other}`)}
-            <div class="small">Actions taken today: [ENTER …]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A2. Isolation / Precautions / EBP</h3>
-            ${li('New precautions initiated today', m.newPrecautionsInitiated)}
-            ${li('Precautions discontinued today', m.precautionsDiscontinued)}
-            ${li('Active EBP count', m.residentsOnEBP)}
-            <div class="small">PPE supply status: [ENTER …]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A3. MDRO / Culture Follow-up</h3>
-            ${li('MDRO active today', m.mdroActive)}
-            ${li('Cultures collected today', m.culturesCollectedToday)}
-            ${li('Cultures pending follow-up', m.culturesPendingFollowup)}
-            <div class="small">Notes: [ENTER …]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A4. Outbreak Monitoring</h3>
-            ${li('Active outbreaks today', m.outbreaksActiveToday)}
-            ${li('Outbreak cases today', m.outbreakCasesToday)}
-            <div class="small">DOH notification: [CHECK IF APPLICABLE]</div>
-            <div class="small">Control measures: [N/A IF NONE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A5. Antibiotic Stewardship</h3>
-            ${li('New ABT starts today', m.newABTStarts)}
-            ${li('Active ABT courses today', m.activeABTCourses)}
-            ${li('% with documented indication', `${m.abxWithIndicationPct}%`)}
-            ${li('Timeouts due today', m.abxTimeoutsDueToday)}
-            ${li('Timeouts completed today', m.abxTimeoutsCompletedToday)}
-          </section>
-          <section class="sec"><h3>A6. Immunization Activity</h3>
-            ${li('Vaccines given today', m.vaccinesGivenToday)}
-            ${li('Declines today', m.vaxDeclinesToday)}
-            ${li('Due / Overdue', `${m.vaxDueCount} / ${m.vaxOverdueCount}`)}
-          </section>
-          <section class="sec"><h3>A7. Staff Illness / Exposure</h3>
-            <div class="small">Staff illness reported: [CHECK IF APPLICABLE]</div>
-            <div class="small">Work restrictions: [CHECK IF APPLICABLE]</div>
-            <div class="small">Exposure incidents: [N/A IF NONE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A8. Environmental Cleaning</h3>
-            <div class="small">Issues identified: [CHECK IF APPLICABLE]</div>
-            <div class="small">High-risk areas addressed: [N/A IF NONE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>A9. Education / Compliance</h3>
-            <div class="small">Audit notes: [N/A IF NONE]</div>
-            <div class="small">Coaching provided: [CHECK IF APPLICABLE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>Signatures</h3>
-            <div>Prepared by signature: _________________________ Date: ___________</div>
-            <div>Reviewed by signature: _________________________ Date: ___________</div>
-          </section>
-        </article>`;
-    }
-
-    function residentQuickList(db, date, unitId) {
-      const rows = db.records.ip_cases
-        .filter(r => matchesUnit(r, unitId) && isActiveOnDate(r, date))
-        .slice(0, 10)
-        .map(r => {
-          const name = pick(r, ['residentName', 'name', 'patientName']) || '[ENTER …]';
-          const room = pick(r, ['room', 'roomNumber']) || '[ENTER …]';
-          return `<li>${name} — ${room}</li>`;
-        });
-      return rows.length ? `<ol>${rows.join('')}</ol>` : '<div class="small">[N/A IF NONE]</div>';
-    }
-
-    function unitBreakdownTable(db, date) {
-      const units = collectUnits(db).filter(u => u !== 'facility');
-      if (!units.length) return '<div class="small">[N/A IF NONE]</div>';
-      const body = units.map(u => {
-        const m = deriveMetrics(db, date, u);
-        return `<tr><td>${u}</td><td>${m.activeIPCases}</td><td>${m.newPrecautionsInitiated}</td><td>${m.newInfections}</td></tr>`;
-      }).join('');
-      return `<table><thead><tr><th>Unit</th><th>Active Precautions</th><th>New Precautions</th><th>New Infections</th></tr></thead><tbody>${body}</tbody></table>`;
-    }
-
-    function renderUnitPage(db, date, unitId) {
-      const m = deriveMetrics(db, date, unitId);
-      return `
-        <article class="page">
-          <h2>DAILY UNIT INFECTION PREVENTION UPDATE</h2>
-          ${reportHeader(date, unitId)}
-          <section class="sec"><h3>B1. Unit Isolation Status</h3>
-            ${li('Total on precautions today', m.activeIPCases)}
-            ${li('New precautions initiated today', m.newPrecautionsInitiated)}
-            ${li('Discontinued today', m.precautionsDiscontinued)}
-            <div class="small">Signage verified: [CHECK IF APPLICABLE]</div>
-            <div class="small">Quick list (top 10):</div>${residentQuickList(db, date, unitId)}
-            ${unitId === 'facility' ? unitBreakdownTable(db, date) : ''}
-          </section>
-          <section class="sec"><h3>B2. Symptom Surveillance</h3>
-            <div class="small">Fever cases today: [ENTER …]</div>
-            <div class="small">Respiratory symptoms: [ENTER …]</div>
-            <div class="small">GI symptoms: [ENTER …]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>B3. Device / Wound Monitoring</h3>
-            <div class="small">Foley concerns: [CHECK IF APPLICABLE]</div>
-            <div class="small">Feeding tube concerns: [CHECK IF APPLICABLE]</div>
-            <div class="small">Wound concerns: [CHECK IF APPLICABLE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>B4. Equipment Cleaning</h3>
-            <div class="small">Shared equipment cleaned: [CHECK IF APPLICABLE]</div>
-            <div class="small">Glucometer cleaning verified: [CHECK IF APPLICABLE]</div>
-            <div class="small">Isolation equipment handling compliant: [CHECK IF APPLICABLE]</div>
-          </section>
-          <section class="sec"><h3>B5. Hand Hygiene / PPE</h3>
-            <div class="small">Compliance status: [ENTER …]</div>
-            <div class="small">Supplies at point of care: [CHECK IF APPLICABLE]</div>
-            <div class="small">Coaching provided: [CHECK IF APPLICABLE]</div>
-          </section>
-          <section class="sec"><h3>B6. Reporting / Escalation</h3>
-            <div class="small">IP nurse notified: [CHECK IF APPLICABLE]</div>
-            <div class="small">Provider notified: [CHECK IF APPLICABLE]</div>
-            <div class="small">Incident reports filed: [CHECK IF APPLICABLE]</div>
-            <div class="small">Notes: [N/A IF NONE]</div><div class="hand"></div>
-          </section>
-          <section class="sec"><h3>Signatures</h3>
-            <div>Charge Nurse signature: _______________________ Date: ___________</div>
-            <div>Unit Manager signature: _______________________ Date: ___________</div>
-          </section>
-        </article>`;
-    }
-
-    function renderPreview(which) {
-      const date = els.reportDate.value;
-      const unitId = els.unitSelect.value;
-      let html = '';
-      if (which === 'ip' || which === 'both') html += renderIPPage(dbState, date, unitId);
-      if (which === 'unit' || which === 'both') html += renderUnitPage(dbState, date, unitId);
-      els.reportPreview.innerHTML = html;
-      renderWeeklySummary();
-      renderDebug();
-    }
-
-    function renderWeeklySummary() {
-      const unitId = els.unitSelect.value;
-      const date = els.reportDate.value;
-      const list = dbState.records.ip_daily_metrics.filter(r => r.unitId === unitId);
-      const end = new Date(`${date}T00:00:00`);
-      const start = new Date(end);
-      start.setDate(start.getDate() - 6);
-      const startISO = toISODate(start);
-      const rows = list.filter(r => r.date >= startISO && r.date <= date).sort((a, b) => a.date.localeCompare(b.date));
-
-      if (!rows.length) {
-        els.weeklySummary.innerHTML = '<div class="small">No saved metrics for selected unit/date range.</div>';
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Infection Prevention Survey-Readiness Update Report</title>
+    <style>
+      @page {
+        size: Letter;
+        margin: 0.5in;
       }
 
-      const sum = f => rows.reduce((n, r) => n + (Number(r[f]) || 0), 0);
-      const residentDays = sum('residentDays');
-      const infections = sum('newInfections');
-      const per1000 = residentDays ? ((infections / residentDays) * 1000).toFixed(2) : 'N/A';
-      const tRows = rows.map(r => `<tr><td>${r.date}</td><td>${r.newInfections}</td><td>${r.activeIPCases}</td><td>${r.newABTStarts}</td><td>${r.vaccinesGivenToday}</td></tr>`).join('');
-
-      els.weeklySummary.innerHTML = `
-        <div><strong>Total new infections:</strong> ${infections}</div>
-        <div><strong>Total active IP snapshots:</strong> ${sum('activeIPCases')}</div>
-        <div><strong>Total ABT starts:</strong> ${sum('newABTStarts')}</div>
-        <div><strong>Total vaccines given:</strong> ${sum('vaccinesGivenToday')}</div>
-        <div><strong>Per 1000 resident-days:</strong> ${per1000}</div>
-        <table><thead><tr><th>Date</th><th>New Inf</th><th>Active IP</th><th>ABT Starts</th><th>Vax Given</th></tr></thead><tbody>${tRows}</tbody></table>`;
-    }
-
-    async function saveDailyMetrics() {
-      const date = els.reportDate.value;
-      const unitId = els.unitSelect.value;
-      const metric = deriveMetrics(dbState, date, unitId);
-      upsertDailyMetric(dbState, metric);
-      await suiteSaveDBAsync(dbState);
-      lastSavedAt = new Date().toISOString();
-      renderWeeklySummary();
-      renderDebug();
-      alert('Saved to db.records.ip_daily_metrics');
-    }
-
-    function showWarning(message) {
-      els.warningBanner.textContent = message;
-      els.warningBanner.style.display = 'block';
-    }
-
-    function validateCompatibility() {
-      const problems = [];
-      const schemaVersion = dbState.schemaVersion || '0.0.0';
-      if (compareVersions(schemaVersion, SCHEMA_VERSION_COMPAT_MIN) < 0 || compareVersions(schemaVersion, SCHEMA_VERSION_COMPAT_MAX) > 0) {
-        problems.push(`schemaVersion ${schemaVersion} outside compatible range ${SCHEMA_VERSION_COMPAT_MIN}..${SCHEMA_VERSION_COMPAT_MAX}`);
+      * {
+        box-sizing: border-box;
       }
 
-      const capsObj = dbState.capabilities && typeof dbState.capabilities === 'object' ? dbState.capabilities : {};
-      const caps = new Set([
-        ...Object.keys(capsObj).filter(k => capsObj[k]),
-        ...Object.keys(capsObj).filter(k => capsObj[k] === true),
-        ...(Array.isArray(dbState.capabilities) ? dbState.capabilities : [])
-      ]);
-      CAPABILITIES_REQUIRED.forEach(c => { if (!caps.has(c)) problems.push(`missing required capability: ${c}`); });
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111;
+        background: #fff;
+        font-size: 11pt;
+        line-height: 1.35;
+      }
 
-      if (problems.length) showWarning(`Compatibility warning: ${problems.join(' | ')}`);
-    }
+      .report {
+        width: 100%;
+        max-width: 7.5in;
+        margin: 0 auto;
+      }
 
-    function postModuleHello() {
-      const msg = { type: 'MODULE_HELLO', appId: APP_ID, buildTag: BUILD_TAG, ts: Date.now() };
-      try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); } catch (_) {}
-      try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (_) {}
-    }
+      .header {
+        border: 1.5px solid #111;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
 
-    function waitForAck(timeoutMs = 1200) {
-      return new Promise(resolve => {
-        let done = false;
-        const timer = setTimeout(() => {
-          if (done) return;
-          done = true;
-          window.removeEventListener('message', onMessage);
-          resolve(null);
-        }, timeoutMs);
+      .header-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 24px;
+        margin-bottom: 10px;
+      }
 
-        function onMessage(ev) {
-          const data = ev.data || {};
-          if (data.type !== 'UNIFIED_HELLO_ACK') return;
-          clearTimeout(timer);
-          window.removeEventListener('message', onMessage);
-          if (!done) {
-            done = true;
-            resolve(data);
-          }
+      .title {
+        text-align: center;
+        font-size: 14pt;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        margin: 8px 0 6px;
+        text-transform: uppercase;
+      }
+
+      .instruction {
+        text-align: center;
+        font-size: 10pt;
+        margin: 0;
+      }
+
+      .section {
+        margin: 10px 0;
+        page-break-inside: avoid;
+      }
+
+      h2 {
+        margin: 0;
+        padding: 4px 0;
+        font-size: 12pt;
+        font-weight: 700;
+        border-bottom: 1px solid #111;
+      }
+
+      .preface {
+        font-size: 9.5pt;
+        color: #333;
+        margin: 5px 0 8px;
+      }
+
+      .subsection {
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px solid #777;
+        page-break-inside: avoid;
+      }
+
+      .subsection h3 {
+        margin: 0 0 5px;
+        font-size: 10.5pt;
+        font-weight: 700;
+      }
+
+      .item {
+        margin: 2px 0;
+      }
+
+      .placeholder {
+        font-weight: 700;
+      }
+
+      .line {
+        border-bottom: 1px solid #444;
+        height: 20px;
+        margin: 3px 0 4px;
+      }
+
+      .line.tall {
+        height: 26px;
+      }
+
+      .line-block {
+        margin: 6px 0;
+      }
+
+      hr {
+        border: none;
+        border-top: 1px solid #777;
+        margin: 8px 0;
+      }
+
+      .signature-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: end;
+        margin-top: 10px;
+      }
+
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+
+      .no-print-controls {
+        border: 1px solid #777;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .control-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .control-grid label {
+        display: block;
+        font-size: 9pt;
+        margin-bottom: 2px;
+      }
+
+      .control-grid input,
+      .control-grid select,
+      .control-grid button {
+        width: 100%;
+        border: 1px solid #666;
+        padding: 5px 7px;
+        font-size: 10pt;
+      }
+
+      .auto-note {
+        font-size: 9pt;
+        color: #333;
+        margin: 5px 0 0;
+      }
+
+      .auto-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 6px;
+        font-size: 9.5pt;
+      }
+
+      .auto-table th,
+      .auto-table td {
+        border: 1px solid #666;
+        padding: 4px 6px;
+        vertical-align: top;
+      }
+
+      .binder-divider {
+        margin: 12px 0 8px;
+        border-top: 2px solid #111;
+        border-bottom: 1px solid #777;
+        padding: 3px 0;
+        text-align: center;
+        font-size: 9pt;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+
+      @media screen {
+        body {
+          padding: 12px;
+        }
+        .report {
+          border: 1px solid #b5b5b5;
+          padding: 14px;
+        }
+      }
+
+      @media print {
+        body {
+          padding: 0;
         }
 
-        window.addEventListener('message', onMessage);
-      });
-    }
+        .no-print-controls {
+          display: none;
+        }
 
-    function renderDebug() {
-      const unitCount = collectUnits(dbState).length;
-      const schemaVersion = dbState.schemaVersion || 'unknown';
-      const ack = helloAck ? 'received' : 'not received';
-      els.debugPanel.innerHTML = `
-        <div>APP_ID: ${APP_ID}</div>
-        <div>BUILD_TAG: ${BUILD_TAG}</div>
-        <div>Detected schemaVersion: ${schemaVersion}</div>
-        <div>Unit list count: ${unitCount}</div>
-        <div>Hello ACK: ${ack}</div>
-        <div>Last metrics saved: ${lastSavedAt || '[N/A IF NONE]'}</div>
-        <div>Required capabilities: ${CAPABILITIES_REQUIRED.join(', ')}</div>
-        <div>Optional capabilities: ${CAPABILITIES_OPTIONAL.join(', ')}</div>`;
-    }
+        .report {
+          border: none;
+          padding: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="report">
+      <section class="no-print-controls">
+        <div class="control-grid">
+          <div>
+            <label for="reportDate">Report date</label>
+            <input id="reportDate" type="date" />
+          </div>
+          <div>
+            <label for="unitSelect">Unit</label>
+            <select id="unitSelect"></select>
+          </div>
+          <div>
+            <label for="facilityInput">Facility Name</label>
+            <input
+              id="facilityInput"
+              type="text"
+              placeholder="[ENTER FACILITY NAME]"
+            />
+          </div>
+          <div>
+            <label>&nbsp;</label>
+            <button id="autofillButton" type="button">
+              Auto-fill from Active Records
+            </button>
+          </div>
+        </div>
+        <p class="auto-note">
+          Auto-fill reads from <strong>UNIFIED_DB_V1</strong> (ip_cases, abx,
+          vax). If unavailable, placeholders remain for manual completion.
+        </p>
+      </section>
 
-    function initUnits() {
-      const units = collectUnits(dbState);
-      els.unitSelect.innerHTML = units.map(u => `<option value="${u}">${u === 'facility' ? 'Facility (All Units)' : u}</option>`).join('');
-    }
+      <header class="header">
+        <div class="header-grid">
+          <div>
+            <strong>Facility Name:</strong>
+            <span class="placeholder" id="facilityName"
+              >[ENTER FACILITY NAME]</span
+            >
+          </div>
+          <div>
+            <strong>Unit (if applicable):</strong>
+            <span class="placeholder" id="unitName">[ENTER UNIT]</span>
+          </div>
+          <div>
+            <strong>Date of Report:</strong>
+            <span class="placeholder" id="dateOfReport">[ENTER DATE]</span>
+          </div>
+          <div>
+            <strong>Prepared By:</strong>
+            <span class="placeholder">[ENTER NAME/TITLE]</span>
+          </div>
+          <div>
+            <strong>Reviewed By:</strong>
+            <span class="placeholder">[ENTER SUPERVISOR NAME/TITLE]</span>
+          </div>
+        </div>
+        <div class="title">
+          Daily Infection Prevention Survey-Readiness Update Report
+        </div>
+        <p class="instruction">
+          This form is completed DAILY to document infection surveillance,
+          actions taken, and follow-up at both the facility and unit level.
+        </p>
+      </header>
 
-    function printReportOnly() {
-      window.print();
-    }
+      <div class="binder-divider">
+        BINDER SECTION DIVIDER — FACILITY-WIDE IP
+      </div>
+      <section class="section">
+        <h2>
+          SECTION A — FACILITY-WIDE IP PROGRAM UPDATE (For IP Nurse Binder)
+        </h2>
+        <p class="preface">
+          Section A documents facility-wide infection prevention and control
+          activity for the day, using standardized surveillance criteria and
+          evidence-based practice.
+        </p>
 
-    async function init() {
-      els.reportDate.value = toISODate(new Date());
-      postModuleHello();
-      helloAck = await waitForAck();
-      if (!helloAck) showWarning('Handshake warning: UNIFIED_HELLO_ACK not received. Module continues in standalone mode.');
+        <div class="subsection">
+          <h3>1. Surveillance Summary (Facility-Wide)</h3>
+          <div class="item">
+            • Surveillance criteria used today (e.g., McGeer/NHSN):
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • New infections identified today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • Primary infection syndromes today:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Residents with new or ongoing infections (Name/Room/Diagnosis):
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Source of detection: <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Actions taken:
+            <span class="placeholder">[DESCRIBE ACTION TAKEN]</span>
+          </div>
+          <div class="item">
+            • Entered into surveillance tracking log / software:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="line-block">
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+          </div>
+        </div>
 
-      dbState = normalizeDB(suiteLoadDB());
-      validateCompatibility();
-      initUnits();
-      renderPreview('both');
-    }
+        <div class="subsection">
+          <h3>
+            2. Isolation, Enhanced Barrier Precautions (EBP) &amp;
+            Transmission-Based Precautions
+          </h3>
+          <div class="item">
+            • Auto-populated active precautions snapshot:
+            <span class="placeholder" id="autoPrecautionsSummary"
+              >[N/A IF NONE]</span
+            >
+          </div>
+          <table class="auto-table" id="precautionsTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Room</th>
+                <th>Unit</th>
+                <th>Type</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="item">
+            • New transmission-based precautions initiated today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Resident name(s)/room(s) and type:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Precautions discontinued today:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Residents on EBP today:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • EBP implementation verified:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Isolation / EBP signage and door instructions correct:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • PPE supply status for isolation/EBP rooms:
+            <span class="placeholder">[ADEQUATE / LOW / CRITICAL]</span>
+          </div>
+          <div class="item">
+            • Any deviation from policy noted:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+        </div>
 
-    els.btnIP.addEventListener('click', () => renderPreview('ip'));
-    els.btnUnit.addEventListener('click', () => renderPreview('unit'));
-    els.btnBoth.addEventListener('click', () => renderPreview('both'));
-    els.btnSave.addEventListener('click', () => saveDailyMetrics().catch(err => showWarning(`Save failed: ${err.message || err}`)));
-    els.btnPrint.addEventListener('click', printReportOnly);
-    els.unitSelect.addEventListener('change', () => renderPreview('both'));
-    els.reportDate.addEventListener('change', () => renderPreview('both'));
+        <div class="subsection">
+          <h3>3. Outbreak &amp; Cluster Monitoring</h3>
+          <div class="item">
+            • Suspected outbreak activity today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Units involved and syndrome:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Number of residents in current cluster:
+            <span class="placeholder">[NUMBER / N/A]</span>
+          </div>
+          <div class="item">
+            • Testing performed today:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Public health or DOH notification required today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • If YES, date/time notified and contact:
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Interim control measures implemented:
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="line-block">
+            <div class="line"></div>
+            <div class="line"></div>
+          </div>
+        </div>
 
-    init().catch(err => showWarning(`Initialization warning: ${err.message || err}`));
-  </script>
-</body>
+        <div class="subsection">
+          <h3>4. Antibiotic Stewardship Activity</h3>
+          <div class="item">
+            • Auto-populated new antibiotic starts (selected date):
+            <span class="placeholder" id="autoAbxStarts">[NUMBER / NONE]</span>
+          </div>
+          <table class="auto-table" id="abxTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Unit</th>
+                <th>Medication</th>
+                <th>Indication</th>
+                <th>Start Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="item">
+            • New antibiotic starts today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • Infection indication(s) documented:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Indications reviewed with evidence-based criteria:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Cultures obtained when indicated:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+          <div class="item">
+            • 48–72 hour antibiotic timeout review completed:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+          <div class="item">
+            • Opportunities identified:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Stewardship concerns:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Provider/pharmacist notified:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>5. Immunization Program Activity</h3>
+          <div class="item">
+            • Auto-populated vaccines administered today:
+            <span class="placeholder" id="autoVaccineCount"
+              >[DESCRIBE OR NONE]</span
+            >
+          </div>
+          <table class="auto-table" id="vaccineTable">
+            <thead>
+              <tr>
+                <th>Resident</th>
+                <th>Unit</th>
+                <th>Vaccine</th>
+                <th>Status</th>
+                <th>Date Given</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="5">[SEE ATTACHED LOG / N/A]</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="item">
+            • Vaccines administered today:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • New admissions/readmissions screened for vaccine status:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Refusals/declinations today:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Resident/family education on vaccination provided:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Any barriers or supply issues:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>6. Staff Illness, Exposure &amp; Work Restrictions</h3>
+          <div class="item">
+            • Staff illness reported today:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Work restrictions/exclusions implemented:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Exposure incidents:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Occupational health notified as required:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+          <div class="item">
+            • Follow-up actions planned:
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>7. Environmental Infection Control (Facility-Level)</h3>
+          <div class="item">
+            • Environmental/cleaning concerns identified:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Location(s) and issues:
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • High-risk areas rounded today:
+            <span class="placeholder">[LIST OR N/A]</span>
+          </div>
+          <div class="item">
+            • Terminal/enhanced cleaning performed:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Disinfectant supply status facility-wide:
+            <span class="placeholder">[ADEQUATE / LOW / CRITICAL]</span>
+          </div>
+          <div class="item">
+            • Linen/waste/sharps concerns noted:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>8. Education, Observation &amp; Compliance Activities</h3>
+          <div class="item">
+            • Infection prevention education provided today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Topic(s): <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Target audience:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Hand hygiene or PPE observations performed:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Direct observations:
+            <span class="placeholder">[NUMBER COMPLETED]</span>
+          </div>
+          <div class="item">
+            • Noncompliance episodes noted:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Corrective actions taken:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Staff/department requiring focused follow-up:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>9. Communication &amp; Reporting (Facility-Level)</h3>
+          <div class="item">
+            • Providers notified of infection-related changes today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Key provider notifications:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Resident/family notifications:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Resident/family notification summary:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Administrative/leadership updates provided:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • NHSN/mandated reporting performed:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+          <div class="item">
+            • Module(s) updated:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>10. Follow-Up Items &amp; QAPI Linkage</h3>
+          <div class="item">
+            • Issues requiring follow-up:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Items referred to QAPI/performance improvement project:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • If YES, description and responsible person/department:
+            <span class="placeholder">[DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Target date for follow-up completion:
+            <span class="placeholder">[ENTER DATE]</span>
+          </div>
+          <div class="line-block">
+            <div class="line"></div>
+            <div class="line"></div>
+            <div class="line"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="page-break"></div>
+
+      <div class="binder-divider">BINDER SECTION DIVIDER — UNIT-LEVEL IP</div>
+      <section class="section">
+        <h2>
+          SECTION B — UNIT-LEVEL INFECTION PREVENTION UPDATE (For Unit Binder)
+        </h2>
+        <p class="preface">
+          Section B is completed at the unit level to document point-of-care
+          infection prevention status and actions for this shift/day.
+        </p>
+
+        <div class="subsection">
+          <h3>1. Current Isolation, EBP &amp; Signage on Unit</h3>
+          <div class="item">
+            • Total residents on transmission-based precautions:
+            <span class="placeholder">[NUMBER]</span>
+          </div>
+          <div class="item">
+            • Residents on Enhanced Barrier Precautions (EBP):
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • New precautions/EBP initiated today:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Precautions/EBP discontinued today:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Signage at room entrances correct and visible:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • PPE and supplies available at point of care:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Any observed deviation from protocol:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>2. Symptom Surveillance on Unit</h3>
+          <div class="item">
+            • New fever cases today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • New respiratory symptoms today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • New GI symptoms today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • Skin/wound infection concerns raised today:
+            <span class="placeholder">[NUMBER / NONE]</span>
+          </div>
+          <div class="item">
+            • Any suspected cluster on this unit:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Provider/IP notified for concerning symptoms or cluster:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>3. Device &amp; Wound Monitoring</h3>
+          <div class="item">
+            • Residents with indwelling urinary catheters:
+            <span class="placeholder">[NUMBER]</span>
+          </div>
+          <div class="item">
+            • Catheter issues or potential CAUTI concerns:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Residents with central lines/vascular devices:
+            <span class="placeholder">[NUMBER]</span>
+          </div>
+          <div class="item">
+            • Line care bundle concerns:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Residents with feeding tubes/other invasive devices:
+            <span class="placeholder">[NUMBER]</span>
+          </div>
+          <div class="item">
+            • Device-related issues or infection concerns:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Wounds with signs/symptoms of infection:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+          <div class="item">
+            • Device/wound concerns communicated to provider/IP:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>4. Equipment &amp; Environmental Cleaning (Unit-Level)</h3>
+          <div class="item">
+            • Shared equipment cleaned between residents per protocol:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Glucometer cleaning/disinfection verified:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+          <div class="item">
+            • Isolation equipment handled and cleaned correctly:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • High-touch common surfaces appear clean and uncluttered:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Environmental/cleaning concern noted:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+          <div class="item">
+            • Environmental services notified for follow-up:
+            <span class="placeholder">[YES/NO / N/A]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>5. Hand Hygiene &amp; PPE Compliance (Unit Snapshot)</h3>
+          <div class="item">
+            • Overall hand hygiene compliance observed today:
+            <span class="placeholder">[ADEQUATE / NEEDS IMPROVEMENT]</span>
+          </div>
+          <div class="item">
+            • Approximate hand hygiene opportunities observed:
+            <span class="placeholder">[ENTER NUMBER / N/A]</span>
+          </div>
+          <div class="item">
+            • Approximate missed hand hygiene opportunities:
+            <span class="placeholder">[ENTER NUMBER / N/A]</span>
+          </div>
+          <div class="item">
+            • PPE use observed during resident care:
+            <span class="placeholder">[ADEQUATE / NEEDS IMPROVEMENT]</span>
+          </div>
+          <div class="item">
+            • Immediate feedback/coaching provided:
+            <span class="placeholder">[YES/NO / DESCRIBE]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>6. Staff Education / Just-in-Time Coaching on Unit</h3>
+          <div class="item">
+            • Just-in-time teaching provided today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Topics covered: <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Staff groups reached:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Staff requiring follow-up education:
+            <span class="placeholder">[LIST OR NONE]</span>
+          </div>
+          <div class="item">
+            • Education materials used/provided:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+        </div>
+
+        <div class="subsection">
+          <h3>7. Reporting, Escalation &amp; Unit Leadership Involvement</h3>
+          <div class="item">
+            • IP Nurse notified of unit concerns today:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • What was reported:
+            <span class="placeholder">[DESCRIBE OR N/A]</span>
+          </div>
+          <div class="item">
+            • Provider notifications made:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Incident/occurrence reports filed:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Discussed during unit huddle/shift report:
+            <span class="placeholder">[YES/NO]</span>
+          </div>
+          <div class="item">
+            • Issues requiring escalation to leadership:
+            <span class="placeholder">[DESCRIBE OR NONE]</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="binder-divider">
+        BINDER SECTION DIVIDER — SIGNATURES &amp; NOTES
+      </div>
+      <section class="section">
+        <h2>SECTION C — SIGNATURES &amp; ADDITIONAL NOTES</h2>
+        <div class="signature-row">
+          <div>
+            <strong>Prepared by (Unit or Facility Representative):</strong>
+            __________________________________________
+          </div>
+          <div><strong>Date:</strong> __________</div>
+        </div>
+        <div class="signature-row">
+          <div>
+            <strong>Reviewed by (IP Nurse / DON / Designee):</strong>
+            __________________________________________
+          </div>
+          <div><strong>Date:</strong> __________</div>
+        </div>
+        <hr />
+        <div><strong>Additional Notes / Narrative Summary:</strong></div>
+        <div class="line-block">
+          <div class="line tall"></div>
+          <div class="line tall"></div>
+          <div class="line tall"></div>
+          <div class="line tall"></div>
+          <div class="line tall"></div>
+          <div class="line tall"></div>
+        </div>
+        <div class="item">
+          Surveyor questions / family concerns / emerging trends /
+          clarifications:
+          <span class="placeholder">[SEE ATTACHED LOG / N/A]</span>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      function safeParse(raw, fallback) {
+        try {
+          return JSON.parse(raw);
+        } catch (_err) {
+          return fallback;
+        }
+      }
+
+      function toISODate(value) {
+        if (!value) return null;
+        if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))
+          return value;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return null;
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      }
+
+      function pick(record, keys) {
+        for (const key of keys) {
+          if (
+            record &&
+            record[key] !== undefined &&
+            record[key] !== null &&
+            String(record[key]).trim() !== ""
+          ) {
+            return record[key];
+          }
+        }
+        return null;
+      }
+
+      function inferStartDate(record) {
+        return toISODate(
+          pick(record, [
+            "onsetDate",
+            "precautionStartDate",
+            "initiationDate",
+            "startDate",
+          ]),
+        );
+      }
+
+      function inferEndDate(record) {
+        return toISODate(
+          pick(record, [
+            "resolutionDate",
+            "precautionEndDate",
+            "dischargeDate",
+            "endDate",
+          ]),
+        );
+      }
+
+      function getUnit(record) {
+        return String(
+          pick(record, ["unit", "unitId", "locationUnit"]) || "",
+        ).trim();
+      }
+
+      function unitMatch(record, selectedUnit) {
+        if (selectedUnit === "facility") return true;
+        return getUnit(record) === selectedUnit;
+      }
+
+      function isActiveOnDate(record, reportDate) {
+        const startDate = inferStartDate(record);
+        const endDate = inferEndDate(record);
+        if (!startDate || startDate > reportDate) return false;
+        if (!endDate) return true;
+        return endDate >= reportDate;
+      }
+
+      function writeRows(tableId, rows, fallbackColspan) {
+        const body = document.querySelector(`#${tableId} tbody`);
+        if (!body) return;
+        if (!rows.length) {
+          body.innerHTML = `<tr><td colspan="${fallbackColspan}">[SEE ATTACHED LOG / N/A]</td></tr>`;
+          return;
+        }
+        body.innerHTML = rows
+          .map(
+            (cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`,
+          )
+          .join("");
+      }
+
+      function collectUnits(db) {
+        const units = new Set(["facility"]);
+        [
+          db.records?.ip_cases || [],
+          db.records?.abx || [],
+          db.records?.vax || [],
+        ].forEach((list) => {
+          list.forEach((record) => {
+            const unit = getUnit(record);
+            if (unit) units.add(unit);
+          });
+        });
+        return Array.from(units);
+      }
+
+      function normalize(db) {
+        return {
+          records: {
+            ip_cases: Array.isArray(db?.records?.ip_cases)
+              ? db.records.ip_cases
+              : [],
+            abx: Array.isArray(db?.records?.abx) ? db.records.abx : [],
+            vax: Array.isArray(db?.records?.vax) ? db.records.vax : [],
+          },
+        };
+      }
+
+      function applyAutoFill() {
+        const db = normalize(
+          safeParse(localStorage.getItem("UNIFIED_DB_V1"), {}),
+        );
+        const reportDate =
+          document.getElementById("reportDate").value || toISODate(new Date());
+        const selectedUnit =
+          document.getElementById("unitSelect").value || "facility";
+        const facilityValue = document
+          .getElementById("facilityInput")
+          .value.trim();
+
+        document.getElementById("facilityName").textContent =
+          facilityValue || "[ENTER FACILITY NAME]";
+        document.getElementById("unitName").textContent =
+          selectedUnit === "facility" ? "Facility (All Units)" : selectedUnit;
+        document.getElementById("dateOfReport").textContent =
+          reportDate || "[ENTER DATE]";
+
+        const activePrecautions = db.records.ip_cases.filter(
+          (record) =>
+            unitMatch(record, selectedUnit) &&
+            isActiveOnDate(record, reportDate),
+        );
+        const newAbx = db.records.abx.filter(
+          (record) =>
+            unitMatch(record, selectedUnit) &&
+            toISODate(pick(record, ["startDate", "orderDate", "createdAt"])) ===
+              reportDate,
+        );
+        const vaxGiven = db.records.vax.filter((record) => {
+          const status = String(pick(record, ["status"]) || "").toLowerCase();
+          return (
+            unitMatch(record, selectedUnit) &&
+            status === "given" &&
+            toISODate(
+              pick(record, ["dateGiven", "givenDate", "administrationDate"]),
+            ) === reportDate
+          );
+        });
+
+        document.getElementById("autoPrecautionsSummary").textContent =
+          activePrecautions.length
+            ? `${activePrecautions.length} active case(s)`
+            : "[N/A IF NONE]";
+        document.getElementById("autoAbxStarts").textContent = newAbx.length
+          ? String(newAbx.length)
+          : "[NUMBER / NONE]";
+        document.getElementById("autoVaccineCount").textContent =
+          vaxGiven.length
+            ? `${vaxGiven.length} dose(s) documented`
+            : "[DESCRIBE OR NONE]";
+
+        writeRows(
+          "precautionsTable",
+          activePrecautions.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            pick(record, ["room", "roomNumber", "location"]) || "[N/A IF NONE]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["precautionType", "isolationType", "protocol"]) ||
+              "[CHECK IF APPLICABLE]",
+            inferEndDate(record) ? "Closed" : "Active",
+          ]),
+          5,
+        );
+
+        writeRows(
+          "abxTable",
+          newAbx.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["antibiotic", "medication", "drug"]) ||
+              "[DESCRIBE ACTION TAKEN]",
+            pick(record, ["indication", "reason", "diagnosis"]) ||
+              "[N/A IF NONE]",
+            toISODate(pick(record, ["startDate", "orderDate", "createdAt"])) ||
+              "[N/A IF NONE]",
+          ]),
+          5,
+        );
+
+        writeRows(
+          "vaccineTable",
+          vaxGiven.map((record) => [
+            pick(record, ["residentName", "name", "mrn"]) || "[ENTER NAME]",
+            getUnit(record) || "[N/A IF NONE]",
+            pick(record, ["vaccineType", "vaccine", "type"]) || "[N/A IF NONE]",
+            pick(record, ["status"]) || "given",
+            toISODate(
+              pick(record, ["dateGiven", "givenDate", "administrationDate"]),
+            ) || "[N/A IF NONE]",
+          ]),
+          5,
+        );
+      }
+
+      (function initAutoFill() {
+        const unitSelect = document.getElementById("unitSelect");
+        const reportDate = document.getElementById("reportDate");
+        const db = normalize(
+          safeParse(localStorage.getItem("UNIFIED_DB_V1"), {}),
+        );
+        const units = collectUnits(db);
+        unitSelect.innerHTML = units
+          .map(
+            (unit) =>
+              `<option value="${unit}">${unit === "facility" ? "Facility (All Units)" : unit}</option>`,
+          )
+          .join("");
+        reportDate.value = toISODate(new Date());
+        document
+          .getElementById("autofillButton")
+          .addEventListener("click", applyAutoFill);
+        applyAutoFill();
+      })();
+    </script>
+  </body>
 </html>
