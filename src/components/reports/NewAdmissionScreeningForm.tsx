@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { format, parseISO, differenceInDays, subDays } from 'date-fns';
+import { format, parseISO, differenceInDays, subDays, isValid } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Printer, AlertTriangle, CheckCircle, Clock, Edit, XCircle, Syringe } from 'lucide-react';
@@ -88,11 +88,11 @@ const saveDateOverrides = (overrides: Record<string, string>) => {
 
 const parseDateSafe = (value?: string): Date | null => {
   if (!value) return null;
-  try {
-    return parseISO(value);
-  } catch {
-    return null;
-  }
+  const parsed = parseISO(value);
+  if (isValid(parsed)) return parsed;
+
+  const fallback = new Date(value);
+  return isValid(fallback) ? fallback : null;
 };
 
 const formatHistoryDate = (value?: string): string => {
@@ -145,34 +145,27 @@ const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormP
       
       // Check if resident has a valid admit date within the period
       if (admitDate) {
-        try {
-          const admit = parseISO(admitDate);
-          if (admit >= cutoffDate) {
-            isNewAdmission = true;
-          }
-        } catch {
-          // Invalid date
+        const admit = parseDateSafe(admitDate);
+        if (admit && admit >= cutoffDate) {
+          isNewAdmission = true;
         }
       }
       
       // Also check last_seen_census_at - if recently added to census
       const lastSeen = resident.last_seen_census_at;
       if (lastSeen && !isNewAdmission) {
-        try {
-          const seenDate = parseISO(lastSeen);
-          if (seenDate >= cutoffDate && !admitDate) {
-            // New to census without admit date - likely new admission
-            isNewAdmission = true;
-            admitDate = lastSeen; // Use census date as proxy
-          }
-        } catch {
-          // Invalid date
+        const seenDate = parseDateSafe(lastSeen);
+        if (seenDate && seenDate >= cutoffDate && !admitDate) {
+          // New to census without admit date - likely new admission
+          isNewAdmission = true;
+          admitDate = lastSeen; // Use census date as proxy
         }
       }
       
       if (!isNewAdmission) return;
       
-      const daysSinceAdmit = admitDate ? differenceInDays(today, parseISO(admitDate)) : 0;
+      const parsedAdmitDate = parseDateSafe(admitDate);
+      const daysSinceAdmit = parsedAdmitDate ? differenceInDays(today, parsedAdmitDate) : 0;
       
       // Check for existing clinical records
       const hasEBP = false;
@@ -258,7 +251,11 @@ const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormP
     return recentAdmissions.sort((a, b) => {
       if (!a.admitDate) return 1;
       if (!b.admitDate) return -1;
-      return parseISO(b.admitDate).getTime() - parseISO(a.admitDate).getTime();
+      const admitA = parseDateSafe(a.admitDate);
+      const admitB = parseDateSafe(b.admitDate);
+      if (!admitA) return 1;
+      if (!admitB) return -1;
+      return admitB.getTime() - admitA.getTime();
     });
   }, [db, cutoffDate, today, excludedMrns, dateOverrides, existingScreeningMrns]);
   
@@ -333,7 +330,8 @@ const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormP
     y += 7;
     doc.text(`Room: ${formData.room}`, 15, y);
     doc.text(`Unit: ${formData.unit}`, 80, y);
-    doc.text(`Admit Date: ${formData.admitDate ? format(parseISO(formData.admitDate), 'MM/dd/yyyy') : 'N/A'}`, 120, y);
+    const admitDate = parseDateSafe(formData.admitDate);
+    doc.text(`Admit Date: ${admitDate ? format(admitDate, 'MM/dd/yyyy') : 'N/A'}`, 120, y);
     
     // Vaccination section
     y += 15;
@@ -625,15 +623,18 @@ const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormP
                 </td>
               </tr>
             ) : (
-              pagedScreeningList.map((item) => (
-                <tr key={item.mrn} className={item.screeningStatus === 'overdue' ? 'bg-destructive/5' : ''}>
+              pagedScreeningList.map((item) => {
+                const parsedAdmitDate = parseDateSafe(item.admitDate);
+
+                return (
+                  <tr key={item.mrn} className={item.screeningStatus === 'overdue' ? 'bg-destructive/5' : ''}>
                   <td>{getStatusIcon(item.screeningStatus)}</td>
                   <td className="font-medium">{item.room}</td>
                   <td>
                     <div>{item.name}</div>
                     <div className="text-xs text-muted-foreground">{item.mrn}</div>
                   </td>
-                  <td>{item.admitDate ? format(parseISO(item.admitDate), 'MM/dd/yyyy') : '—'}</td>
+                  <td>{parsedAdmitDate ? format(parsedAdmitDate, 'MM/dd/yyyy') : '—'}</td>
                   <td>
                     <span className={item.daysSinceAdmit > 3 ? 'text-destructive font-medium' : ''}>
                       {item.daysSinceAdmit}
@@ -708,7 +709,8 @@ const NewAdmissionScreeningForm = ({ daysBack = 14 }: NewAdmissionScreeningFormP
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
