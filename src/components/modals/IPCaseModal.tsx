@@ -10,11 +10,12 @@ import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { IPCase, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { todayISO, toLocalISODate } from '@/lib/parsers';
+import { isoDateFromAny, todayISO, toLocalISODate } from '@/lib/parsers';
 import PillInput from '@/components/ui/pill-input';
 import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 import { checkDuplicateIPCase, formatValidationErrors, validateIPCase } from '@/lib/validators';
 import { createAuditLog } from '@/lib/audit';
+import { canonicalizeIPRow } from '@/lib/ipCaseFields';
 
 interface IPCaseModalProps {
   open: boolean;
@@ -247,7 +248,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
 
     const protocol = formData.precautionType || 'Standard Precautions';
     
-    const caseData: IPCase = {
+    const baseCaseData: IPCase = {
       id: editCase?.id || editCase?.record_id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: editCase?.record_id || editCase?.id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: formData.mrn,
@@ -279,6 +280,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       vaccineStatus: formData.vaccineStatus,
       createdAt: editCase?.createdAt || new Date().toISOString(),
     };
+
+    const caseData = canonicalizeIPRow(baseCaseData as Record<string, unknown>, (value) => isoDateFromAny(value) || '') as IPCase;
 
 
     const validation = validateIPCase(caseData);
@@ -313,6 +316,8 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     nextReview.setDate(nextReview.getDate() + reviewDays);
     caseData.nextReviewDate = toLocalISODate(nextReview);
     caseData.next_review_date = caseData.nextReviewDate;
+    caseData.next_review = caseData.nextReviewDate;
+    caseData.nextReview = caseData.nextReviewDate;
 
     if (editCase) {
       const idx = db.records.ip_cases.findIndex((c) => {
