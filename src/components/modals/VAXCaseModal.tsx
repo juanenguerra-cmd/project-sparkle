@@ -14,6 +14,7 @@ import { recordWorkflowMetric } from '@/lib/analytics/workflowMetrics';
 import { checkDuplicateVax, formatValidationErrors, validateVaxRecord } from '@/lib/validators';
 import { createAuditLog } from '@/lib/audit';
 import { normalizeVaccineName } from '@/lib/regulatory';
+import { normalizeVaxRecordShape } from '@/lib/vaxRecordFields';
 
 interface VAXCaseModalProps {
   open: boolean;
@@ -202,16 +203,18 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
 
     const now = nowISO();
     
-    const recordData: VaxRecord = {
+    const vaccineName = normalizeVaccineName(formData.vaccine);
+    const recordData: VaxRecord = normalizeVaxRecordShape({
       id: editRecord?.id || editRecord?.record_id || `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: editRecord?.record_id || editRecord?.id || `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      residentId: selectedResident?.residentId || selectedResident?.id || editRecord?.residentId,
       mrn: formData.mrn,
       residentName: formData.residentName,
       name: formData.residentName,
       unit: formData.unit,
       room: formData.room,
-      vaccine: normalizeVaccineName(formData.vaccine),
-      vaccine_type: normalizeVaccineName(formData.vaccine),
+      vaccine: vaccineName,
+      vaccine_type: vaccineName,
       dose: formData.dose,
       dateGiven: isVaccinated || isDeclined ? formData.dateGiven : '',
       date_given: isVaccinated || isDeclined ? formData.dateGiven : '',
@@ -221,7 +224,7 @@ const VAXCaseModal = ({ open, onClose, onSave, editRecord }: VAXCaseModalProps) 
       notes: formData.notes,
       createdAt: editRecord?.createdAt || now,
       administrationSource: formData.administrationSource || undefined,
-    };
+    }) as VaxRecord;
 
     const currentDb = loadDB();
 

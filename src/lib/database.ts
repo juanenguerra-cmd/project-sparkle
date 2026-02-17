@@ -28,6 +28,7 @@ import { migrateResidentIds, migrateWorkflowMetrics } from './migrations';
 import { deriveAbtStatus } from './abtStatus';
 import { encryptObject, decryptObject } from './encryption';
 import { checkAutoBackup } from './backup';
+import { normalizeVaxRecordShape } from './vaxRecordFields';
 
 export interface ICNDatabase {
   census: {
@@ -517,21 +518,33 @@ export const importDBFromJSON = async (
         const id = r.id || r.record_id || `vax_${r.mrn}_${r.vaccine || r.vaccineType}`;
         if (existingIds.has(id)) return;
         
-        db.records.vax.push({
+        db.records.vax.push(normalizeVaxRecordShape({
           id,
           record_id: id,
+          residentId: r.residentId || '',
           mrn: canonicalMRN(r.mrn || ''),
           name: r.name || r.patientName || r.residentName || '',
           residentName: r.name || r.patientName || r.residentName || '',
           unit: r.unit || '',
           room: r.room || '',
-          vaccine: r.vaccine || r.vaccineType || '',
-          vaccine_type: r.vaccine || r.vaccineType || '',
+          vaccine: r.vaccine || r.vaccineType || r.vaccine_type || '',
+          vaccine_type: r.vaccine || r.vaccineType || r.vaccine_type || '',
           status: r.status || 'due',
           dateGiven: r.dateGiven || r.date_given || r.date || '',
+          date_given: r.date_given || r.dateGiven || r.date || '',
           dueDate: r.dueDate || r.due_date || '',
-          createdAt: now
-        });
+          due_date: r.due_date || r.dueDate || '',
+          offerDate: r.offerDate || r.dateOffered || '',
+          dateOffered: r.dateOffered || r.offerDate || '',
+          administered_by: r.administered_by || r.administeredBy || r.givenBy || '',
+          administeredBy: r.administeredBy || r.administered_by || r.givenBy || '',
+          givenBy: r.givenBy || r.administeredBy || r.administered_by || '',
+          lot: r.lot || r.lotNumber || '',
+          lotNumber: r.lotNumber || r.lot || '',
+          site: r.site || r.administrationSite || '',
+          administrationSite: r.administrationSite || r.site || '',
+          createdAt: now,
+        }));
         existingIds.add(id);
       });
     }

@@ -10,6 +10,7 @@ import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { VaxRecord } from '@/lib/types';
 import { todayISO } from '@/lib/parsers';
 import { normalizeVaccineName } from '@/lib/regulatory';
+import { normalizeVaxRecordShape } from '@/lib/vaxRecordFields';
 
 interface VAXImportModalProps {
   open: boolean;
@@ -54,16 +55,18 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
       return;
     }
 
-    const newRecord: VaxRecord = {
+    const vaccineName = normalizeVaccineName(formData.vaccine);
+    const newRecord: VaxRecord = normalizeVaxRecordShape({
       id: `vax_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: `vax_${formData.mrn}_${formData.vaccine}`,
+      residentId: resident.residentId || resident.id,
       mrn: formData.mrn,
       residentName: resident.name,
       name: resident.name,
       unit: resident.unit,
       room: resident.room,
-      vaccine: normalizeVaccineName(formData.vaccine),
-      vaccine_type: normalizeVaccineName(formData.vaccine),
+      vaccine: vaccineName,
+      vaccine_type: vaccineName,
       dose: formData.dose,
       status: formData.status,
       dateGiven: formData.status === 'given' ? formData.dateGiven || todayISO() : undefined,
@@ -72,7 +75,7 @@ const VAXImportModal = ({ open, onClose, onImport }: VAXImportModalProps) => {
       due_date: formData.dueDate,
       notes: formData.notes,
       createdAt: new Date().toISOString()
-    };
+    }) as VaxRecord;
 
     db.records.vax.push(newRecord);
     addAudit(db, 'vax_add', `Added ${formData.vaccine} record for ${resident.name}`, 'vax');
