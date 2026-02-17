@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
 import { IPCase } from '@/lib/types';
+import { canonicalizeIPRow } from '@/lib/ipCaseFields';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
 
 interface IPImportModalProps {
@@ -50,7 +51,7 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
       return;
     }
 
-    const newCase: IPCase = {
+    const baseCase: IPCase = {
       id: `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       mrn: formData.mrn,
       residentName: resident.name,
@@ -66,8 +67,11 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
       onset_date: formData.onsetDate,
       status: 'Active',
       notes: formData.notes,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      record_id: '',
     };
+
+    const newCase = canonicalizeIPRow(baseCase as Record<string, unknown>, toLocalISODate) as IPCase;
 
     // Calculate next review date based on protocol
     const reviewDays = formData.protocol === 'EBP' 
@@ -78,6 +82,8 @@ const IPImportModal = ({ open, onClose, onImport }: IPImportModalProps) => {
     nextReview.setDate(nextReview.getDate() + reviewDays);
     newCase.nextReviewDate = toLocalISODate(nextReview);
     newCase.next_review_date = newCase.nextReviewDate;
+    newCase.next_review = newCase.nextReviewDate;
+    newCase.nextReview = newCase.nextReviewDate;
 
     db.records.ip_cases.push(newCase);
     addAudit(db, 'ip_add', `Added IP case: ${formData.infectionType} for ${resident.name}`, 'ip');

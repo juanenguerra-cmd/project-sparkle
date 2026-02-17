@@ -1,21 +1,10 @@
 import { format } from 'date-fns';
 import { addAudit, loadDB, saveDB } from '@/lib/database';
+import { canonicalizeIPRow, hasRequiredIPFields, IP_CENTRALIZED_COLUMNS } from '@/lib/ipCaseFields';
 import { isoDateFromAny } from '@/lib/parsers';
 import { collectColumns, convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
 
-const IP_PREFERRED_COLUMNS = [
-  'id', 'mrn', 'residentName', 'name', 'unit', 'room', 'status', 'case_status',
-  'infectionType', 'infection_type', 'protocol', 'isolationType', 'isolation_type',
-  'sourceOfInfection', 'source_of_infection', 'pathogen', 'organism',
-  'onsetDate', 'onset_date', 'precautionStartDate', 'resolutionDate', 'resolution_date',
-  'nextReviewDate', 'next_review_date', 'lastReviewDate', 'reviewNotes',
-  'triggerReason', 'highContactCare', 'signagePosted', 'suppliesStocked', 'roomCheckDate',
-  'exposureLinked', 'outbreakId', 'requiredPPE', 'nhsnPathogenCode', 'vaccineStatus',
-  'staffAssignments', 'closeContacts', 'commonAreasVisited', 'sharedEquipment', 'otherEquipment',
-  '_autoClosed', '_autoClosedReason', 'notes', 'createdAt', 'updatedAt',
-];
-
-const REQUIRED_COLUMNS = ['residentName', 'infectionType', 'onsetDate'];
+const REQUIRED_COLUMNS = ['residentName/name', 'infectionType/infection_type/pathogen/organism', 'onsetDate/onset_date/onset/event_date'];
 const ARRAY_FIELDS = ['highContactCare', 'commonAreasVisited', 'sharedEquipment'];
 
 export const exportIPToCSV = (): void => {
@@ -25,7 +14,7 @@ export const exportIPToCSV = (): void => {
     return;
   }
 
-  const columns = collectColumns(records, IP_PREFERRED_COLUMNS);
+  const columns = collectColumns(records, [...IP_CENTRALIZED_COLUMNS]);
   const csv = convertToCSV(records, columns);
   downloadCSV(csv, `ip-tracker-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.csv`);
 };
@@ -40,23 +29,23 @@ export const importIPFromCSV = async (file: File | null): Promise<{ newCount: nu
     throw new Error('CSV file is empty.');
   }
 
-  const missingColumns = REQUIRED_COLUMNS.filter((column) => !(column in rows[0]));
-  if (missingColumns.length > 0) {
-    throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+  const rowsWithRequiredFields = rows.filter((row) => hasRequiredIPFields(row));
+  if (rowsWithRequiredFields.length === 0) {
+    throw new Error(`Missing required data fields. Required aliases: ${REQUIRED_COLUMNS.join(', ')}`);
   }
 
   const db = loadDB();
   const existing = db.records.ip_cases as Array<Record<string, unknown>>;
-  const preview = summarizeIPChanges(rows, existing);
+  const preview = summarizeIPChanges(rowsWithRequiredFields, existing);
 
   const confirmed = window.confirm(
-    `Import ${rows.length} IP records?\n\n${preview.newCount} new records\n${preview.updateCount} updates\n\nMatching records are updated (not duplicated). Continue?`,
+    `Import ${rowsWithRequiredFields.length} IP records?\n\n${preview.newCount} new records\n${preview.updateCount} updates\n\nMatching records are updated (not duplicated). Continue?`,
   );
   if (!confirmed) {
     return { newCount: 0, updateCount: 0 };
   }
 
-  return upsertIPRecords(rows);
+  return upsertIPRecords(rowsWithRequiredFields);
 };
 
 const summarizeIPChanges = (
@@ -93,12 +82,14 @@ const upsertIPRecords = (rows: Array<Record<string, string>>): { newCount: numbe
 
     if (idx >= 0) {
       const current = existing[idx];
-      existing[idx] = { ...current, ...normalized, id: String(current.id || normalized.id || generateId()), updatedAt: now };
+      const canonicalId = String(current.id || current.record_id || normalized.id || normalized.record_id || generateId());
+      existing[idx] = { ...current, ...normalized, id: canonicalId, record_id: canonicalId, updatedAt: now };
       updateCount += 1;
       return;
     }
 
-    existing.unshift({ ...normalized, id: String(normalized.id || generateId()), createdAt: now, updatedAt: now });
+    const canonicalId = String(normalized.id || normalized.record_id || generateId());
+    existing.unshift({ ...normalized, id: canonicalId, record_id: canonicalId, createdAt: now, updatedAt: now });
     newCount += 1;
   });
 
@@ -137,16 +128,7 @@ const buildIPSignature = (record: Record<string, unknown>): string => {
 };
 
 const normalizeIPRecord = (row: Record<string, string>): Record<string, unknown> => {
-  const normalized: Record<string, unknown> = {
-    ...row,
-    id: row.id || '',
-    residentName: row.residentName || row.name || '',
-    infectionType: row.infectionType || row.infection_type || '',
-    sourceOfInfection: row.sourceOfInfection || row.source_of_infection || '',
-    onsetDate: toISODate(row.onsetDate || row.onset_date),
-    resolutionDate: toISODate(row.resolutionDate || row.resolution_date),
-    precautionStartDate: toISODate(row.precautionStartDate),
-  };
+  const normalized = canonicalizeIPRow(row, toISODate);
 
   ARRAY_FIELDS.forEach((field) => {
     const value = row[field];
