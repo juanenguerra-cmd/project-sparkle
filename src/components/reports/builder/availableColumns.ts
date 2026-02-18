@@ -190,6 +190,32 @@ export const DATA_SOURCE_COLUMNS: Record<DataSource, AvailableColumn[]> = {
     { id: 'totalCases', name: 'Total Cases', type: 'number', category: 'metrics' },
   ],
 
+
+  staff: [
+    { id: 'employeeId', name: 'Employee ID', type: 'text', category: 'identification', required: true },
+    { id: 'fullName', name: 'Full Name', type: 'text', category: 'identification', required: true },
+    { id: 'role', name: 'Role', type: 'text', category: 'position' },
+    { id: 'department', name: 'Department', type: 'text', category: 'organization' },
+    { id: 'status', name: 'Status', type: 'status', category: 'tracking' },
+    { id: 'hireDate', name: 'Hire Date', type: 'date', category: 'timeline' },
+    { id: 'notes', name: 'Notes', type: 'text', category: 'notes' },
+  ],
+
+  staffVaccination: [
+    { id: 'employeeId', name: 'Employee ID', type: 'text', category: 'identification', required: true },
+    { id: 'fullName', name: 'Full Name', type: 'text', category: 'identification', required: true },
+    { id: 'role', name: 'Role', type: 'text', category: 'position' },
+    { id: 'department', name: 'Department', type: 'text', category: 'organization' },
+    { id: 'status', name: 'Staff Status', type: 'status', category: 'tracking' },
+    { id: 'influenzaStatus', name: 'Influenza Status', type: 'status', category: 'vaccination' },
+    { id: 'influenzaLastDate', name: 'Influenza Last Date', type: 'date', category: 'vaccination' },
+    { id: 'influenzaLocation', name: 'Influenza Location', type: 'text', category: 'vaccination' },
+    { id: 'pneumoStatus', name: 'Pneumococcal Status', type: 'status', category: 'vaccination' },
+    { id: 'pneumoLastDate', name: 'Pneumococcal Last Date', type: 'date', category: 'vaccination' },
+    { id: 'covidStatus', name: 'COVID-19 Status', type: 'status', category: 'vaccination' },
+    { id: 'covidLastDate', name: 'COVID-19 Last Date', type: 'date', category: 'vaccination' },
+  ],
+
   contacts: [
     { id: 'id', name: 'Contact ID', type: 'text', category: 'identification' },
     { id: 'lineListingId', name: 'Line Listing ID', type: 'text', category: 'reference' },

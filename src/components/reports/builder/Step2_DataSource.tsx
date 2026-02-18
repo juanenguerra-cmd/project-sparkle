@@ -30,6 +30,8 @@ const Step2_DataSource = ({ template, onUpdate, onNext, onBack }: Props) => {
             <SelectItem value="line_listings">Line Listings</SelectItem>
             <SelectItem value="outbreaks">Outbreaks</SelectItem>
             <SelectItem value="contacts">Contact Tracing</SelectItem>
+            <SelectItem value="staff">Staff Roster</SelectItem>
+            <SelectItem value="staffVaccination">Staff Vaccination</SelectItem>
           </SelectContent>
         </Select>
       </div>

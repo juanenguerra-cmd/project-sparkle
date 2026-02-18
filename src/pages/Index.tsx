@@ -17,6 +17,8 @@ import AuditLogView from '@/components/views/AuditLogView';
 import UserManagementView from '@/components/views/UserManagementView';
 import SettingsView from '@/components/views/SettingsView';
 import ReferenceLibraryView from '@/components/views/ReferenceLibraryView';
+import StaffManagementPage from '@/pages/StaffManagementPage';
+import StaffVaccinationTrackerPage from '@/pages/StaffVaccinationTrackerPage';
 import DataManagementModal from '@/components/modals/DataManagementModal';
 import BackupReminderBanner from '@/components/BackupReminderBanner';
 import LockScreen from '@/components/LockScreen';
@@ -94,6 +96,10 @@ const Index = () => {
         return <UserManagementView />;
       case 'settings':
         return <SettingsView />;
+      case 'staff':
+        return <StaffManagementPage />;
+      case 'staff_vaccination':
+        return <StaffVaccinationTrackerPage />;
       default:
         return <DashboardView onNavigate={handleNavigate} />;
     }

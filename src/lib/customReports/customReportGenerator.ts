@@ -7,6 +7,8 @@ import type {
 } from '@/lib/types';
 import type { ICNDatabase } from '@/lib/database';
 import type { ReportData } from '@/lib/reportGenerators';
+import { getAllStaff } from '@/lib/stores/staffStore';
+import { getStaffVaccinationRows } from '@/lib/reports/staffVaccinationRows';
 
 export const generateCustomReport = (
   template: CustomReportTemplate,
@@ -49,6 +51,10 @@ const fetchDataFromSource = (source: DataSource, db: ICNDatabase): Record<string
       return db.records.outbreaks;
     case 'contacts':
       return db.records.contacts;
+    case 'staff':
+      return getAllStaff() as unknown as Record<string, unknown>[];
+    case 'staffVaccination':
+      return getStaffVaccinationRows({}) as unknown as Record<string, unknown>[];
     default:
       return [];
   }

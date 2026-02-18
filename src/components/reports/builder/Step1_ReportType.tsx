@@ -13,6 +13,8 @@ const OPTIONS: ReportTypeOption[] = [
   { id: 'medication', label: 'Medication Report', category: 'stewardship', defaultDataSource: 'abt' },
   { id: 'ip', label: 'Infection Prevention Log', category: 'surveillance', defaultDataSource: 'ip_cases' },
   { id: 'vax', label: 'Vaccination Tracker', category: 'vaccination', defaultDataSource: 'vaccinations' },
+  { id: 'staff_roster', label: 'Staff Roster', category: 'staff_employee', defaultDataSource: 'staff' },
+  { id: 'staff_vax_summary', label: 'Staff Vaccination Summary', category: 'staff_employee', defaultDataSource: 'staffVaccination' },
   { id: 'custom', label: 'Custom Combined Report', category: 'custom', defaultDataSource: 'notes' },
 ];
 
