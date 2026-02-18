@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Upload, Trash2 } from 'lucide-react';
 import { todayISO } from '@/lib/parsers';
 import ImportPreviewModal, { parseBackupPreview, BackupPreview, ImportMode } from './ImportPreviewModal';
+import { buildBackupSpreadsheetBlob, readBackupFileAsJson } from '@/lib/backupFile';
 
 interface DataManagementModalProps {
   open: boolean;
@@ -46,6 +47,33 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
       toast({
         title: 'Export Failed',
         description: 'Failed to export database',
+        variant: 'destructive'
+      });
+    }
+  }, [toast]);
+
+  const handleExportXlsx = useCallback(() => {
+    try {
+      const json = exportDBToJSON();
+      const blob = buildBackupSpreadsheetBlob(json);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `icn_hub_backup_${todayISO()}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      toast({
+        title: 'Data Exported',
+        description: 'Excel backup downloaded successfully'
+      });
+    } catch (err) {
+      console.error('XLSX export failed:', err);
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export Excel backup',
         variant: 'destructive'
       });
     }
@@ -94,7 +122,7 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
         clearDB();
       }
       
-      const text = await pendingFile.text();
+      const text = await readBackupFileAsJson(pendingFile);
       const result = await importDBFromJSON(text);
       
       if (result.success) {
@@ -163,7 +191,7 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
           <DialogHeader>
             <DialogTitle>Data Management</DialogTitle>
             <DialogDescription>
-              Export your data for backup or import from a previous backup
+              Export your data for backup or import from JSON/XLSX backups
             </DialogDescription>
           </DialogHeader>
           
@@ -176,12 +204,21 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
               <Download className="w-4 h-4 mr-2" />
               Export All Data (JSON)
             </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={handleExportXlsx}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export All Data (XLSX)
+            </Button>
             
             <div className="relative">
               <input 
                 type="file" 
                 ref={fileInputRef}
-                accept=".json,application/json"
+                accept=".json,.xlsx,.xls,application/json"
                 onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 style={{ display: 'block' }}
@@ -192,7 +229,7 @@ const DataManagementModal = ({ open, onClose, onDataChange }: DataManagementModa
                 disabled={importing}
               >
                 <Upload className="w-4 h-4 mr-2" />
-                {importing ? 'Importing...' : 'Import Data Backup'}
+                {importing ? 'Importing...' : 'Import Data Backup (JSON/XLSX)'}
               </Button>
             </div>
 
