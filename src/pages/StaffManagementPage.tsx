@@ -28,6 +28,24 @@ const DEPARTMENT_OPTIONS: { value: string; label: string }[] = [
 ];
 
 type SeasonalState = 'current' | 'outdated' | 'missing' | 'declined';
+type StaffFilterOption = 'all' | 'active' | 'inactive' | 'fluAttention' | 'covidAttention';
+type StaffSortOption = 'nameAsc' | 'nameDesc' | 'hireDateNewest' | 'hireDateOldest' | 'employeeIdAsc';
+
+const STAFF_FILTER_OPTIONS: { value: StaffFilterOption; label: string }[] = [
+  { value: 'all', label: 'All staff' },
+  { value: 'active', label: 'Active only' },
+  { value: 'inactive', label: 'Inactive only' },
+  { value: 'fluAttention', label: 'Influenza needs attention' },
+  { value: 'covidAttention', label: 'Covid-19 needs attention' },
+];
+
+const STAFF_SORT_OPTIONS: { value: StaffSortOption; label: string }[] = [
+  { value: 'nameAsc', label: 'Name (A → Z)' },
+  { value: 'nameDesc', label: 'Name (Z → A)' },
+  { value: 'hireDateNewest', label: 'Date hired (newest first)' },
+  { value: 'hireDateOldest', label: 'Date hired (oldest first)' },
+  { value: 'employeeIdAsc', label: 'Employee ID (A → Z)' },
+];
 
 function seasonBounds(today = new Date()): { start: Date; end: Date } {
   const year = today.getFullYear();
@@ -71,16 +89,36 @@ export function StaffManagementPage() {
   const [staff, setStaff] = useState<StaffMember[]>(() => getAllStaff());
   const [search, setSearch] = useState('');
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-  const [showInactive, setShowInactive] = useState(false);
+  const [filterOption, setFilterOption] = useState<StaffFilterOption>('active');
+  const [sortOption, setSortOption] = useState<StaffSortOption>('nameAsc');
 
   const filtered = useMemo(
     () =>
-      staff.filter((s) => {
-        if (!showInactive && s.status === 'inactive') return false;
+      [...staff]
+      .filter((s) => {
+        if (filterOption === 'active' && s.status === 'inactive') return false;
+        if (filterOption === 'inactive' && s.status !== 'inactive') return false;
+        if (filterOption === 'fluAttention') {
+          const influenzaState = seasonalStatus(s.influenzaStatus, s.influenzaDate);
+          if (influenzaState === 'current') return false;
+        }
+        if (filterOption === 'covidAttention') {
+          const covidState = seasonalStatus(s.covidStatus, s.covidDate);
+          if (covidState === 'current') return false;
+        }
         const needle = search.toLowerCase();
         return s.employeeId.toLowerCase().includes(needle) || s.fullName.toLowerCase().includes(needle);
+      })
+      .sort((a, b) => {
+        if (sortOption === 'nameAsc') return a.fullName.localeCompare(b.fullName);
+        if (sortOption === 'nameDesc') return b.fullName.localeCompare(a.fullName);
+        if (sortOption === 'employeeIdAsc') return a.employeeId.localeCompare(b.employeeId);
+
+        const aTime = parseISODateOnly(a.hireDate)?.getTime() ?? 0;
+        const bTime = parseISODateOnly(b.hireDate)?.getTime() ?? 0;
+        return sortOption === 'hireDateNewest' ? bTime - aTime : aTime - bTime;
       }),
-    [staff, search, showInactive]
+    [staff, search, filterOption, sortOption]
   );
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,6 +165,7 @@ export function StaffManagementPage() {
 
   const activeCount = useMemo(() => staff.filter((s) => s.status !== 'inactive').length, [staff]);
   const inactiveCount = staff.length - activeCount;
+  const selectedFilterLabel = STAFF_FILTER_OPTIONS.find((option) => option.value === filterOption)?.label ?? 'All staff';
 
   return (
     <div className="space-y-4">
@@ -151,12 +190,28 @@ export function StaffManagementPage() {
         />
         <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Show inactive
+            Filter
+            <select
+              value={filterOption}
+              onChange={(e) => setFilterOption(e.target.value as StaffFilterOption)}
+              className="rounded border px-2 py-1"
+            >
+              {STAFF_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            Sort
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as StaffSortOption)}
+              className="rounded border px-2 py-1"
+            >
+              {STAFF_SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </label>
           <span className="text-sm text-muted-foreground">
             {filtered.length} shown ({activeCount} active{inactiveCount > 0 ? `, ${inactiveCount} inactive` : ''})
@@ -168,6 +223,8 @@ export function StaffManagementPage() {
         Import adds only new staff records not already on the list (auto-detected by Employee ID). Existing staff records are kept as-is.
         Compliance fields remain in this same combined table row and can be edited per staff member below.
       </p>
+
+      <p className="text-sm text-muted-foreground">Current filter: {selectedFilterLabel}</p>
 
       <div className="overflow-auto rounded border">
         <table className="w-full border-collapse text-sm">
