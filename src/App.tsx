@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { useEffect } from 'react';
 import Index from './pages/Index';
+import StaffManagementPage from './pages/StaffManagementPage';
+import StaffVaccinationTrackerPage from './pages/StaffVaccinationTrackerPage';
 import NotFound from './pages/NotFound';
 import LoginPage from './components/pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -35,6 +37,22 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <ProtectedRoute>
+                  <StaffManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff-vaccination"
+              element={
+                <ProtectedRoute>
+                  <StaffVaccinationTrackerPage />
                 </ProtectedRoute>
               }
             />

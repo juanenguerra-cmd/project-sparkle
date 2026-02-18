@@ -470,7 +470,9 @@ export type ViewType =
   | 'reports' 
   | 'audit'
   | 'user_management'
-  | 'settings';
+  | 'settings'
+  | 'staff'
+  | 'staff_vaccination';
 
 export interface NavItem {
   id: ViewType;
@@ -500,7 +502,8 @@ export type ReportCategory =
   | 'surveillance'
   | 'vaccination'
   | 'stewardship'
-  | 'custom';
+  | 'custom'
+  | 'staff_employee';
 
 export type DataSource =
   | 'census'
@@ -510,7 +513,9 @@ export type DataSource =
   | 'notes'
   | 'line_listings'
   | 'outbreaks'
-  | 'contacts';
+  | 'contacts'
+  | 'staff'
+  | 'staffVaccination';
 
 export interface ColumnFormat {
   type: 'date' | 'currency' | 'percentage' | 'duration';
