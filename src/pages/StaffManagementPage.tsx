@@ -114,8 +114,9 @@ export function StaffManagementPage() {
   const deptOptions = useMemo(() => {
     const options = new Set<string>();
     staff.forEach((member) => {
-      if (member.department) {
-        options.add(member.department);
+      const department = member.department?.trim();
+      if (department) {
+        options.add(department);
       }
     });
     return [...options].sort((a, b) => a.localeCompare(b));
@@ -130,7 +131,7 @@ export function StaffManagementPage() {
       if (statusFilter !== 'all' && String(member.status ?? '') !== statusFilter) {
         return false;
       }
-      if (deptFilter !== 'all' && String(member.department ?? '') !== deptFilter) {
+      if (deptFilter !== 'all' && String(member.department ?? '').trim() !== deptFilter) {
         return false;
       }
       if (!needle) {
@@ -412,24 +413,23 @@ export function StaffManagementPage() {
           </select>
         </label>
 
-        {deptOptions.length > 0 && (
-          <label className="flex min-w-[170px] flex-col gap-1 text-sm text-muted-foreground">
-            Department
-            <select
-              value={deptFilter}
-              onChange={(e) => {
-                setDeptFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="rounded border px-2 py-2 text-foreground"
-            >
-              <option value="all">All</option>
-              {deptOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        <label className="flex min-w-[170px] flex-col gap-1 text-sm text-muted-foreground">
+          Department
+          <select
+            value={deptFilter}
+            onChange={(e) => {
+              setDeptFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="rounded border px-2 py-2 text-foreground"
+            disabled={deptOptions.length === 0}
+          >
+            <option value="all">All</option>
+            {deptOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="flex min-w-[170px] flex-col gap-1 text-sm text-muted-foreground">
           Sort field
