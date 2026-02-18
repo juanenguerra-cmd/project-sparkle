@@ -95,33 +95,22 @@ export function importStaffFromCSVRows(rows: RawStaffRow[]) {
   const existing = getAllStaff();
   const existingByEmployeeId = new Map(existing.map((s) => [s.employeeId, s]));
 
-  const newIds = new Set<string>();
   let newCount = 0;
-  let updatedCount = 0;
+  let skippedExistingCount = 0;
 
   for (const row of rows) {
     const normalized = normalizeStaffRow(row);
     if (!normalized) continue;
 
-    newIds.add(normalized.employeeId);
     const now = new Date().toISOString();
 
     const existingStaff = existingByEmployeeId.get(normalized.employeeId);
     if (existingStaff) {
-      Object.assign(existingStaff, {
-        ...existingStaff,
-        firstName: normalized.firstName,
-        lastName: normalized.lastName,
-        fullName: normalized.fullName,
-        center: normalized.center,
-        department: normalized.department,
-        empType: normalized.empType || existingStaff.empType,
-        role: normalized.role,
-        hireDate: normalized.hireDate || existingStaff.hireDate,
-        status: 'active',
-        updatedAt: now,
-      });
-      updatedCount += 1;
+      if (existingStaff.status === 'inactive') {
+        existingStaff.status = 'active';
+        existingStaff.updatedAt = now;
+      }
+      skippedExistingCount += 1;
     } else {
       const newStaff: StaffMember = {
         id: crypto.randomUUID(),
@@ -143,22 +132,10 @@ export function importStaffFromCSVRows(rows: RawStaffRow[]) {
     }
   }
 
-  let inactivatedCount = 0;
-  const nowISO = new Date().toISOString();
-
-  for (const staff of existing) {
-    if (!newIds.has(staff.employeeId) && staff.status !== 'inactive') {
-      staff.status = 'inactive';
-      staff.updatedAt = nowISO;
-      inactivatedCount += 1;
-    }
-  }
-
   const ok = window.confirm(
     `Staff import summary:\n\n` +
       `${newCount} new staff will be added (active)\n` +
-      `${updatedCount} existing staff will be updated (active)\n` +
-      `${inactivatedCount} staff will be marked as inactive (not in new list)\n\n` +
+      `${skippedExistingCount} existing staff already on the list will be skipped\n\n` +
       'Continue?'
   );
 
@@ -167,5 +144,5 @@ export function importStaffFromCSVRows(rows: RawStaffRow[]) {
   saveStaffList(existing);
   linkVaxRecordsToStaff();
 
-  return { newCount, updatedCount, inactivatedCount };
+  return { newCount, skippedExistingCount };
 }
