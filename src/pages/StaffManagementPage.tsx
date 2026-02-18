@@ -55,7 +55,7 @@ export function StaffManagementPage() {
   };
 
   const handleExport = () => {
-    const columns = ['employeeId', 'fullName', 'role', 'department', 'status', 'hireDate', 'notes'];
+    const columns = ['employeeId', 'fullName', 'role', 'center', 'department', 'empType', 'status', 'hireDate', 'faceFitTestDate', 'notes'];
     const csv = convertToCSV(staff as unknown as Array<Record<string, unknown>>, columns);
     downloadCSV(csv, 'staff-roster.csv');
   };
@@ -97,15 +97,20 @@ export function StaffManagementPage() {
         <span className="text-sm text-muted-foreground">{filtered.length} staff</span>
       </div>
 
+      <p className="text-sm text-muted-foreground">Update or import staff demographic fields here (Name, Position, Center, Department, Emp Type, Date Hired). Vaccine details are tracked in the Staff Vaccination Tracker page, and Face Fit Test can be entered directly when editing each staff member below.</p>
+
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b bg-muted/30 text-left">
             <th className="p-2">Employee ID</th>
             <th className="p-2">Name</th>
-            <th className="p-2">Role</th>
+            <th className="p-2">Position</th>
+            <th className="p-2">Center</th>
             <th className="p-2">Department</th>
+            <th className="p-2">Emp Type</th>
             <th className="p-2">Status</th>
-            <th className="p-2">Hire Date</th>
+            <th className="p-2">Date Hired</th>
+            <th className="p-2">Face Fit Test</th>
             <th className="p-2">Notes</th>
             <th className="p-2">Actions</th>
           </tr>
@@ -116,9 +121,12 @@ export function StaffManagementPage() {
               <td className="p-2">{s.employeeId}</td>
               <td className="p-2">{s.fullName}</td>
               <td className="p-2">{s.role}</td>
+              <td className="p-2">{s.center || ''}</td>
               <td className="p-2">{s.department}</td>
+              <td className="p-2">{s.empType || ''}</td>
               <td className="p-2 capitalize">{s.status}</td>
               <td className="p-2">{s.hireDate || ''}</td>
+              <td className="p-2">{s.faceFitTestDate || ''}</td>
               <td className="p-2">{s.notes || ''}</td>
               <td className="p-2">
                 <div className="flex gap-2">
@@ -153,6 +161,9 @@ function StaffEditModal({ staff, onClose, onSave }: { staff: StaffMember; onClos
     staff.department && !DEPARTMENT_OPTIONS.some((option) => option.value === staff.department) ? staff.department : ''
   );
 
+  const [center, setCenter] = useState(staff.center || '');
+  const [empType, setEmpType] = useState(staff.empType || '');
+  const [faceFitTestDate, setFaceFitTestDate] = useState(staff.faceFitTestDate || '');
   const [notes, setNotes] = useState(staff.notes || '');
 
   function handleSave() {
@@ -173,7 +184,10 @@ function StaffEditModal({ staff, onClose, onSave }: { staff: StaffMember; onClos
     const updated: StaffMember = {
       ...staff,
       role: finalRole,
+      center: center || undefined,
       department: finalDept,
+      empType: empType || undefined,
+      faceFitTestDate: faceFitTestDate || undefined,
       notes,
       updatedAt: new Date().toISOString(),
     };
@@ -219,6 +233,21 @@ function StaffEditModal({ staff, onClose, onSave }: { staff: StaffMember; onClos
             <input className="mt-1 w-full rounded border px-3 py-2" type="text" value={deptOther} onChange={(e) => setDeptOther(e.target.value)} placeholder="Enter department" />
           </label>
         )}
+
+        <label className="block text-sm">
+          Center
+          <input className="mt-1 w-full rounded border px-3 py-2" type="text" value={center} onChange={(e) => setCenter(e.target.value)} placeholder="Enter center" />
+        </label>
+
+        <label className="block text-sm">
+          Emp Type
+          <input className="mt-1 w-full rounded border px-3 py-2" type="text" value={empType} onChange={(e) => setEmpType(e.target.value)} placeholder="APT, FT, etc." />
+        </label>
+
+        <label className="block text-sm">
+          Face Fit Test Date
+          <input className="mt-1 w-full rounded border px-3 py-2" type="date" value={faceFitTestDate} onChange={(e) => setFaceFitTestDate(e.target.value)} />
+        </label>
 
         <label className="block text-sm">
           Notes

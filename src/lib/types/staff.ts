@@ -16,10 +16,13 @@ export interface StaffMember {
   firstName: string;
   lastName: string;
   fullName: string;
+  center?: string;
   department?: string;
+  empType?: string;
   role?: StaffRole | string;
   status: 'active' | 'inactive';
   hireDate?: string;
+  faceFitTestDate?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
