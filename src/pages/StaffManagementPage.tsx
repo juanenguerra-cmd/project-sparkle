@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { convertToCSV, downloadCSV, parseCSV } from '@/lib/utils/csvUtils';
 import { getAllStaff, saveStaffList, upsertStaff } from '@/lib/stores/staffStore';
 import { importStaffFromCSVRows, type RawStaffRow } from '@/lib/utils/staffImport';
@@ -91,6 +91,8 @@ export function StaffManagementPage() {
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [filterOption, setFilterOption] = useState<StaffFilterOption>('active');
   const [sortOption, setSortOption] = useState<StaffSortOption>('nameAsc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   const filtered = useMemo(
     () =>
@@ -166,6 +168,19 @@ export function StaffManagementPage() {
   const activeCount = useMemo(() => staff.filter((s) => s.status !== 'inactive').length, [staff]);
   const inactiveCount = staff.length - activeCount;
   const selectedFilterLabel = STAFF_FILTER_OPTIONS.find((option) => option.value === filterOption)?.label ?? 'All staff';
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  const paginated = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  }, [filtered, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (currentPage > (totalPages || 1)) {
+      setCurrentPage(totalPages || 1);
+    }
+  }, [currentPage, totalPages]);
 
   return (
     <div className="space-y-4">
@@ -185,7 +200,10 @@ export function StaffManagementPage() {
           type="search"
           placeholder="Search by name"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full max-w-md rounded border px-3 py-2"
         />
         <div className="flex items-center gap-4">
@@ -193,7 +211,10 @@ export function StaffManagementPage() {
             Filter
             <select
               value={filterOption}
-              onChange={(e) => setFilterOption(e.target.value as StaffFilterOption)}
+              onChange={(e) => {
+                setFilterOption(e.target.value as StaffFilterOption);
+                setCurrentPage(1);
+              }}
               className="rounded border px-2 py-1"
             >
               {STAFF_FILTER_OPTIONS.map((option) => (
@@ -245,7 +266,7 @@ export function StaffManagementPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((s) => {
+            {paginated.map((s) => {
               const influenzaState = seasonalStatus(s.influenzaStatus, s.influenzaDate);
               const covidState = seasonalStatus(s.covidStatus, s.covidDate);
               const inactive = s.status === 'inactive';
@@ -300,6 +321,68 @@ export function StaffManagementPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 border-t pt-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            Showing {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{' '}
+            {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} staff
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm">
+            Rows per page:
+            <select
+              className="ml-2 rounded border px-2 py-1"
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </label>
+
+          <div className="flex gap-1">
+            <button
+              className="rounded border px-3 py-1 disabled:opacity-50"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              First
+            </button>
+            <button
+              className="rounded border px-3 py-1 disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </button>
+            <span className="flex items-center px-3 text-sm">
+              Page {currentPage} of {totalPages || 1}
+            </span>
+            <button
+              className="rounded border px-3 py-1 disabled:opacity-50"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages || 1, p + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+            </button>
+            <button
+              className="rounded border px-3 py-1 disabled:opacity-50"
+              onClick={() => setCurrentPage(totalPages || 1)}
+              disabled={currentPage >= totalPages}
+            >
+              Last
+            </button>
+          </div>
+        </div>
       </div>
 
       {editingStaff && <StaffEditModal staff={editingStaff} onClose={() => setEditingStaff(null)} onSave={handleSaveEdit} />}
