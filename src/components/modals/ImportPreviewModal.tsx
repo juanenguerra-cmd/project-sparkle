@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertTriangle, CheckCircle2, Users, Pill, Shield, Syringe, FileText, AlertCircle } from 'lucide-react';
 import { canonicalMRN } from '@/lib/parsers';
+import { readBackupFileAsJson } from '@/lib/backupFile';
 
 export type ImportMode = 'merge' | 'replace';
 
@@ -42,7 +43,7 @@ export const parseBackupPreview = async (file: File): Promise<BackupPreview> => 
   const warnings: string[] = [];
   
   try {
-    const text = await file.text();
+    const text = await readBackupFileAsJson(file);
     const data = JSON.parse(text);
 
     const residentsFromArray = (residents: any[] | undefined): Record<string, any> => {
