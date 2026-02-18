@@ -41,7 +41,6 @@ const navSections: {
       { id: 'notes', label: 'Notes & Symptoms', icon: <FileText className="w-5 h-5" /> },
       { id: 'outbreak', label: 'Outbreak/Line List', icon: <AlertTriangle className="w-5 h-5" /> },
       { id: 'staff', label: 'Staff / Employee List', icon: <Users className="w-5 h-5" /> },
-      { id: 'staff_vaccination', label: 'Staff Vaccination Tracker', icon: <Syringe className="w-5 h-5" /> },
     ],
   },
   {
