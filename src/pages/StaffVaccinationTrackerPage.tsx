@@ -37,6 +37,8 @@ export function StaffVaccinationTrackerPage() {
         <h1 className="text-2xl font-semibold">Staff Vaccination Tracker</h1>
       </div>
 
+      <p className="text-sm text-muted-foreground">Use this tracker to review vaccination details for staff. To edit vaccine records, open the main VAX tracker and create or edit records linked to staff. Face fit testing is shown here and can be updated from Staff / Employee List → Edit staff member.</p>
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <select className="rounded border px-3 py-2" value={departmentFilter || 'all'} onChange={(e) => setDepartmentFilter(e.target.value === 'all' ? '' : e.target.value)}>
           <option value="all">All Departments</option>
@@ -57,8 +59,12 @@ export function StaffVaccinationTrackerPage() {
           <tr className="border-b bg-muted/30 text-left">
             <th className="p-2">Employee ID</th>
             <th className="p-2">Name</th>
-            <th className="p-2">Role</th>
+            <th className="p-2">Position</th>
+            <th className="p-2">Center</th>
             <th className="p-2">Department</th>
+            <th className="p-2">Emp Type</th>
+            <th className="p-2">Date Hired</th>
+            <th className="p-2">Face Fit Test</th>
             <th className="p-2">Influenza</th>
             <th className="p-2">Pneumococcal</th>
             <th className="p-2">COVID-19</th>
@@ -70,7 +76,11 @@ export function StaffVaccinationTrackerPage() {
               <td className="p-2">{s.employeeId}</td>
               <td className="p-2">{s.fullName}</td>
               <td className="p-2">{s.role}</td>
+              <td className="p-2">{s.center || ''}</td>
               <td className="p-2">{s.department}</td>
+              <td className="p-2">{s.empType || ''}</td>
+              <td className="p-2">{s.hireDate || ''}</td>
+              <td className="p-2">{s.faceFitTestDate || 'Not recorded'}</td>
               <td className="p-2">{formatStatus(influenza)}</td>
               <td className="p-2">{formatStatus(pneumo)}</td>
               <td className="p-2">{formatStatus(covid)}</td>

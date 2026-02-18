@@ -31,11 +31,16 @@ function getCaseInsensitiveValue(raw: RawStaffRow, key: string): string {
   return matchedKey ? String(raw[matchedKey] || '') : '';
 }
 
-function normalizeStaffRow(raw: RawStaffRow) {
-  const employeeId = getCaseInsensitiveValue(raw, 'Payroll No.').toString().trim();
-  if (!employeeId) return null;
+function buildFallbackEmployeeId(name: string): string | null {
+  const normalized = name.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase();
+  return normalized ? `NAME_${normalized}` : null;
+}
 
+function normalizeStaffRow(raw: RawStaffRow) {
   const name = getCaseInsensitiveValue(raw, 'Name').trim();
+  const payrollNo = getCaseInsensitiveValue(raw, 'Payroll No.').toString().trim();
+  const employeeId = payrollNo || buildFallbackEmployeeId(name);
+  if (!employeeId) return null;
   let firstName = '';
   let lastName = '';
 
@@ -66,9 +71,10 @@ function normalizeStaffRow(raw: RawStaffRow) {
   else if (position.includes('ADMIN')) role = 'Admin';
   else if (rawPosition) role = rawPosition;
 
+  const center = getCaseInsensitiveValue(raw, 'Center').trim() || undefined;
   const department = getCaseInsensitiveValue(raw, 'Department').trim() || undefined;
   const hireDate = toISODate(getCaseInsensitiveValue(raw, 'Date Hired'));
-  const empType = getCaseInsensitiveValue(raw, 'Emp Type').trim();
+  const empType = getCaseInsensitiveValue(raw, 'Emp Type').trim() || undefined;
 
   const normalizedRole = STAFF_ROLE_OPTIONS.includes(role as StaffRole) ? role : rawPosition || role;
 
@@ -78,6 +84,7 @@ function normalizeStaffRow(raw: RawStaffRow) {
     lastName,
     fullName,
     role: normalizedRole,
+    center,
     department,
     hireDate,
     empType,
@@ -106,11 +113,12 @@ export function importStaffFromCSVRows(rows: RawStaffRow[]) {
         firstName: normalized.firstName,
         lastName: normalized.lastName,
         fullName: normalized.fullName,
+        center: normalized.center,
         department: normalized.department,
+        empType: normalized.empType || existingStaff.empType,
         role: normalized.role,
         hireDate: normalized.hireDate || existingStaff.hireDate,
         status: 'active',
-        notes: normalized.empType ? `EmpType: ${normalized.empType}` : existingStaff.notes,
         updatedAt: now,
       });
       updatedCount += 1;
@@ -121,11 +129,12 @@ export function importStaffFromCSVRows(rows: RawStaffRow[]) {
         firstName: normalized.firstName,
         lastName: normalized.lastName,
         fullName: normalized.fullName,
+        center: normalized.center,
         department: normalized.department,
+        empType: normalized.empType,
         role: normalized.role,
         status: 'active',
         hireDate: normalized.hireDate,
-        notes: normalized.empType ? `EmpType: ${normalized.empType}` : '',
         createdAt: now,
         updatedAt: now,
       };
