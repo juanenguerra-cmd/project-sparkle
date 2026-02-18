@@ -22,7 +22,7 @@ describe('importStaffFromCSVRows', () => {
       },
     ]);
 
-    expect(result).toEqual({ newCount: 1, updatedCount: 0, inactivatedCount: 0 });
+    expect(result).toEqual({ newCount: 1, skippedExistingCount: 0 });
 
     const staff = getAllStaff();
     expect(staff).toHaveLength(1);
@@ -35,7 +35,7 @@ describe('importStaffFromCSVRows', () => {
     expect(staff[0].hireDate).toBe('2023-05-16');
   });
 
-  it('updates center and emp type on existing staff records', () => {
+  it('skips existing staff records and does not overwrite current directory data', () => {
     localStorage.setItem(
       DB_KEY,
       JSON.stringify({
@@ -47,6 +47,10 @@ describe('importStaffFromCSVRows', () => {
             lastName: 'Antoine',
             fullName: 'Rolande Antoine',
             role: 'RN',
+            center: 'Original Center',
+            department: 'Original Department',
+            empType: 'FT',
+            hireDate: '2026-01-01',
             status: 'active',
             createdAt: '2026-01-01T00:00:00.000Z',
             updatedAt: '2026-01-01T00:00:00.000Z',
@@ -58,7 +62,7 @@ describe('importStaffFromCSVRows', () => {
     const result = importStaffFromCSVRows([
       {
         Name: 'Antoine, Rolande',
-        Position: 'R.N.',
+        Position: 'L.P.N.',
         Center: 'Long Beach',
         Department: 'Nursing',
         'Emp Type': 'APT',
@@ -66,11 +70,14 @@ describe('importStaffFromCSVRows', () => {
       },
     ]);
 
-    expect(result).toEqual({ newCount: 0, updatedCount: 1, inactivatedCount: 0 });
+    expect(result).toEqual({ newCount: 0, skippedExistingCount: 1 });
 
     const staff = getAllStaff();
-    expect(staff[0].center).toBe('Long Beach');
-    expect(staff[0].empType).toBe('APT');
-    expect(staff[0].hireDate).toBe('2026-02-03');
+    expect(staff).toHaveLength(1);
+    expect(staff[0].center).toBe('Original Center');
+    expect(staff[0].department).toBe('Original Department');
+    expect(staff[0].empType).toBe('FT');
+    expect(staff[0].hireDate).toBe('2026-01-01');
+    expect(staff[0].role).toBe('RN');
   });
 });

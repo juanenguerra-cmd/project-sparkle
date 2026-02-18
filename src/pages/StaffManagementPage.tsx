@@ -71,14 +71,16 @@ export function StaffManagementPage() {
   const [staff, setStaff] = useState<StaffMember[]>(() => getAllStaff());
   const [search, setSearch] = useState('');
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const filtered = useMemo(
     () =>
       staff.filter((s) => {
+        if (!showInactive && s.status === 'inactive') return false;
         const needle = search.toLowerCase();
         return s.employeeId.toLowerCase().includes(needle) || s.fullName.toLowerCase().includes(needle);
       }),
-    [staff, search]
+    [staff, search, showInactive]
   );
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,7 +91,7 @@ export function StaffManagementPage() {
     const result = importStaffFromCSVRows(rows);
     if (result) {
       setStaff(getAllStaff());
-      alert(`Import complete.\nNew: ${result.newCount}\nUpdated: ${result.updatedCount}\nInactivated: ${result.inactivatedCount}`);
+      alert(`Import complete.\nNew: ${result.newCount}\nSkipped existing: ${result.skippedExistingCount}`);
     }
     e.target.value = '';
   };
@@ -123,6 +125,9 @@ export function StaffManagementPage() {
     setEditingStaff(null);
   };
 
+  const activeCount = useMemo(() => staff.filter((s) => s.status !== 'inactive').length, [staff]);
+  const inactiveCount = staff.length - activeCount;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -144,12 +149,24 @@ export function StaffManagementPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full max-w-md rounded border px-3 py-2"
         />
-        <span className="text-sm text-muted-foreground">{filtered.length} staff</span>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showInactive}
+              onChange={(e) => setShowInactive(e.target.checked)}
+            />
+            Show inactive
+          </label>
+          <span className="text-sm text-muted-foreground">
+            {filtered.length} shown ({activeCount} active{inactiveCount > 0 ? `, ${inactiveCount} inactive` : ''})
+          </span>
+        </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Import updates directory fields (Name, Position, Department, Emp Type, Date Hired). Missing names from a new import are automatically marked inactive.
-        Compliance fields are edited per staff member below.
+        Import adds only new staff records not already on the list (auto-detected by Employee ID). Existing staff records are kept as-is.
+        Compliance fields remain in this same combined table row and can be edited per staff member below.
       </p>
 
       <div className="overflow-auto rounded border">
