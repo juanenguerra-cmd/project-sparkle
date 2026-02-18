@@ -6,7 +6,8 @@ import {
   validateResident,
   checkDuplicateMRN,
   checkDuplicateIPCase,
-  validateABTRecord
+  validateABTRecord,
+  validateVaxRecord
 } from '../validators';
 
 describe('Date Validation', () => {
@@ -179,5 +180,21 @@ describe('ABT Validation', () => {
     );
 
     expect(result.valid).toBe(true);
+  });
+});
+
+
+describe('VAX Validation', () => {
+  it('should allow declined vaccines without a decline reason override', () => {
+    const result = validateVaxRecord({
+      mrn: 'TEST001',
+      residentName: 'Test Patient',
+      vaccine: 'Flu',
+      status: 'declined',
+      dateGiven: '2024-05-10'
+    } as any);
+
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
   });
 });

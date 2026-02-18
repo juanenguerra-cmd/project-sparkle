@@ -169,10 +169,6 @@ export const validateVaxRecord = (vax: Partial<VaxRecord>): ValidationResult => 
     if (err) errors.push(err);
   }
 
-  if (vax.status === 'declined' && !(vax.declineReason || vax.decline_reason)) {
-    errors.push('Decline reason is required for declined vaccines');
-  }
-
   return { valid: errors.length === 0, errors };
 };
 
