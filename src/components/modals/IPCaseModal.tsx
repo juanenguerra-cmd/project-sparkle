@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
-import { DeviceType, HAIType, IPCase, Resident } from '@/lib/types';
+import { DeviceType, HAIType, IPCase, Resident, LabConfirmedStatus } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
 import PillInput from '@/components/ui/pill-input';
@@ -73,6 +73,12 @@ const DEVICE_TYPE_OPTIONS: Array<{ value: DeviceType | ''; label: string }> = [
   { value: 'Other', label: 'Other' },
 ];
 
+const LAB_CONFIRMED_STATUS_OPTIONS: Array<{ value: LabConfirmedStatus | ''; label: string }> = [
+  { value: '', label: '—' },
+  { value: 'Confirmed', label: 'Confirmed' },
+  { value: 'Suspected', label: 'Suspected' },
+];
+
 const COMMON_AREAS = ['Dining', 'Rehab gym', 'Beauty shop'];
 const SHARED_EQUIPMENT = ['Lift', 'Shower chair', 'Therapy gym'];
 
@@ -121,7 +127,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     deviceType: '' as DeviceType | '',
     eventDetectedDate: '',
     specimenCollectedDate: '',
-    labConfirmed: false,
+    labConfirmedStatus: '' as LabConfirmedStatus | '',
 
     staffAssignments: '',
     closeContacts: '',
@@ -181,7 +187,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
         deviceType: (editCase.deviceType || '') as any,
         eventDetectedDate: editCase.eventDetectedDate || '',
         specimenCollectedDate: editCase.specimenCollectedDate || '',
-        labConfirmed: !!editCase.labConfirmed,
+        labConfirmedStatus: (editCase.labConfirmedStatus || '') as any,
 
         staffAssignments: editCase.staffAssignments || '',
         closeContacts: editCase.closeContacts || '',
@@ -222,7 +228,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       deviceType: '',
       eventDetectedDate: '',
       specimenCollectedDate: '',
-      labConfirmed: false,
+      labConfirmedStatus: '',
 
       staffAssignments: '',
       closeContacts: '',
@@ -318,7 +324,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       deviceType: formData.deviceType,
       eventDetectedDate: formData.eventDetectedDate,
       specimenCollectedDate: formData.specimenCollectedDate,
-      labConfirmed: formData.labConfirmed,
+      labConfirmedStatus: formData.labConfirmedStatus,
 
       staffAssignments: formData.staffAssignments,
       closeContacts: formData.closeContacts,
@@ -676,15 +682,20 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium">Lab confirmed</Label>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Checkbox
-                      id="labConfirmed"
-                      checked={formData.labConfirmed}
-                      onCheckedChange={(v) => setFormData(p => ({ ...p, labConfirmed: !!v }))}
-                    />
-                    <label htmlFor="labConfirmed" className="text-sm cursor-pointer">Yes</label>
-                  </div>
+                  <Label className="text-xs font-medium">Lab status</Label>
+                  <Select
+                    value={formData.labConfirmedStatus}
+                    onValueChange={(v: any) => setFormData(p => ({ ...p, labConfirmedStatus: v === 'none' ? '' : v }))}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LAB_CONFIRMED_STATUS_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
