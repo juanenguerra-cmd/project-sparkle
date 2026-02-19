@@ -216,22 +216,7 @@ export const generateDeviceAssociatedInfectionReport = (
       const haiType = (ipCase as any).haiType || (ipCase as any).hai_type || '—';
       const deviceType = (ipCase as any).deviceType || (ipCase as any).device_type || '—';
 
-      const labStatusRaw =
-        (ipCase as any).labConfirmedStatus ??
-        (ipCase as any).lab_confirmed_status ??
-        (ipCase as any).labConfirmed ??
-        (ipCase as any).lab_confirmed;
-
-      const labStatusNormalized =
-        labStatusRaw === true
-          ? 'Confirmed'
-          : labStatusRaw === false
-            ? 'Suspected'
-            : typeof labStatusRaw === 'string'
-              ? (labStatusRaw.trim() || '')
-              : '';
-
-      const labStatus = labStatusNormalized || '—';
+      const labStatus = ((ipCase as any).labConfirmedStatus || '') as string;
 
       const specimenDateStr = (ipCase as any).specimenCollectedDate || (ipCase as any).specimen_collected_date;
       const specimenLabel = specimenDateStr ? format(parseISO(specimenDateStr), 'MM/dd/yyyy') : '—';
@@ -247,7 +232,7 @@ export const generateDeviceAssociatedInfectionReport = (
         ipCase.unit || resident?.unit || '',
         haiType,
         deviceType,
-        labStatus,
+        labStatus || '—',
         specimenLabel,
         eventDetectedLabel,
         ipCase.status || '—',
