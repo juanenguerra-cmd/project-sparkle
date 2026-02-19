@@ -3,10 +3,11 @@ import App from './App.tsx';
 import './index.css';
 import { initDB } from './lib/database';
 import { initBrowserCompatibility, detectBrowser, testLocalStorage } from './lib/browserCompat';
+import { registerExtensionNoiseHandlers } from './lib/extensionNoiseGuard';
 
 const root = createRoot(document.getElementById('root')!);
 
-
+registerExtensionNoiseHandlers();
 initBrowserCompatibility();
 
 const browserInfo = detectBrowser();
