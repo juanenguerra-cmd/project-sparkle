@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, Lock, User } from 'lucide-react';
 import { toast as sonnerToast } from 'sonner';
@@ -7,6 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { initSessionMonitoring, login } from '@/lib/auth';
+import {
+  getCapturedExtensionErrors,
+  subscribeToExtensionErrors,
+  type CapturedExtensionError,
+} from '@/lib/extensionNoiseGuard';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -15,6 +20,13 @@ const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [errors, setErrors] = useState<CapturedExtensionError[]>(() => getCapturedExtensionErrors());
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    return subscribeToExtensionErrors(setErrors);
+  }, []);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +89,26 @@ const LoginPage = () => {
           <div className="mt-6 text-center text-xs text-gray-500">
             <p>Default: admin / admin123</p>
             <p className="mt-1">⚠️ Change password after first login</p>
+            {import.meta.env.DEV && (
+              <button type="button" onClick={() => setShowDiagnostics((current) => !current)} className="mt-2 text-blue-600 underline hover:text-blue-700">
+                Diagnostics
+              </button>
+            )}
+            {import.meta.env.DEV && showDiagnostics && (
+              <div className="mt-2 rounded-md border bg-white p-3 text-left text-[11px] text-gray-700">
+                <p><span className="font-semibold">User Agent:</span> {navigator.userAgent}</p>
+                <p><span className="font-semibold">Extension Context:</span> {String(Boolean((globalThis as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id))}</p>
+                <p className="mt-2 font-semibold">Captured extension noise (last 10)</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {errors.length === 0 && <li>No extension-related window errors captured.</li>}
+                  {errors.map((entry, idx) => (
+                    <li key={`${entry.timestamp}-${idx}`}>
+                      [{new Date(entry.timestamp).toLocaleTimeString()}] {entry.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p className="mt-3">Developed and built by Juan Enguerra all rights reserved 2025</p>
           </div>
         </CardContent>

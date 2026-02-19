@@ -76,6 +76,7 @@ import ReportListItem from '@/components/reports/ReportListItem';
 import InfectionTrendChart from '@/components/reports/InfectionTrendChart';
 import ScheduledReportsPanel from '@/components/reports/ScheduledReportsPanel';
 import SurveyModePanel from '@/components/reports/SurveyModePanel';
+import IPCommandDashboardPanel from '@/components/reports/IPCommandDashboardPanel';
 import FloorLayoutHeatmap from '@/components/reports/FloorLayoutHeatmap';
 import TrendPredictionPanel from '@/components/analytics/TrendPredictionPanel';
 import NewAdmissionScreeningForm from '@/components/reports/NewAdmissionScreeningForm';
@@ -159,6 +160,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
   return (
     <div className="space-y-6">
+      <IPCommandDashboardPanel />
       <div id="report-surveillance">
         <Collapsible open={surveillanceOpen} onOpenChange={setSurveillanceOpen}>
           <SectionCard title="Antibiotic & Infection Surveillance">
