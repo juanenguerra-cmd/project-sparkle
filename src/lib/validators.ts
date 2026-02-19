@@ -111,6 +111,12 @@ export const validateIPCase = (ipCase: Partial<IPCase>): ValidationResult => {
     if (onsetErr) errors.push(onsetErr);
   }
 
+  // Device-associated infection validation (CAUTI/CLABSI)
+  if (ipCase.deviceAssociated) {
+    if (!ipCase.haiType) errors.push('HAI type is required when Device-associated is checked');
+    if (!ipCase.deviceType) errors.push('Device type is required when Device-associated is checked');
+  }
+
   if (status === 'Resolved' || status === 'Discharged') {
     if (!resolution) errors.push('Resolution date is required for resolved/discharged cases');
     else {
@@ -241,7 +247,7 @@ export const combineValidationResults = (...results: ValidationResult[]): Valida
   return { valid: errors.length === 0, errors };
 };
 
-export const formatValidationErrors = (errors: string[]): string => {
+export const formatValidationErrors = (errors: string[]): ValidationResult['errors'] extends any ? string : string => {
   if (errors.length <= 1) return errors[0] || '';
   return errors.map((e, i) => `${i + 1}. ${e}`).join('\n');
 };
