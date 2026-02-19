@@ -17,10 +17,20 @@ import {
   generateDailyIPWorklist,
   generateVaxDueList,
   generateVaxReofferReport,
+  generateMonthlyABTReport,
+  generateAntibioticDurationReport,
+  generateOutbreakSummaryReport,
+  generateVaxSnapshotReport,
   ReportData
 } from '@/lib/reportGenerators';
+import {
+  generateInfectionSurveillanceTrend,
+  generateInfectionAcquired,
+  generateInfectionRatePer1000Days,
+  generateAntibioticUtilizationRatio,
+} from '@/lib/reports/surveillanceReports';
 
-export type SurveyPackType = 'audit' | 'abt' | 'precautions' | 'vaccination' | 'complete';
+export type SurveyPackType = 'audit' | 'abt' | 'precautions' | 'vaccination' | 'complete' | 'survey_all';
 
 interface SurveyPackParams {
   packType: SurveyPackType;
@@ -34,6 +44,47 @@ interface SurveyPackResult {
   doc: jsPDF;
   reportCount: number;
 }
+
+const createUnavailableReport = (title: string, reason: string): ReportData => ({
+  title,
+  subtitle: 'Documentation placeholder',
+  generatedAt: new Date().toISOString(),
+  filters: {
+    date: format(new Date(), 'MM/dd/yyyy'),
+    status: 'Not configured in current build',
+  },
+  headers: ['Item', 'Status', 'Notes'],
+  rows: [[title, 'Pending workflow configuration', reason]],
+});
+
+const generateOutbreakLineListingReport = (db: ICNDatabase): ReportData => {
+  const rows = [...db.records.line_listings]
+    .sort((a, b) => (a.onsetDate || '').localeCompare(b.onsetDate || ''))
+    .map((entry) => {
+      const outbreak = db.records.outbreaks.find((item) => item.id === entry.outbreakId);
+      return [
+        outbreak?.name || outbreak?.type || 'Unlinked',
+        entry.onsetDate || '',
+        entry.residentName || '',
+        entry.unit || '',
+        entry.room || '',
+        entry.labResults || '',
+        entry.outcome || '',
+      ];
+    });
+
+  return {
+    title: 'OUTBREAK LINE LISTING (ACTIVE + HISTORICAL)',
+    subtitle: 'Case-level outbreak tracking for survey review',
+    generatedAt: new Date().toISOString(),
+    filters: {
+      date: format(new Date(), 'MM/dd/yyyy'),
+      scope: 'All outbreaks',
+    },
+    headers: ['Outbreak', 'Onset', 'Resident', 'Unit', 'Room', 'Lab Results', 'Outcome'],
+    rows,
+  };
+};
 
 const COLORS = {
   primary: (): Rgb => getThemeRgb('--primary', [14, 165, 233]),
@@ -645,6 +696,96 @@ export const buildSurveyPack = async (params: SurveyPackParams): Promise<SurveyP
         { title: 'Re-offer List', data: generateVaxReofferReport(db, 'all') },
       ];
       break;
+
+    case 'survey_all': {
+      packTitle = 'IP Survey Packet (All Requested Reports)';
+      const now = new Date();
+      const monthlyAbt = generateMonthlyABTReport(db, now.getMonth(), now.getFullYear(), {
+        mode: 'active_in_period',
+        showDischargedLabel: true,
+      });
+      const start = new Date(fromDate);
+      const end = new Date(toDate);
+
+      reports = [
+        // Surveillance Data
+        { title: 'Infection Surveillance Trend', data: generateInfectionSurveillanceTrend(db, start, end) },
+        { title: 'Line Listings (Active + Historical)', data: generateOutbreakLineListingReport(db) },
+        { title: 'Infection Rate per 1000 Resident Days', data: generateInfectionRatePer1000Days(db, start, end) },
+        { title: 'Trend Analysis and Graph Data', data: generateInfectionSurveillanceTrend(db, start, end) },
+        { title: 'Device-Associated Infection Tracking', data: generateInfectionAcquired(db, start, end) },
+        { title: 'MDRO Tracking Log', data: generateInfectionAcquired(db, start, end) },
+        {
+          title: 'NHSN Submission Tracking',
+          data: createUnavailableReport('NHSN SUBMISSION TRACKING', 'Enable dedicated NHSN workflow to populate submission status and transmission audit trail.'),
+        },
+        { title: 'Benchmark Comparisons (AUR)', data: generateAntibioticUtilizationRatio(db, start, end) },
+
+        // Outbreak Management
+        { title: 'Outbreak Summary Documentation', data: generateOutbreakSummaryReport(db, 90) },
+        { title: 'Outbreak Line Listings', data: generateOutbreakLineListingReport(db) },
+        {
+          title: 'Epidemic Curves',
+          data: createUnavailableReport('EPIDEMIC CURVES', 'No dedicated epidemic curve renderer is currently configured for packet export.'),
+        },
+        {
+          title: 'Testing Logs',
+          data: createUnavailableReport('OUTBREAK TESTING LOGS', 'Add structured outbreak testing log entries to enable report extraction.'),
+        },
+        {
+          title: 'Cohorting Plans / Maps',
+          data: createUnavailableReport('COHORTING PLANS / MAPS', 'No cohorting map artifact exists in the current report stack.'),
+        },
+        {
+          title: 'Isolation Expansion Strategies',
+          data: createUnavailableReport('ISOLATION EXPANSION STRATEGIES', 'Action-log specific model is not yet implemented for packet export.'),
+        },
+        {
+          title: 'Communication with Health Authorities',
+          data: createUnavailableReport('COMMUNICATION WITH HEALTH AUTHORITIES', 'Structured communication log report is pending implementation.'),
+        },
+        {
+          title: 'Clearance Criteria Documentation',
+          data: createUnavailableReport('CLEARANCE CRITERIA DOCUMENTATION', 'Outbreak clearance criteria artifact is not yet modeled as a report source.'),
+        },
+        {
+          title: 'After-Action Review Reports',
+          data: createUnavailableReport('AFTER-ACTION REVIEW REPORT', 'AAR template/report output has not been implemented yet.'),
+        },
+
+        // Antibiotic Stewardship
+        { title: 'Stewardship Summary', data: monthlyAbt },
+        { title: 'Utilization Reports (AUR)', data: generateAntibioticUtilizationRatio(db, start, end) },
+        { title: 'Active Antibiotics List', data: generateActiveABTList(db) },
+        {
+          title: 'Culture & Sensitivity Tracking',
+          data: createUnavailableReport('CULTURE & SENSITIVITY TRACKING', 'Culture and susceptibility capture is not yet extracted as a dedicated report.'),
+        },
+        { title: 'Indication Audits', data: generateMissingIndicationsReport(db) },
+        { title: 'Antibiotic Time-out Documentation', data: generateTimeoutDueList(db) },
+        { title: 'Prolonged Antibiotics Review', data: generateAntibioticDurationReport(db, 7) },
+
+        // Immunization Program
+        { title: 'Resident Vaccination Rates', data: generateVaxSnapshotReport(db, fromDate, toDate, 'all') },
+        {
+          title: 'Staff Vaccination Rates',
+          data: createUnavailableReport('STAFF VACCINATION RATES', 'Staff vaccination summary export is not yet wired into Survey Pack PDF generation.'),
+        },
+        { title: 'Declination Reports', data: generateDeclinationSummary(db) },
+        { title: 'Consented / Vaccinated Reports', data: generateVaxCoverageSummary(db) },
+        {
+          title: 'Annual Influenza Summary',
+          data: createUnavailableReport('ANNUAL INFLUENZA SUMMARY', 'Seasonal annual influenza rollup is not yet available as a packet report.'),
+        },
+
+        // Communication Logs
+        {
+          title: 'Reports to Public Health Authorities',
+          data: createUnavailableReport('PUBLIC HEALTH REPORTING LOG', 'Communication logs are not yet normalized into a reportable dataset.'),
+        },
+      ];
+      break;
+    }
   }
   
   // Add cover page
