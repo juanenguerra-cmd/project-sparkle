@@ -68,6 +68,9 @@ export interface ABTRecord {
   stewardshipNotes?: string;
 }
 
+export type HAIType = 'CAUTI' | 'CLABSI' | 'MDRO' | 'SSI' | 'Other';
+export type DeviceType = 'Urinary catheter' | 'Central line' | 'Other';
+
 export interface IPCase {
   id: string;
   residentId?: string;
@@ -120,6 +123,14 @@ export interface IPCase {
   nhsnPathogenCode?: string;
   vaccineStatus?: string;
   dob?: string;
+
+  // Device-associated infections (CAUTI/CLABSI) + MDRO classification
+  haiType?: HAIType | '';
+  deviceAssociated?: boolean;
+  deviceType?: DeviceType | '';
+  eventDetectedDate?: string;
+  specimenCollectedDate?: string;
+  labConfirmed?: boolean;
 }
 
 export interface VaxRecord {
@@ -471,7 +482,7 @@ export type ViewType =
   | 'audit'
   | 'user_management'
   | 'settings'
-  | 'staff'
+  | 'staff' 
   | 'staff_vaccination';
 
 export interface NavItem {
