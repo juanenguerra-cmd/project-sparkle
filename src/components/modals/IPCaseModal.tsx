@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { loadDB, saveDB, addAudit, getActiveResidents } from '@/lib/database';
-import { IPCase, Resident } from '@/lib/types';
+import { DeviceType, HAIType, IPCase, Resident } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { todayISO, toLocalISODate } from '@/lib/parsers';
 import PillInput from '@/components/ui/pill-input';
@@ -57,6 +57,22 @@ const VACCINE_STATUS_OPTIONS = [
   { value: 'unknown', label: 'Unknown' },
 ];
 
+const HAI_TYPE_OPTIONS: Array<{ value: HAIType | ''; label: string }> = [
+  { value: '', label: '—' },
+  { value: 'CAUTI', label: 'CAUTI' },
+  { value: 'CLABSI', label: 'CLABSI' },
+  { value: 'MDRO', label: 'MDRO' },
+  { value: 'SSI', label: 'SSI' },
+  { value: 'Other', label: 'Other' },
+];
+
+const DEVICE_TYPE_OPTIONS: Array<{ value: DeviceType | ''; label: string }> = [
+  { value: '', label: '—' },
+  { value: 'Urinary catheter', label: 'Urinary catheter' },
+  { value: 'Central line', label: 'Central line' },
+  { value: 'Other', label: 'Other' },
+];
+
 const COMMON_AREAS = ['Dining', 'Rehab gym', 'Beauty shop'];
 const SHARED_EQUIPMENT = ['Lift', 'Shower chair', 'Therapy gym'];
 
@@ -98,6 +114,15 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     nhsnPathogenCode: '',
     vaccineStatus: '',
     requiredPPE: '',
+
+    // Device-associated infections
+    deviceAssociated: false,
+    haiType: '' as HAIType | '',
+    deviceType: '' as DeviceType | '',
+    eventDetectedDate: '',
+    specimenCollectedDate: '',
+    labConfirmed: false,
+
     staffAssignments: '',
     closeContacts: '',
     commonAreasVisited: [] as string[],
@@ -150,6 +175,14 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
         nhsnPathogenCode: editCase.nhsnPathogenCode || '',
         vaccineStatus: editCase.vaccineStatus || '',
         requiredPPE: editCase.requiredPPE || '',
+
+        deviceAssociated: !!editCase.deviceAssociated,
+        haiType: (editCase.haiType || '') as any,
+        deviceType: (editCase.deviceType || '') as any,
+        eventDetectedDate: editCase.eventDetectedDate || '',
+        specimenCollectedDate: editCase.specimenCollectedDate || '',
+        labConfirmed: !!editCase.labConfirmed,
+
         staffAssignments: editCase.staffAssignments || '',
         closeContacts: editCase.closeContacts || '',
         commonAreasVisited: editCase.commonAreasVisited || [],
@@ -183,6 +216,14 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       nhsnPathogenCode: '',
       vaccineStatus: '',
       requiredPPE: '',
+
+      deviceAssociated: false,
+      haiType: '',
+      deviceType: '',
+      eventDetectedDate: '',
+      specimenCollectedDate: '',
+      labConfirmed: false,
+
       staffAssignments: '',
       closeContacts: '',
       commonAreasVisited: [],
@@ -246,7 +287,7 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
     }
 
     const protocol = formData.precautionType || 'Standard Precautions';
-    
+
     const caseData: IPCase = {
       id: editCase?.id || editCase?.record_id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       record_id: editCase?.record_id || editCase?.id || `ip_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -270,6 +311,15 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       status: formData.status,
       notes: formData.notes,
       requiredPPE: formData.requiredPPE,
+
+      // Device-associated infections
+      deviceAssociated: formData.deviceAssociated,
+      haiType: formData.haiType,
+      deviceType: formData.deviceType,
+      eventDetectedDate: formData.eventDetectedDate,
+      specimenCollectedDate: formData.specimenCollectedDate,
+      labConfirmed: formData.labConfirmed,
+
       staffAssignments: formData.staffAssignments,
       closeContacts: formData.closeContacts,
       commonAreasVisited: formData.commonAreasVisited,
@@ -279,7 +329,6 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
       vaccineStatus: formData.vaccineStatus,
       createdAt: editCase?.createdAt || new Date().toISOString(),
     };
-
 
     const validation = validateIPCase(caseData);
     if (!validation.valid) {
@@ -576,6 +625,88 @@ const IPCaseModal = ({ open, onClose, onSave, editCase }: IPCaseModalProps) => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Device-associated infection section */}
+            <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
+              <Label className="text-xs font-semibold text-primary mb-3 block">Device-associated infection / HAI</Label>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="deviceAssociated"
+                  checked={formData.deviceAssociated}
+                  onCheckedChange={(v) => setFormData(p => ({ ...p, deviceAssociated: !!v }))}
+                />
+                <label htmlFor="deviceAssociated" className="text-sm cursor-pointer">Device-associated (e.g., CAUTI/CLABSI)</label>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">HAI Type</Label>
+                  <Select value={formData.haiType} onValueChange={(v: any) => setFormData(p => ({ ...p, haiType: v }))}>
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {HAI_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">Use MDRO for tracking if no device is involved.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Device type (if device-associated)</Label>
+                  <Select
+                    value={formData.deviceType}
+                    onValueChange={(v: any) => setFormData(p => ({ ...p, deviceType: v }))}
+                    disabled={!formData.deviceAssociated}
+                  >
+                    <SelectTrigger className="text-sm">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DEVICE_TYPE_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value || 'none'} value={opt.value || 'none'}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Lab confirmed</Label>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Checkbox
+                      id="labConfirmed"
+                      checked={formData.labConfirmed}
+                      onCheckedChange={(v) => setFormData(p => ({ ...p, labConfirmed: !!v }))}
+                    />
+                    <label htmlFor="labConfirmed" className="text-sm cursor-pointer">Yes</label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Event detected date</Label>
+                  <Input
+                    type="date"
+                    value={formData.eventDetectedDate}
+                    onChange={(e) => setFormData(p => ({ ...p, eventDetectedDate: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Specimen collected date</Label>
+                  <Input
+                    type="date"
+                    value={formData.specimenCollectedDate}
+                    onChange={(e) => setFormData(p => ({ ...p, specimenCollectedDate: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
               </div>
             </div>
 
