@@ -70,6 +70,7 @@ export interface ABTRecord {
 
 export type HAIType = 'CAUTI' | 'CLABSI' | 'MDRO' | 'SSI' | 'Other';
 export type DeviceType = 'Urinary catheter' | 'Central line' | 'Other';
+export type LabConfirmedStatus = 'Confirmed' | 'Suspected';
 
 export interface IPCase {
   id: string;
@@ -130,7 +131,7 @@ export interface IPCase {
   deviceType?: DeviceType | '';
   eventDetectedDate?: string;
   specimenCollectedDate?: string;
-  labConfirmed?: boolean;
+  labConfirmedStatus?: LabConfirmedStatus | '';
 }
 
 export interface VaxRecord {
@@ -248,7 +249,7 @@ export interface Note {
   updated_at?: string;
   // Symptom tracking fields
   symptoms?: string[];
-  symptomCategory?: SymptomCategory;
+  symptomCategory?: string;
   requiresFollowUp?: boolean;
   followUpDate?: string;
   followUpStatus?: 'pending' | 'completed' | 'escalated';
@@ -302,7 +303,7 @@ export interface LineListingRecommendation {
   unit: string;
   room: string;
   infectionSource: string;
-  category: SymptomCategory;
+  category: string;
   startDate?: string;
   createdAt: string;
 }
@@ -406,6 +407,7 @@ export interface AppSettings {
     hideMRN: boolean;
     hideDOB: boolean;
     hidePhysician: boolean;
+    hideNotes: boolean;
     hideNotes: boolean;
     initialsOnly: boolean;
   };
