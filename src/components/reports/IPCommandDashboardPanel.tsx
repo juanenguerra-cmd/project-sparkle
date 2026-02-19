@@ -10,6 +10,7 @@ import { loadDB } from '@/lib/database';
 import { buildSurveyPack, type SurveyPackType } from '@/lib/pdf/surveyPackPdf';
 
 const PACKET_OPTIONS = [
+  { id: 'survey_packet', label: 'Survey Packet (All Requested Reports)', packType: 'survey_all' as SurveyPackType },
   { id: 'survey_entrance', label: 'Survey Entrance', packType: 'audit' as SurveyPackType },
   { id: 'monthly', label: 'Monthly', packType: 'precautions' as SurveyPackType },
   { id: 'outbreak', label: 'Outbreak', packType: 'audit' as SurveyPackType },
