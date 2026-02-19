@@ -20,7 +20,8 @@ import {
   Outbreak,
   ContactEntry,
   SymptomCategory,
-  SYMPTOM_OPTIONS
+  SYMPTOM_OPTIONS,
+  LabConfirmedStatus
 } from './types';
 import { isoDateFromAny, nowISO, canonicalMRN, mrnMatchKeys, todayISO, computeTxDays } from './parsers';
 import { storage, defaultSettings, defaultDatabase } from './storage';
@@ -150,6 +151,29 @@ const mergeDatabases = (remoteDb: ICNDatabase, localDb: ICNDatabase): ICNDatabas
       ...localDb.settings,
     },
   };
+};
+
+const normalizeLabConfirmedStatus = (value: unknown): LabConfirmedStatus | '' => {
+  if (value === null || value === undefined) return '';
+
+  if (typeof value === 'boolean') return value ? 'Confirmed' : 'Suspected';
+
+  const s = String(value).trim().toLowerCase();
+  if (!s) return '';
+
+  // Common “truthy” variants
+  if (['confirmed', 'confirm', 'c', 'true', 'yes', 'y', 'positive', 'pos'].includes(s)) return 'Confirmed';
+
+  // Common “falsy / suspected” variants
+  if (['suspected', 'suspect', 's', 'false', 'no', 'n', 'unconfirmed', 'pending', 'unknown', 'tbd', 'probable'].includes(s)) {
+    return 'Suspected';
+  }
+
+  // Pass-through for exact labels
+  if (s === 'confirmed') return 'Confirmed';
+  if (s === 'suspected') return 'Suspected';
+
+  return '';
 };
 
 /**
@@ -504,9 +528,20 @@ export const importDBFromJSON = async (
     if (Array.isArray(ipSource)) {
       const existingIds = new Set(db.records.ip_cases.map(r => r.id));
       ipSource.forEach((r: any) => {
-        if (!existingIds.has(r.id)) {
-          db.records.ip_cases.push(r);
+        if (existingIds.has(r.id)) return;
+
+        const migratedCase: any = { ...r };
+
+        // Backward-compatible migration: labConfirmed (boolean) -> labConfirmedStatus
+        if (migratedCase.labConfirmedStatus === undefined || migratedCase.labConfirmedStatus === null || migratedCase.labConfirmedStatus === '') {
+          migratedCase.labConfirmedStatus = normalizeLabConfirmedStatus(migratedCase.labConfirmed);
+        } else {
+          migratedCase.labConfirmedStatus = normalizeLabConfirmedStatus(migratedCase.labConfirmedStatus);
         }
+
+        delete migratedCase.labConfirmed;
+
+        db.records.ip_cases.push(migratedCase);
       });
     }
     
