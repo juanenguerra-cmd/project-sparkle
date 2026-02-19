@@ -105,6 +105,7 @@ interface ReportsViewProps {
 }
 
 const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => {
+  const REPORT_HISTORY_KEY = 'sparkle_report_history';
   const [executiveOpen, setExecutiveOpen] = useState(false);
   const [operationalOpen, setOperationalOpen] = useState(true);
   const [surveillanceOpen, setSurveillanceOpen] = useState(false);
@@ -113,6 +114,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [currentReport, setCurrentReport] = useState<ReportData | null>(null);
+  const [reportHistory, setReportHistory] = useState<ReportData[]>([]);
   const [trendReport, setTrendReport] = useState<InfectionTrendReport | null>(null);
   const [exportFormat, setExportFormat] = useState('PDF');
   const [printFontSize, setPrintFontSize] = useState<'normal' | 'compact'>('normal');
@@ -132,6 +134,28 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
 
   const db = loadDB();
 
+  useEffect(() => {
+    try {
+      const storedHistory = localStorage.getItem(REPORT_HISTORY_KEY);
+      if (!storedHistory) return;
+
+      const parsedHistory = JSON.parse(storedHistory);
+      if (Array.isArray(parsedHistory)) {
+        setReportHistory(parsedHistory);
+      }
+    } catch {
+      setReportHistory([]);
+    }
+  }, []);
+
+  const saveReportToHistory = (report: ReportData) => {
+    setReportHistory((previousHistory) => {
+      const nextHistory = [report, ...previousHistory.slice(0, 24)];
+      localStorage.setItem(REPORT_HISTORY_KEY, JSON.stringify(nextHistory));
+      return nextHistory;
+    });
+  };
+
   const surveillanceReports = [
     { id: 'surv_trend', name: 'Infection Surveillance Trend', description: 'Monthly infection counts by category with trending analysis' },
     { id: 'surv_acquired', name: 'Infections Acquired', description: 'Facility-acquired infections with onset dates and classification' },
@@ -150,6 +174,7 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
         const endDate = surveillanceToDate ? parseISO(surveillanceToDate) : new Date();
         const report = generateDeviceAssociatedInfectionReport(db, startDate, endDate, surveillanceDateField);
         setCurrentReport(report);
+        saveReportToHistory(report);
         toast.success(`Generated: ${report.title}`);
         return;
       }
@@ -201,6 +226,25 @@ const ReportsView = ({ surveyorMode = false, onNavigate }: ReportsViewProps) => 
                   <ReportListItem key={report.id} report={report} onGenerate={handleGenerateReport} onDescriptionChange={() => {}} />
                 ))}
               </div>
+
+              {reportHistory.length > 0 && (
+                <div className="mt-6 border rounded-lg p-4 bg-muted/20">
+                  <h4 className="text-sm font-semibold mb-3">Recent Reports</h4>
+                  <div className="space-y-2">
+                    {reportHistory.map((report, index) => (
+                      <button
+                        key={`${report.title}-${index}`}
+                        type="button"
+                        className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-muted transition-colors"
+                        onClick={() => setCurrentReport(report)}
+                      >
+                        <div className="font-medium">{report.title}</div>
+                        <div className="text-xs text-muted-foreground">{report.subtitle || 'No date range specified'}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div ref={reportRef}>
                 {currentReport && (
